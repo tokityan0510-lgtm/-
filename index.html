@@ -252,7 +252,7 @@ const STAGES = [
 const PRESTIGE_STAGE = 8;   // この素材に到達したら「砕く」が解放される
 // ブロックの価値の素材倍率（TUNE.valStage）
 const sv = s => Math.pow(TUNE.valStage, s);
-const TUNE = {fhp:4000, fhpLate:4000, fdmg:4000, gaugeBase:6000, gaugeA:2.5, gaugePow:3.3, lvBonus:.01, tapProg:1.5, dustBase:18, dustDiv:8, dustBonus:.001, pmultBonus:.1, idleBonus:5, idleRamp:30, feverReward:2, costX:3, valStage:1e4, modSpan:7, droneDmg:5, droneInt:1.5, bossHp:1500, bossGrow:1.35, bossReward:300, comboDecay:.6};
+const TUNE = {fhp:4000, fhpLate:4000, fdmg:4000, gaugeBase:8500, gaugeA:2.5, gaugePow:3.3, lvBonus:.01, tapProg:1.5, dustBase:18, dustDiv:8, dustBonus:.001, pmultBonus:.1, idleBonus:5, idleRamp:30, feverReward:2, costX:3, valStage:1e4, modSpan:7, droneDmg:5, droneInt:1.5, bossHp:1500, bossGrow:1.35, bossReward:300, comboDecay:.6};
 const DEFAULT = {
   coins:0, stage:0, lv:{}, mods:{}, equip:[], slots:2, best:0, ended:false, muted:false, t:0, idleRate:0, prog:0, started:false, kills:0, boss:null,
   sp:{}, ach:{}, dust:0, perm:{}, runs:0, buyMode:1, endSeen:false,
@@ -645,6 +645,7 @@ function fireDrone(d){
   bullets.push({x:d.x, y:d.y, vx:dx / len * v, vy:dy / len * v, tx, ty, j, life:len / v + .05});
   fx.shoot(d, tx, ty);
 }
+const armRate = () => 1 + (idleMult() - 1) / (TUNE.idleBonus - 1);
 const armPow = id => (1 + .25 * L(id + 'P')) * (id === 'cannon' && SP('cn1') ? 2 : 1);
 function fireArm(a, n){
   const j = droneTarget(); if (j === -1 && a.id !== 'laser') return;
@@ -672,7 +673,8 @@ function fireArm(a, n){
 function stepArms(dt){
   for (const a of ARMS){
     const n = L(a.id + 'N'); if (!n) continue;
-    armT[a.id] = (armT[a.id] || Math.random()) + dt * n / a.every;
+    // 放置中は兵器の連射が上がる（放置ボーナスが最大のとき2倍）
+    armT[a.id] = (armT[a.id] || Math.random()) + dt * n / a.every * armRate();
     while (armT[a.id] >= 1){ armT[a.id] -= 1; fireArm(a, n); }
   }
   const base = stat.dmg();
@@ -1509,7 +1511,7 @@ function anyAffordable(kind){
 function renderTabs(){
   tabsEl.innerHTML = TABS.map(([k, n]) => `<button class="tab" role="tab" data-tab="${k}" aria-selected="${tab === k}">${n}${tab !== k && anyAffordable(k) ? '<span class="dot"></span>' : ''}</button>`).join('');
 }
-const HINTS = {arms:'放置で勝手に戦ってくれる兵器。素材を進めるほど新しい兵器が手に入る（値段が届くようになる）。', idle:'ドローンは目を離していても撃ち続ける。放置の稼ぎはここで伸びる。', tap:'タップは加速役。叩くほどフィーバーゲージが溜まり、満タンで全部が速くなる。長押しで連打できる。', core:'ドローンにもタップにも効く土台の強化。', build:'モジュールは装備枠に入れたものだけが効く。組み合わせでビルドが決まる。', ach:'実績1個ごとに全部の報酬が+1%。', dust:'宇宙を砕くと星屑が手に入り、すべてがリセットされる代わりに永続強化が買える。'};
+const HINTS = {arms:'放置で勝手に戦ってくれる兵器。触らずにいるほど連射が上がる（最大2倍）。素材を進めるほど新しい兵器が手に入る。', idle:'ドローンは目を離していても撃ち続ける。放置の稼ぎはここで伸びる。', tap:'タップは加速役。叩くほどフィーバーゲージが溜まり、満タンで全部が速くなる。長押しで連打できる。', core:'ドローンにもタップにも効く土台の強化。', build:'モジュールは装備枠に入れたものだけが効く。組み合わせでビルドが決まる。', ach:'実績1個ごとに全部の報酬が+1%。', dust:'宇宙を砕くと星屑が手に入り、すべてがリセットされる代わりに永続強化が買える。'};
 function buyN(u){ return save.buyMode === 'max' ? Math.max(1, upMaxN(u)) : Math.min(save.buyMode, u.max - L(u.id)); }
 function sheetHtml(){
   let h = `<p class="hint">${HINTS[tab]}</p>`;
