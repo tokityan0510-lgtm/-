@@ -252,7 +252,7 @@ const STAGES = [
 const PRESTIGE_STAGE = 8;   // この素材に到達したら「砕く」が解放される
 // ブロックの価値の素材倍率（TUNE.valStage）
 const sv = s => Math.pow(TUNE.valStage, s);
-const TUNE = {fhp:4000, fhpLate:4000, fdmg:4000, gaugeBase:180000, gaugeA:6, gaugePow:3.3, tapProg:2, dustBase:18, dustDiv:8, dustBonus:.001, pmultBonus:.1, idleBonus:5, idleRamp:30, feverReward:2, costX:3, valStage:1e4, modSpan:7, droneDmg:5, droneInt:1.5, bossHp:1500, bossGrow:1.35, bossReward:300, comboDecay:.6};
+const TUNE = {fhp:4000, fhpLate:4000, fdmg:4000, gaugeBase:2000, gaugeA:2.5, gaugePow:3.3, lvBonus:.01, tapProg:2, dustBase:18, dustDiv:8, dustBonus:.001, pmultBonus:.1, idleBonus:5, idleRamp:30, feverReward:2, costX:3, valStage:1e4, modSpan:7, droneDmg:5, droneInt:1.5, bossHp:1500, bossGrow:1.35, bossReward:300, comboDecay:.6};
 const DEFAULT = {
   coins:0, stage:0, lv:{}, mods:{}, equip:[], slots:2, best:0, ended:false, muted:false, t:0, idleRate:0, prog:0, started:false, kills:0, boss:null,
   sp:{}, ach:{}, dust:0, perm:{}, runs:0, buyMode:1, endSeen:false,
@@ -364,7 +364,10 @@ const permMult = () => (1 + .01 * achCount()) * (1 + TUNE.pmultBonus * P('pmult'
 const idleMult = () => 1 + (TUNE.idleBonus - 1) * Math.min(1, lastTap / TUNE.idleRamp);
 const rewardMult = () => permMult() * idleMult() * (buffs.frenzy > 0 ? 7 : 1) * (fever > 0 ? TUNE.feverReward : 1);
 // 相場はその周だけの倍率なので、ボスゲージにも効く
-const comboMult = () => (1 + Math.sqrt(combo) * stat.chain()) * stat.market();
+// 強化ボーナス：どの強化でも1Lv買うごとに稼ぎ（とボスゲージの進み）が +lvBonus。特定の強化を買わなくても詰まらないように
+const lvTotal = () => { let n = 0; for (const k in save.lv) n += save.lv[k]; return n; };
+const lvMult = () => 1 + TUNE.lvBonus * lvTotal();
+const comboMult = () => (1 + Math.sqrt(combo) * stat.chain()) * stat.market() * lvMult();
 const luckyInterval = () => 110 * (SP('lk1') ? .75 : 1) * (SP('lk2') ? .75 : 1) * Math.pow(.85, P('plucky'));
 
 const stat = {
@@ -396,7 +399,7 @@ const blockHp = s => 300 * Math.pow(TUNE.fhp, Math.min(s, PRESTIGE_STAGE)) * Mat
 const bossK = () => Math.max(save.stage, save.kills);
 // 稼ぎの倍率は「相場」×「コンボ係数」で、どちらもボス撃破のたびに買えるLvに比例して伸びる（段階の2乗ほど）。
 // ゲージはそれに合わせて (1 + gaugeA×段階)² で伸ばし、さらに (1 + 段階)^gaugePow で後半ほど少し長くする
-const gaugeNeed = () => Math.round(TUNE.gaugeBase * Math.pow(1 + TUNE.gaugeA * bossK(), 2) * Math.pow(1 + bossK(), TUNE.gaugePow) * Math.pow(.92, P('pgauge')));
+const gaugeNeed = () => Math.round(TUNE.gaugeBase * (1 + TUNE.gaugeA * bossK()) * Math.pow(1 + bossK(), TUNE.gaugePow) * Math.pow(.92, P('pgauge')));
 const bossHp = () => blockHp(save.stage) * TUNE.bossHp * Math.pow(TUNE.bossGrow, bossK());
 const dustGain = () => { if (save.stage < PRESTIGE_STAGE) return 0; const lv = Math.log10(TUNE.valStage) / 5; return Math.floor(TUNE.dustBase * Math.pow(2, (Math.log10(Math.max(1, save.st.earnedRun)) - 37 * lv) / (TUNE.dustDiv * lv))); };
 
@@ -580,8 +583,9 @@ function breakBlock(i, burst, src, d = 0){
   blocks[i] = deadBlock();
   combo += 1; save.st.destroyed++;
   const gain = earn(b.value * comboMult() * rewardMult());
-  // ボスゲージは稼いだ額で進む（普通のブロック1個・倍率なし＝1。実績・星屑の倍率は除く）。直接タップで壊すと tapProg 倍
-  if (!boss){ save.prog += gain / permMult() / (100 * sv(save.stage)) * (src === 'tap' ? TUNE.tapProg : 1); if (save.prog >= gaugeNeed()) spawnBoss(null); }
+  // ボスゲージ：ブロックの価値 × 強化ボーナス × その場の倍率（フィーバー・放置・フレンジー）で進む。直接タップで壊すと tapProg 倍。
+  // コンボ・相場・実績・星屑はコインだけに効く（特定の強化に頼りきりにならないように）
+  if (!boss){ save.prog += b.value / (100 * sv(save.stage)) * lvMult() * rewardMult() / permMult() * (src === 'tap' ? TUNE.tapProg : 1); if (save.prog >= gaugeNeed()) spawnBoss(null); }
   const x = cx(i), y = cy(i);
   const nd = d + 1, kp = Math.pow(stat.keep(), nd);
   spawnShards(x, y, stat.shards() * burst, i, 0, nd);
@@ -1200,7 +1204,7 @@ const CHAIN_COLORS = [[0, '#ffffff'], [50, '#ffe14d'], [100, '#ff9a3c'], [250, '
 function hud(dt){
   const c = fmt(save.coins); if (c !== shownCoins){ coinsEl.textContent = c; shownCoins = c; }
   const im = idleMult(), rm = permMult();
-  const ps = (dispRate > 0 ? `毎秒 <b>+${fmt(dispRate)}</b>` : '') + (im > 1.05 ? `<span class="mul" style="color:var(--good)">放置 ×${im.toFixed(1)}</span>` : '') + (rm > 1.001 ? `<span class="mul">報酬 ×${fmtX(rm)}</span>` : '');
+  const ps = (dispRate > 0 ? `毎秒 <b>+${fmt(dispRate)}</b>` : '') + (im > 1.05 ? `<span class="mul" style="color:var(--good)">放置 ×${im.toFixed(1)}</span>` : '') + (lvTotal() ? `<span class="mul">強化 ×${fmtX(lvMult())}</span>` : '') + (rm > 1.001 ? `<span class="mul">報酬 ×${fmtX(rm)}</span>` : '');
   if (ps !== shownProd){ prodEl.innerHTML = ps; shownProd = ps; }
   feverFill.style.width = (fever > 0 ? Math.min(100, fever / stat.fever() * 100) : Math.min(100, heat)) + '%';
   feverEl.style.opacity = fever > 0 ? 1 : 0;
@@ -1234,7 +1238,7 @@ function etaText(){
 }
 function updateProgLabel(){ progText.textContent = boss ? 'ボス戦中' : (save.ended ? '次のボスまで（再戦）' : '次のボスまで') + etaText(); }
 el('prog').addEventListener('click', () => showToast('稼ぐほど進む',
-  'タップで直接壊すと2倍。コンボ・フィーバー・金ブロック・幸運ブロックで加速。強化の「相場」「コンボ係数」（共通タブ）がいちばん効く', 'ボスゲージ', 5000));
+  'どの強化でも1Lv買うごとに+1%（画面上の「強化 ×」）。タップで直接壊すと2倍。フィーバー・放置ボーナス・金ブロック・幸運ブロックでも加速', 'ボスゲージ', 5000));
 const muteBtn = el('mute');
 function syncMute(){ muteBtn.textContent = save.muted ? '🔇' : '🔊'; muteBtn.setAttribute('aria-label', save.muted ? '音を出す' : '音を消す'); }
 muteBtn.addEventListener('click', () => { save.muted = !save.muted; syncMute(); persist(); initAudio(); });
