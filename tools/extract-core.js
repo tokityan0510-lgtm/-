@@ -11,5 +11,5 @@ fs.writeFileSync('core.js', core + `
 // 調整用：環境変数 TUNE='{"gaugeLate":1.5}' で数値を差し替えられる
 Object.assign(TUNE, JSON.parse(process.env.TUNE || '{}'));
 module.exports = { get save(){ return save; }, setSave, DEFAULT, L, ML, M, SP, P, UPG, MODS, SPECIALS, PERM, STAGES, PRESTIGE_STAGE, SLOT_COST, upCost, modCost, slotCost, spCost, permCost, stat, layout, buildGrid, step, tap, cx, cy, fmt,
-  checkAch, prestige, dustGain, ACH, get blocks(){ return blocks; }, get boss(){ return boss; }, get lucky(){ return lucky; }, get combo(){ return combo; }, get fever(){ return fever; }, setState(s){ state = s; }, fx };
+  checkAch, prestige, dustGain, ACH, gaugeNeed, comboMult, rewardMult, permMult, get blocks(){ return blocks; }, get boss(){ return boss; }, get lucky(){ return lucky; }, get combo(){ return combo; }, get fever(){ return fever; }, setState(s){ state = s; }, fx };
 `);
