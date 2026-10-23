@@ -56,7 +56,7 @@ const ARMS = [
 const UPG = [
   // 放置
   {cat:'idle', id:'drones',   name:'ドローンの台数', note:'勝手に撃ち続けるドローン',           cost:800,   span:10, max:11,  v:l => `${1+l+P('pdrone')}台`},
-  {cat:'idle', id:'droneint', name:'連射速度',       note:'ドローンが撃つ間隔',                 cost:600,   span:9,  max:14,  v:l => `${(TUNE.droneInt*Math.pow(.85,l)*(SP('rl1')?.8:1)).toFixed(2)}秒`},
+  {cat:'idle', id:'droneint', name:'連射速度',       note:'ドローンが撃つ間隔',                 cost:600,   span:9,  max:8,  v:l => `${(TUNE.droneInt*Math.pow(.85,l)*(SP('rl1')?.8:1)).toFixed(2)}秒`},
   {cat:'idle', id:'dronedmg', name:'弾の威力',       note:'ドローンの弾が与えるダメージ（上限なし）', cost:900, inf:true, g:1.2, max:1e9, v:l => `×${fmtX(TUNE.droneDmg*(1+.25*l))}`},
   {cat:'idle', id:'spawn',    name:'共鳴',           note:'1秒ごとに、直前1秒に与えたダメージの一部をもう一度与える', cost:1200, span:8, max:15, v:l => l ? `${Math.round(stat.reso(l)*100)}%` : 'なし'},
   {cat:'idle', id:'drburst',  name:'弾の炸裂',       note:'弾が当たったとき飛び散るかけら',     cost:2500,  span:8,  max:10,  v:l => `+${l*2*(SP('bu1')?2:1)}個`},
@@ -96,7 +96,7 @@ const SPECIALS = [
   {cat:'idle', id:'dr3', name:'ドローン改良 III', note:'ドローンの弾の威力 ×2',               ref:['drones',9],   req:() => L('drones') >= 9, rq:'ドローンの台数 Lv9'},
   {cat:'idle', id:'dr4', name:'ドローン軍団',     note:'ドローンの弾の威力 ×2',               ref:['drones',11],   req:() => L('drones') >= 11, rq:'ドローンの台数 Lv11'},
   {cat:'idle', id:'rl1', name:'速射機構',         note:'ドローンの発射間隔 ×0.8',             ref:['droneint',5],   req:() => L('droneint') >= 5, rq:'連射速度 Lv5'},
-  {cat:'idle', id:'rl2', name:'二連装',           note:'ドローンが2発同時に撃つ',             ref:['droneint',10],   req:() => L('droneint') >= 10, rq:'連射速度 Lv10'},
+  {cat:'idle', id:'rl2', name:'二連装',           note:'ドローンが2発同時に撃つ',             ref:['droneint',8],    req:() => L('droneint') >= 8, rq:'連射速度 Lv8'},
   {cat:'idle', id:'sp1', name:'大共鳴',           note:'共鳴の威力 ×2',                       ref:['spawn',5],   req:() => L('spawn') >= 5, rq:'共鳴 Lv5'},
   {cat:'idle', id:'bu1', name:'榴弾',             note:'弾の炸裂で飛ぶ破片 ×2',               ref:['drburst',5],   req:() => L('drburst') >= 5, rq:'弾の炸裂 Lv5'},
   {cat:'arms', id:'cn1', name:'徹甲弾',           note:'砲台の威力 ×2・爆発範囲 ×1.2',        ref:['cannonN',3], req:() => L('cannonN') >= 3, rq:'砲台の数 Lv3'},
@@ -169,7 +169,7 @@ const stat = {
   drones:   () => Math.min(12, 1 + L('drones') + P('pdrone')),
   droneInt: () => TUNE.droneInt * Math.pow(.85, L('droneint')) * (SP('rl1') ? .8 : 1) * (buffs.barrage > 0 ? .125 : 1),
   droneDmg: () => TUNE.droneDmg * (1 + .25 * L('dronedmg')) * (SP('dr1') ? 1.5 : 1) * (SP('dr2') ? 1.5 : 1) * (SP('dr3') ? 2 : 1) * (SP('dr4') ? 2 : 1),
-  reso:     (l = L('spawn')) => .04 * l * (SP('sp1') ? 2 : 1),
+  reso:     (l = L('spawn')) => .02 * l * (SP('sp1') ? 2 : 1),
   drburst:  () => L('drburst') * 2 * (SP('bu1') ? 2 : 1),
   tapburst: () => 2 + L('tapburst'),
   tapPow:   () => SP('tp1') ? 2 : 1,
