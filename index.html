@@ -352,7 +352,9 @@ const permCost = p => Math.ceil(p.cost * Math.pow(p.g, P(p.id)));
 const buffs = {frenzy:0, barrage:0, awaken:0, storm:0};
 const BUFF_INFO = {frenzy:['フレンジー 報酬×7', '#ffd84d'], barrage:['弾幕 連射×8', '#4cc9ff'], awaken:['覚醒 クリティカル100%', '#ffe14d'], storm:['破片嵐', '#ff4c88']};
 const achCount = () => Object.keys(save.ach).length;
-const rewardMult = () => (1 + .01 * achCount()) * (1 + TUNE.pmultBonus * P('pmult')) * (1 + TUNE.dustBonus * save.st.bestDust) * (buffs.frenzy > 0 ? 7 : 1) * (fever > 0 ? 3 : 1);
+// ずっと残る倍率（実績・星屑）。ボスゲージの進みからは除く（周回で極端に速くならないように）
+const permMult = () => (1 + .01 * achCount()) * (1 + TUNE.pmultBonus * P('pmult')) * (1 + TUNE.dustBonus * save.st.bestDust);
+const rewardMult = () => permMult() * (buffs.frenzy > 0 ? 7 : 1) * (fever > 0 ? 3 : 1);
 const comboMult = () => 1 + Math.sqrt(combo) * stat.chain();
 const luckyInterval = () => 110 * (SP('lk1') ? .75 : 1) * (SP('lk2') ? .75 : 1) * Math.pow(.85, P('plucky'));
 
@@ -562,8 +564,8 @@ function breakBlock(i, burst, src, d = 0){
   blocks[i] = deadBlock();
   combo += 1; save.st.destroyed++;
   const gain = earn(b.value * comboMult() * rewardMult());
-  // ボスゲージは稼いだ額で進む（普通のブロック1個・倍率なし＝1）。直接タップで壊すと tapProg 倍
-  if (!boss){ save.prog += gain / (100 * sv(save.stage)) * (src === 'tap' ? TUNE.tapProg : 1); if (save.prog >= gaugeNeed()) spawnBoss(null); }
+  // ボスゲージは稼いだ額で進む（普通のブロック1個・倍率なし＝1。実績・星屑の倍率は除く）。直接タップで壊すと tapProg 倍
+  if (!boss){ save.prog += gain / permMult() / (100 * sv(save.stage)) * (src === 'tap' ? TUNE.tapProg : 1); if (save.prog >= gaugeNeed()) spawnBoss(null); }
   const x = cx(i), y = cy(i);
   const nd = d + 1, kp = Math.pow(stat.keep(), nd);
   spawnShards(x, y, stat.shards() * burst, i, 0, nd);
