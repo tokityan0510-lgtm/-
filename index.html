@@ -252,7 +252,7 @@ const STAGES = [
 const PRESTIGE_STAGE = 8;   // この素材に到達したら「砕く」が解放される
 // ブロックの価値の素材倍率（TUNE.valStage）
 const sv = s => Math.pow(TUNE.valStage, s);
-const TUNE = {fhp:4000, fhpLate:4000, fdmg:4000, gaugeBase:120000, gaugeA:6, gaugePow:3.3, tapProg:2, dustBase:18, dustDiv:8, dustBonus:.001, pmultBonus:.1, idleBonus:5, idleRamp:30, feverReward:2, costX:3, valStage:1e4, modSpan:5, droneDmg:5, droneInt:1.5, bossHp:1500, bossGrow:1.35, bossReward:300, comboDecay:.6};
+const TUNE = {fhp:4000, fhpLate:4000, fdmg:4000, gaugeBase:120000, gaugeA:6, gaugePow:3.3, tapProg:2, dustBase:18, dustDiv:8, dustBonus:.001, pmultBonus:.1, idleBonus:5, idleRamp:30, feverReward:2, costX:3, valStage:1e4, modSpan:7, droneDmg:5, droneInt:1.5, bossHp:1500, bossGrow:1.35, bossReward:300, comboDecay:.6};
 const DEFAULT = {
   coins:0, stage:0, lv:{}, mods:{}, equip:[], slots:2, best:0, ended:false, muted:false, t:0, idleRate:0, prog:0, started:false, kills:0, boss:null,
   sp:{}, ach:{}, dust:0, perm:{}, runs:0, buyMode:1, endSeen:false,
@@ -341,7 +341,7 @@ const PERM = [
   {id:'pkeep',  name:'モジュール記憶', note:'砕いてもモジュールのLvが残る',          cost:80, g:1,   max:1,  v:l => l ? '有効' : '無効'},
   {id:'pcrit',  name:'星の眼',         note:'クリティカル率 +5%',                    cost:15, g:1.8, max:4,  v:l => `+${5*l}%`},
 ];
-const SLOT_COST = [0, 0, 3e5, 1e8], SLOT_STAGE = [0, 0, 2, 6];
+const SLOT_COST = [0, 0, 3e5, 1e8], SLOT_STAGE = [0, 0, 1, 4];
 const upG = u => u.inf ? u.g : Math.pow(TUNE.valStage, u.span / u.max);
 const upCost  = (u, l = L(u.id)) => Math.ceil(u.cost * TUNE.costX * Math.pow(upG(u), l));
 const upCostN = (u, n) => { let s = 0; for (let k = 0; k < n; k++) s += upCost(u, L(u.id) + k); return s; };
