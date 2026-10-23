@@ -22,7 +22,7 @@ function run(mode, maxMin = 120, dt = 1/30, fresh = true){
       // 人間らしい買い方：買えるものからランダムに6件。半分はまとめ買い（×MAX）、残りは1Lv
       for (let k = 0; k < 6; k++){
         const opts = [];
-        for (const u of G.UPG) if (G.L(u.id) < u.max && G.upCost(u) <= save.coins) opts.push(() => { let n = Math.random() < .5 ? 1e9 : 1; while (n-- > 0 && G.L(u.id) < u.max && G.upCost(u) <= save.coins){ save.coins -= G.upCost(u); save.lv[u.id] = G.L(u.id) + 1; } });
+        for (const u of G.UPG) if (!(process.env.SKIP || '').split(',').includes(u.id) && G.L(u.id) < u.max && G.upCost(u) <= save.coins) opts.push(() => { let n = Math.random() < .5 ? 1e9 : 1; while (n-- > 0 && G.L(u.id) < u.max && G.upCost(u) <= save.coins){ save.coins -= G.upCost(u); save.lv[u.id] = G.L(u.id) + 1; } });
         for (const s of G.SPECIALS) if (!G.SP(s.id) && s.req() && G.spCost(s) <= save.coins) opts.push(() => { save.coins -= G.spCost(s); save.sp[s.id] = 1; });
         for (const m of G.MODS) if (G.ML(m.id) < m.max && G.modCost(m) <= save.coins) opts.push(() => { save.coins -= G.modCost(m); const w = G.ML(m.id); save.mods[m.id] = w + 1; if (!w && save.equip.length < save.slots) save.equip.push(m.id); });
         if (save.slots < 4 && G.slotCost() <= save.coins) opts.push(() => { save.coins -= G.slotCost(); save.slots++; });
