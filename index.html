@@ -252,7 +252,9 @@ const STAGES = [
 const PRESTIGE_STAGE = 8;   // この素材に到達したら「砕く」が解放される
 const F_VAL = 1e5;
 const sv = s => Math.pow(F_VAL, s);
-const TUNE = {fhp:4000, fhpLate:3000, fdmg:2000, gaugeBase:300, gaugeGrow:1.85, gaugeCapK:11, gaugeLate:1.85, tapProg:3, dustBase:18, dustDiv:8, dustBonus:.005, pmultBonus:.25, costX:1, droneDmg:2, droneInt:3, bossHp:1500, bossGrow:1.35, bossReward:300, comboDecay:.6};
+// 値段は価値の伸びに加えて、コンボや金ブロックなど倍率の積み上がりぶん（costStage）も上乗せする
+const priceSv = s => sv(s) * Math.pow(TUNE.costStage, s);
+const TUNE = {fhp:4000, fhpLate:3000, fdmg:2000, gaugeBase:300, gaugeGrow:1.85, gaugeCapK:11, gaugeLate:1.85, tapProg:3, dustBase:18, dustDiv:8, dustBonus:.005, pmultBonus:.25, costX:3, costStage:2.5, droneDmg:5, droneInt:1.5, bossHp:1500, bossGrow:1.35, bossReward:300, comboDecay:.6};
 const DEFAULT = {
   coins:0, stage:0, lv:{}, mods:{}, equip:[], slots:2, best:0, ended:false, muted:false, t:0, idleRate:0, prog:0, started:false, kills:0, boss:null,
   sp:{}, ach:{}, dust:0, perm:{}, runs:0, buyMode:1, endSeen:false,
@@ -330,7 +332,7 @@ const PERM = [
   {id:'pdrone', name:'初期ドローン',   note:'最初からドローンが多い',                cost:8,  g:1.8, max:5,  v:l => `+${l}台`},
   {id:'pstage', name:'先の素材から',   note:'砕いたあと、先の素材から始まる',        cost:10, g:1.8, max:7,  v:l => l ? `${STAGES[l].name}から` : '木箱から'},
   {id:'plucky', name:'幸運の軌道',     note:'幸運ブロックの出現間隔 −15%',           cost:12, g:1.7, max:5,  v:l => `−${Math.round((1-Math.pow(.85,l))*100)}%`},
-  {id:'pgauge', name:'因果の短縮',     note:'ボス出現までに壊す数 −15%',             cost:6,  g:1.9, max:5,  v:l => `−${Math.round((1-Math.pow(.85,l))*100)}%`},
+  {id:'pgauge', name:'因果の短縮',     note:'ボス出現に必要な稼ぎ −15%',             cost:6,  g:1.9, max:5,  v:l => `−${Math.round((1-Math.pow(.85,l))*100)}%`},
   {id:'pauto',  name:'自動タップ',     note:'毎秒勝手にタップする（熱量は半分。幸運ブロックは叩かない）', cost:40, g:2.2, max:3, v:l => `毎秒${l}回`},
   {id:'poff',   name:'長期休暇',       note:'オフライン収入の上限時間 +4時間',      cost:10, g:1.7, max:4,  v:l => `${8+4*l}時間`},
   {id:'pslot',  name:'広い装備枠',     note:'最初から装備枠が多い',                  cost:30, g:2.5, max:2,  v:l => `${2+l}枠から`},
@@ -338,12 +340,12 @@ const PERM = [
   {id:'pcrit',  name:'星の眼',         note:'クリティカル率 +5%',                    cost:15, g:1.8, max:4,  v:l => `+${5*l}%`},
 ];
 const SLOT_COST = [0, 0, 3e5, 1e8];
-const upCost  = (u, l = L(u.id)) => Math.ceil(u.cost * TUNE.costX * Math.pow(u.g, l) * sv(save.stage));
+const upCost  = (u, l = L(u.id)) => Math.ceil(u.cost * TUNE.costX * Math.pow(u.g, l) * priceSv(save.stage));
 const upCostN = (u, n) => { let s = 0; for (let k = 0; k < n; k++) s += upCost(u, L(u.id) + k); return s; };
 const upMaxN  = u => { let n = 0, s = 0; while (L(u.id) + n < u.max){ const c = upCost(u, L(u.id) + n); if (s + c > save.coins) break; s += c; n++; } return n; };
-const modCost = m => Math.ceil((ML(m.id) ? m.cost * Math.pow(m.g, ML(m.id) - 1) : m.unlock) * TUNE.costX * sv(save.stage));
-const slotCost = () => SLOT_COST[save.slots] * TUNE.costX * sv(save.stage);
-const spCost = s => Math.ceil(s.cost * TUNE.costX * sv(save.stage));
+const modCost = m => Math.ceil((ML(m.id) ? m.cost * Math.pow(m.g, ML(m.id) - 1) : m.unlock) * TUNE.costX * priceSv(save.stage));
+const slotCost = () => SLOT_COST[save.slots] * TUNE.costX * priceSv(save.stage);
+const spCost = s => Math.ceil(s.cost * TUNE.costX * priceSv(save.stage));
 const permCost = p => Math.ceil(p.cost * Math.pow(p.g, P(p.id)));
 
 // 幸運ブロックの効果（バフ）
@@ -560,7 +562,8 @@ function breakBlock(i, burst, src, d = 0){
   blocks[i] = deadBlock();
   combo += 1; save.st.destroyed++;
   const gain = earn(b.value * comboMult() * rewardMult());
-  if (!boss){ save.prog += (src === 'tap' ? TUNE.tapProg : 1) * (fever > 0 ? 2 : 1); if (save.prog >= gaugeNeed()) spawnBoss(null); }
+  // ボスゲージは稼いだ額で進む（普通のブロック1個・倍率なし＝1）。直接タップで壊すと tapProg 倍
+  if (!boss){ save.prog += gain / (100 * sv(save.stage)) * (src === 'tap' ? TUNE.tapProg : 1); if (save.prog >= gaugeNeed()) spawnBoss(null); }
   const x = cx(i), y = cy(i);
   const nd = d + 1, kp = Math.pow(stat.keep(), nd);
   spawnShards(x, y, stat.shards() * burst, i, 0, nd);
@@ -1178,7 +1181,7 @@ function hud(dt){
   feverFill.style.width = (fever > 0 ? Math.min(100, fever / stat.fever() * 100) : Math.min(100, heat)) + '%';
   feverEl.style.opacity = fever > 0 ? 1 : 0;
   if (boss){ progFill.classList.add('boss'); progFill.style.width = Math.max(0, boss.hp / boss.max * 100) + '%'; progNum.textContent = fmt(Math.max(0, boss.hp)); }
-  else { progFill.classList.remove('boss'); progFill.style.width = Math.min(100, save.prog / gaugeNeed() * 100) + '%'; progNum.textContent = `${save.prog.toLocaleString('ja-JP')} / ${gaugeNeed().toLocaleString('ja-JP')}`; }
+  else { progFill.classList.remove('boss'); progFill.style.width = Math.min(100, save.prog / gaugeNeed() * 100) + '%'; progNum.textContent = `${fmt(save.prog)} / ${fmt(gaugeNeed())}`; }
   const cm = Math.floor(combo);
   if (cm >= 5){
     if (cm !== shownChain){
