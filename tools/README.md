@@ -4,7 +4,7 @@
 
 ```sh
 cd tools
-node extract-core.js ../rensa-hakai.html   # core.js を生成
+node extract-core.js ../index.html   # core.js を生成
 node bot.js            # 放置のみ / タップあり の両方（最大120分）
 node bot.js idle 60    # 放置のみ、最大60分
 node bot.js tap 60     # 0.17秒ごとにタップ
