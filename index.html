@@ -252,7 +252,7 @@ const STAGES = [
 const PRESTIGE_STAGE = 8;   // この素材に到達したら「砕く」が解放される
 // ブロックの価値の素材倍率（TUNE.valStage）
 const sv = s => Math.pow(TUNE.valStage, s);
-const TUNE = {fhp:4000, fhpLate:4000, fdmg:4000, gaugeBase:6000, gaugeA:2.5, gaugePow:3.3, lvBonus:.01, tapProg:2, dustBase:18, dustDiv:8, dustBonus:.001, pmultBonus:.1, idleBonus:5, idleRamp:30, feverReward:2, costX:3, valStage:1e4, modSpan:7, droneDmg:5, droneInt:1.5, bossHp:1500, bossGrow:1.35, bossReward:300, comboDecay:.6};
+const TUNE = {fhp:4000, fhpLate:4000, fdmg:4000, gaugeBase:6000, gaugeA:2.5, gaugePow:3.3, lvBonus:.01, tapProg:1.5, dustBase:18, dustDiv:8, dustBonus:.001, pmultBonus:.1, idleBonus:5, idleRamp:30, feverReward:2, costX:3, valStage:1e4, modSpan:7, droneDmg:5, droneInt:1.5, bossHp:1500, bossGrow:1.35, bossReward:300, comboDecay:.6};
 const DEFAULT = {
   coins:0, stage:0, lv:{}, mods:{}, equip:[], slots:2, best:0, ended:false, muted:false, t:0, idleRate:0, prog:0, started:false, kills:0, boss:null,
   sp:{}, ach:{}, dust:0, perm:{}, runs:0, buyMode:1, endSeen:false,
@@ -276,10 +276,10 @@ const UPG = [
   {cat:'idle', id:'spawn',    name:'落下衝撃',       note:'落ちてきたブロックが、着地した下のブロックにダメージ', cost:1200, span:8, max:15, v:l => l ? `威力×${fmtX(.6*l*(SP('sp1')?2:1))}` : 'なし'},
   {cat:'idle', id:'drburst',  name:'弾の炸裂',       note:'弾が当たったとき追加で飛ぶ破片',     cost:2500,  span:8,  max:10,  v:l => `+${l*2*(SP('bu1')?2:1)}個`},
   // 操作
-  {cat:'tap',  id:'tapburst', name:'タップの破片',   note:'タップで壊したときの破片の倍率',     cost:500,   span:9,  max:20,  v:l => `×${2+l}`},
+  {cat:'tap',  id:'tapburst', name:'タップの破片',   note:'タップで壊したときの破片の倍率',     cost:500,   span:9,  max:10,  v:l => `×${2+l}`},
   {cat:'tap',  id:'heat',     name:'熱量',           note:'1タップで溜まるフィーバーゲージ',     cost:1500,  span:7,  max:12,  v:l => `+${((8+2*l)*(SP('ht1')?1.5:1)).toFixed(0)}`},
   {cat:'tap',  id:'fever',    name:'フィーバー',     note:'ゲージ満タンで報酬2倍・威力2倍になる時間', cost:4000, span:8, max:10, v:l => `${5+l}秒`},
-  {cat:'tap',  id:'tapboom',  name:'衝撃波',         note:'タップした周りのブロックにもダメージ', cost:3000, span:8,  max:8,   v:l => l ? `半径${(1+.3*l+(SP('sw1')?1:0)).toFixed(1)}・威力×${l*2}` : 'なし'},
+  {cat:'tap',  id:'tapboom',  name:'衝撃波',         note:'タップした周りのブロックにもダメージ', cost:3000, span:8,  max:5,   v:l => l ? `半径${(1+.3*l+(SP('sw1')?1:0)).toFixed(1)}・威力×${l*2}` : 'なし'},
   // 共通
   {cat:'core', id:'market',   name:'相場',           note:'すべてのブロックの価値が上がる（上限なし）', cost:1000, inf:true, g:1.15, max:1e9, v:l => `+${(l*10).toLocaleString('ja-JP')}%`},
   {cat:'core', id:'chain',    name:'コンボ係数',     note:'コンボが高いほど報酬が増える（上限なし）', cost:5000, inf:true, g:1.22, max:1e9, v:l => `${(0.1+0.05*l).toFixed(2)}`},
@@ -311,7 +311,7 @@ const SPECIALS = [
   {cat:'idle', id:'sp1', name:'重力加速',         note:'落下衝撃の威力 ×2',                   ref:['spawn',5],   req:() => L('spawn') >= 5, rq:'落下衝撃 Lv5'},
   {cat:'idle', id:'bu1', name:'榴弾',             note:'弾の炸裂で飛ぶ破片 ×2',               ref:['drburst',5],   req:() => L('drburst') >= 5, rq:'弾の炸裂 Lv5'},
   {cat:'tap',  id:'tp1', name:'鉄拳',             note:'タップのボスへの威力と衝撃波 ×2',     ref:['tapburst',5],   req:() => L('tapburst') >= 5, rq:'タップの破片 Lv5'},
-  {cat:'tap',  id:'tp2', name:'連打の達人',       note:'長押しの連打が速くなる（0.17秒→0.11秒）', ref:['tapburst',10], req:() => L('tapburst') >= 10, rq:'タップの破片 Lv10'},
+  {cat:'tap',  id:'tp2', name:'連打の達人',       note:'長押しの連打が速くなる（毎秒4回→6回）', ref:['tapburst',10], req:() => L('tapburst') >= 10, rq:'タップの破片 Lv10'},
   {cat:'tap',  id:'ht1', name:'発熱体',           note:'タップで溜まる熱量 ×1.5',             ref:['heat',5],   req:() => L('heat') >= 5, rq:'熱量 Lv5'},
   {cat:'tap',  id:'fv1', name:'延長戦',           note:'フィーバー中もタップで熱量が溜まり、時間が延びる', ref:['fever',5], req:() => L('fever') >= 5, rq:'フィーバー Lv5'},
   {cat:'tap',  id:'sw1', name:'衝撃波拡大',       note:'衝撃波の半径 +1',                     ref:['tapboom',4],   req:() => L('tapboom') >= 4, rq:'衝撃波 Lv4'},
@@ -391,7 +391,7 @@ const stat = {
   gold:     () => Math.min(.2, .01 + .01 * L('gold')),
   keep:     () => .65 + .025 * L('keep'),
   decay:    () => TUNE.comboDecay * (SP('cb1') ? .5 : 1) * (SP('cb2') ? .5 : 1),
-  holdMs:   () => SP('tp2') ? 110 : 170,
+  holdMs:   () => SP('tp2') ? 170 : 250,
 };
 // 暗黒物質以降はHPの伸びをダメージと揃える（差が積み重なって終盤だけ詰まるのを防ぐ）
 const blockHp = s => 300 * Math.pow(TUNE.fhp, Math.min(s, PRESTIGE_STAGE)) * Math.pow(TUNE.fhpLate, Math.max(0, s - PRESTIGE_STAGE));
@@ -528,7 +528,7 @@ function tap(x, y, auto){
   if (fever > 0){ if (SP('fv1')) fever = Math.min(fv * 2, fever + stat.heat() / 100 * fv * .5); }
   else { heat += stat.heat() * (auto ? .5 : 1); if (heat >= 100){ heat = 0; fever = fv; save.st.fevers++; fx.fever(); } }
   const i = cellAt(x, y);
-  if (i >= 0 && blocks[i].boss && boss){ hitBoss(stat.dmg() * 25 * stat.tapPow(), 'tap'); spawnShards(x, y, stat.shards() * stat.tapburst(), i, 0); }
+  if (i >= 0 && blocks[i].boss && boss){ hitBoss(stat.dmg() * 10 * stat.tapPow(), 'tap'); spawnShards(x, y, stat.shards() * stat.tapburst(), i, 0); }
   else if (i >= 0 && blocks[i].alive) breakBlock(i, stat.tapburst(), auto ? 'auto' : 'tap');
   else spawnShards(x, y, stat.shards() * stat.tapburst(), i, 0);
   const tb = stat.tapboom();
@@ -1284,7 +1284,7 @@ function etaText(){
 }
 function updateProgLabel(){ progText.textContent = boss ? 'ボス戦中' : (save.ended ? '次のボスまで（再戦）' : '次のボスまで') + etaText(); }
 el('prog').addEventListener('click', () => showToast('稼ぐほど進む',
-  'どの強化でも1Lv買うごとに+1%（画面上の「強化 ×」）。タップで直接壊すと2倍。フィーバー・放置ボーナス・金ブロック・幸運ブロックでも加速', 'ボスゲージ', 5000));
+  'どの強化でも1Lv買うごとに+1%（画面上の「強化 ×」）。タップで直接壊すと1.5倍。フィーバー・放置ボーナス・金ブロック・幸運ブロックでも加速', 'ボスゲージ', 5000));
 const muteBtn = el('mute');
 function syncMute(){ muteBtn.textContent = save.muted ? '🔇' : '🔊'; muteBtn.setAttribute('aria-label', save.muted ? '音を出す' : '音を消す'); }
 muteBtn.addEventListener('click', () => { save.muted = !save.muted; syncMute(); persist(); initAudio(); });
