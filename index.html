@@ -252,7 +252,7 @@ const STAGES = [
 const PRESTIGE_STAGE = 8;   // この素材に到達したら「砕く」が解放される
 const F_VAL = 1e5;
 const sv = s => Math.pow(F_VAL, s);
-const TUNE = {fhp:4000, fhpLate:3000, fdmg:2000, gaugeBase:300, gaugeGrow:1.75, gaugeCapK:7, gaugeLate:1.3, tapProg:3, dustBase:18, dustDiv:8, dustBonus:.005, pmultBonus:.25, bossHp:1500, bossGrow:1.35, bossReward:300, comboDecay:.6};
+const TUNE = {fhp:4000, fhpLate:3000, fdmg:2000, gaugeBase:300, gaugeGrow:1.85, gaugeCapK:11, gaugeLate:1.85, tapProg:3, dustBase:18, dustDiv:8, dustBonus:.005, pmultBonus:.25, bossHp:1500, bossGrow:1.35, bossReward:300, comboDecay:.6};
 const DEFAULT = {
   coins:0, stage:0, lv:{}, mods:{}, equip:[], slots:2, best:0, ended:false, muted:false, t:0, idleRate:0, prog:0, started:false, kills:0, boss:null,
   sp:{}, ach:{}, dust:0, perm:{}, runs:0, buyMode:1, endSeen:false,
@@ -376,7 +376,7 @@ const stat = {
 };
 // 暗黒物質以降はHPの伸びをダメージと揃える（差が積み重なって終盤だけ詰まるのを防ぐ）
 const blockHp = s => 300 * Math.pow(TUNE.fhp, Math.min(s, PRESTIGE_STAGE)) * Math.pow(TUNE.fhpLate, Math.max(0, s - PRESTIGE_STAGE));
-// 8体目以降は伸びを緩める（湧き速度の上限で終盤が頭打ちになるのを防ぐ）
+// gaugeCapK 体目以降は gaugeLate で伸ばす（今は同じ値。終盤だけ緩めたいときに使う）
 // 何体目か：先の素材から始めても軽くならないよう、素材の段階と撃破数の大きいほう
 const bossK = () => Math.max(save.stage, save.kills);
 const gaugeNeed = () => Math.round(TUNE.gaugeBase * Math.pow(TUNE.gaugeGrow, Math.min(bossK(), TUNE.gaugeCapK)) * Math.pow(TUNE.gaugeLate, Math.max(0, bossK() - TUNE.gaugeCapK)) * Math.pow(.85, P('pgauge')));
