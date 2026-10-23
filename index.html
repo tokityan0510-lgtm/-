@@ -265,6 +265,14 @@ const M = id => save.equip.includes(id) ? ML(id) : 0;
 const SP = id => !!save.sp[id];
 const P = id => save.perm[id] || 0;
 
+// ===== 兵器：放置で勝手に戦う。素材を進めるほど新しい兵器が手に入る =====
+//   st：手に入る目安の素材の段。n：最大台数。every：1台あたりの発射間隔（秒）。dmg：威力（破片1つの何倍か）
+const ARMS = [
+  {id:'cannon',  name:'砲台',           st:1, n:6, every:3.0, dmg:6,  note:'画面下の砲台が砲弾を撃ち、着弾した周りを吹き飛ばす'},
+  {id:'laser',   name:'レーザー',       st:2, n:5, every:4.5, dmg:8,  note:'横一列をまとめて焼き払う'},
+  {id:'missile', name:'ミサイル',       st:4, n:5, every:5.0, dmg:15, note:'狙ったブロックへ曲がって飛び、大爆発する'},
+  {id:'hole',    name:'ブラックホール', st:6, n:3, every:10,  dmg:4,  note:'周りを吸い込みながら削り、最後に爆発する'},
+];
 // 値段はボスを倒しても上がらない（クッキークリッカー型）。上がるのは買ったときだけ。
 //   inf:true … 上限なし。値段は g 倍ずつ。効果は足し算で伸びる（ボス撃破のたびに数十Lvまとめて買える）
 //   それ以外 … 上限あり。span 段ぶんの価値の伸びをかけて上限に届くよう、1Lvごとに大きく上がる（素材が進むごとに解放される感覚）
@@ -275,6 +283,11 @@ const UPG = [
   {cat:'idle', id:'dronedmg', name:'弾の威力',       note:'ドローンの弾が与えるダメージ（上限なし）', cost:900, inf:true, g:1.2, max:1e9, v:l => `×${fmtX(TUNE.droneDmg*(1+.25*l))}`},
   {cat:'idle', id:'spawn',    name:'落下衝撃',       note:'落ちてきたブロックが、着地した下のブロックにダメージ', cost:1200, span:8, max:15, v:l => l ? `威力×${fmtX(.6*l*(SP('sp1')?2:1))}` : 'なし'},
   {cat:'idle', id:'drburst',  name:'弾の炸裂',       note:'弾が当たったとき追加で飛ぶ破片',     cost:2500,  span:8,  max:10,  v:l => `+${l*2*(SP('bu1')?2:1)}個`},
+  // 兵器（台数は上限あり、威力は上限なし）。値段は手に入る目安の段の価値に合わせる
+  ...ARMS.flatMap(a => [
+    {cat:'arms', id:a.id + 'N', name:a.name + 'の数', note:a.note, cost:2000 * Math.pow(TUNE.valStage, a.st), span:8, max:a.n, v:l => l ? `${l}台` : 'なし'},
+    {cat:'arms', id:a.id + 'P', name:a.name + 'の威力', note:a.name + 'のダメージ（上限なし）', cost:3000 * Math.pow(TUNE.valStage, a.st), inf:true, g:1.2, max:1e9, v:l => `×${fmtX(1 + .25 * l)}`},
+  ]),
   // 操作
   {cat:'tap',  id:'tapburst', name:'タップの破片',   note:'タップで壊したときの破片の倍率',     cost:500,   span:9,  max:10,  v:l => `×${2+l}`},
   {cat:'tap',  id:'heat',     name:'熱量',           note:'1タップで溜まるフィーバーゲージ',     cost:1500,  span:7,  max:12,  v:l => `+${((8+2*l)*(SP('ht1')?1.5:1)).toFixed(0)}`},
@@ -310,6 +323,10 @@ const SPECIALS = [
   {cat:'idle', id:'rl2', name:'二連装',           note:'ドローンが2発同時に撃つ',             ref:['droneint',10],   req:() => L('droneint') >= 10, rq:'連射速度 Lv10'},
   {cat:'idle', id:'sp1', name:'重力加速',         note:'落下衝撃の威力 ×2',                   ref:['spawn',5],   req:() => L('spawn') >= 5, rq:'落下衝撃 Lv5'},
   {cat:'idle', id:'bu1', name:'榴弾',             note:'弾の炸裂で飛ぶ破片 ×2',               ref:['drburst',5],   req:() => L('drburst') >= 5, rq:'弾の炸裂 Lv5'},
+  {cat:'arms', id:'cn1', name:'徹甲弾',           note:'砲台の威力 ×2・爆発範囲 ×1.2',        ref:['cannonN',3], req:() => L('cannonN') >= 3, rq:'砲台の数 Lv3'},
+  {cat:'arms', id:'lz1', name:'十字照射',         note:'レーザーが横と縦の十字に撃つ',        ref:['laserN',3], req:() => L('laserN') >= 3, rq:'レーザーの数 Lv3'},
+  {cat:'arms', id:'ms1', name:'多弾頭',           note:'ミサイルが着弾後に子弾を3つばらまく', ref:['missileN',3], req:() => L('missileN') >= 3, rq:'ミサイルの数 Lv3'},
+  {cat:'arms', id:'bh1', name:'事象の地平線',     note:'ブラックホールの範囲 ×1.4',           ref:['holeN',2], req:() => L('holeN') >= 2, rq:'ブラックホールの数 Lv2'},
   {cat:'tap',  id:'tp1', name:'鉄拳',             note:'タップのボスへの威力と衝撃波 ×2',     ref:['tapburst',5],   req:() => L('tapburst') >= 5, rq:'タップの破片 Lv5'},
   {cat:'tap',  id:'tp2', name:'連打の達人',       note:'長押しの連打が速くなる（毎秒4回→6回）', ref:['tapburst',10], req:() => L('tapburst') >= 10, rq:'タップの破片 Lv10'},
   {cat:'tap',  id:'ht1', name:'発熱体',           note:'タップで溜まる熱量 ×1.5',             ref:['heat',5],   req:() => L('heat') >= 5, rq:'熱量 Lv5'},
@@ -405,9 +422,10 @@ const dustGain = () => { if (save.stage < PRESTIGE_STAGE) return 0; const lv = M
 
 let W = 390, H = 560, cols = 7, rows = 9, cell = 55.7, ucell = 55.7, offX = 0, offY = 0, topBand = 0;
 let blocks = [], shards = [], booms = [], zaps = [], bullets = [], drones = [], boss = null, lucky = null;
+let shells = [], beams = [], missiles = [], holes = [], armT = {}, armK = 0;
 let combo = 0, fever = 0, heat = 0, state = 'title', lastTap = 0, earnedTick = 0, luckyT = 60, autoT = 0;
 let MAXS = 900;   // 破片の上限（自動画質で変わる）
-const fx = {hit(){}, brk(){}, boom(){}, bolt(){}, fever(){}, milestone(){}, tap(){}, split(){}, bossHit(){}, bossSpawn(){}, bossDie(){}, shoot(){}, land(){}, lucky(){}, luckyHit(){}, ach(){}};
+const fx = {arm(){}, beam(){}, hole(){}, hit(){}, brk(){}, boom(){}, bolt(){}, fever(){}, milestone(){}, tap(){}, split(){}, bossHit(){}, bossSpawn(){}, bossDie(){}, shoot(){}, land(){}, lucky(){}, luckyHit(){}, ach(){}};
 const TIERS = [[25, 'いいぞ', '#ffe14d'], [50, 'ナイス！', '#ffe14d'], [100, 'スゴい！', '#ff9a3c'], [250, 'ヤバい！', '#ff4c88'], [500, '狂気', '#c38bff'], [1000, '神', '#4cc9ff'], [2500, '宇宙', '#ffffff'], [5000, '無量大数', '#ffffff']];
 let milestoneSeen = 0;
 
@@ -627,6 +645,88 @@ function fireDrone(d){
   bullets.push({x:d.x, y:d.y, vx:dx / len * v, vy:dy / len * v, tx, ty, j, life:len / v + .05});
   fx.shoot(d, tx, ty);
 }
+const armPow = id => (1 + .25 * L(id + 'P')) * (id === 'cannon' && SP('cn1') ? 2 : 1);
+function fireArm(a, n){
+  const j = droneTarget(); if (j === -1 && a.id !== 'laser') return;
+  const tx = j === -2 ? bossX() : j >= 0 ? cx(j) : W / 2, ty = j === -2 ? bossY() : j >= 0 ? cy(j) : H / 2;
+  if (a.id === 'cannon'){
+    armK = (armK + 1) % n;
+    const x0 = W * (armK + .5) / n, y0 = H - cell * .2, d = Math.hypot(tx - x0, ty - y0);
+    shells.push({x0, y0, tx, ty, t:0, dur:.45 + d / (cell * 18)});
+    fx.arm('cannon', x0, y0);
+  } else if (a.id === 'laser'){
+    const br = boss && Math.random() < .4 ? Math.floor((boss.cells[0] / cols)) + Math.floor(boss.bs / 2) : (Math.random() * rows) | 0;
+    beams.push({kind:'row', k:br, t:.55, fireAt:.25, fired:false});
+    if (SP('lz1')){ const bc = boss && Math.random() < .4 ? boss.cells[0] % cols : (Math.random() * cols) | 0; beams.push({kind:'col', k:bc, t:.55, fireAt:.25, fired:false}); }
+    fx.arm('laser', 0, offY + (br + .5) * cell);
+  } else if (a.id === 'missile'){
+    const x = W * (.1 + Math.random() * .8), y = H + cell * .3;
+    missiles.push({x, y, vx:(Math.random() - .5) * cell * 4, vy:-cell * 7, tx, ty, life:4});
+    fx.arm('missile', x, y);
+  } else if (a.id === 'hole'){
+    const R = cell * 2.6 * (SP('bh1') ? 1.4 : 1);
+    holes.push({x:tx, y:ty, life:3, max:3, tick:0, R});
+    fx.hole(tx, ty, R);
+  }
+}
+function stepArms(dt){
+  for (const a of ARMS){
+    const n = L(a.id + 'N'); if (!n) continue;
+    armT[a.id] = (armT[a.id] || Math.random()) + dt * n / a.every;
+    while (armT[a.id] >= 1){ armT[a.id] -= 1; fireArm(a, n); }
+  }
+  const base = stat.dmg();
+  for (let k = shells.length - 1; k >= 0; k--){
+    const o = shells[k]; o.t += dt;
+    if (o.t >= o.dur){
+      shells.splice(k, 1);
+      booms.push({x:o.tx, y:o.ty, i:Math.max(0, cellAt(o.tx, o.ty)), R:cell * 1.4 * (SP('cn1') ? 1.2 : 1), dmg:base * 6 * armPow('cannon'), t:0, big:false, arm:true, d:0});
+    }
+  }
+  for (let k = beams.length - 1; k >= 0; k--){
+    const b = beams[k]; b.t -= dt;
+    if (!b.fired && b.t <= b.fireAt){
+      b.fired = true;
+      const lim = b.kind === 'row' ? cols : rows; let hitBoss = false;
+      if (b.k < (b.kind === 'row' ? rows : cols)) for (let m = 0; m < lim; m++){
+        const j = b.kind === 'row' ? b.k * cols + m : m * cols + b.k;
+        if (blocks[j].boss){ if (!hitBoss){ hitBoss = true; hit(j, base * 8 * armPow('laser') * 3, 'laser'); } }
+        else if (solid(j)) hit(j, base * 8 * armPow('laser'), 'laser');
+      }
+      fx.beam(b);
+    }
+    if (b.t <= 0) beams.splice(k, 1);
+  }
+  for (let k = missiles.length - 1; k >= 0; k--){
+    const m = missiles[k], dx = m.tx - m.x, dy = m.ty - m.y, d = Math.hypot(dx, dy) || 1, sp = cell * 10;
+    const f = Math.min(1, dt * 3.5); m.vx += (dx / d * sp - m.vx) * f; m.vy += (dy / d * sp - m.vy) * f;
+    m.x += m.vx * dt; m.y += m.vy * dt; m.life -= dt;
+    if (d < cell * .4 || m.life <= 0){
+      missiles.splice(k, 1);
+      const p = armPow('missile');
+      booms.push({x:m.x, y:m.y, i:Math.max(0, cellAt(m.x, m.y)), R:cell * 2.2, dmg:base * 15 * p, t:0, big:false, arm:true, missile:true, d:0});
+      spawnShards(m.x, m.y, 10, cellAt(m.x, m.y), 0);
+      if (SP('ms1')) for (let q = 0; q < 3; q++){ const a = q / 3 * 6.283 + Math.random(); booms.push({x:m.x + Math.cos(a) * cell * 1.8, y:m.y + Math.sin(a) * cell * 1.8, i:0, R:cell * 1.2, dmg:base * 6 * p, t:.12 + q * .06, big:false, arm:true, d:0}); }
+    }
+  }
+  for (let k = holes.length - 1; k >= 0; k--){
+    const h = holes[k]; h.life -= dt; h.tick -= dt;
+    if (h.tick <= 0){
+      h.tick = .25;
+      const c0 = Math.floor((h.x - offX) / cell), r0 = Math.floor((h.y - offY) / cell), span = Math.ceil(h.R / cell); let hitBoss = false;
+      for (let r = r0 - span; r <= r0 + span; r++) for (let c = c0 - span; c <= c0 + span; c++){
+        if (r < 0 || c < 0 || r >= rows || c >= cols) continue;
+        const j = r * cols + c; if (Math.hypot(cx(j) - h.x, cy(j) - h.y) > h.R) continue;
+        if (blocks[j].boss){ if (!hitBoss){ hitBoss = true; hit(j, base * 4 * armPow('hole') * 3, 'hole'); } }
+        else if (solid(j)) hit(j, base * 4 * armPow('hole'), 'hole');
+      }
+    }
+    if (h.life <= 0){
+      holes.splice(k, 1);
+      booms.push({x:h.x, y:h.y, i:Math.max(0, cellAt(h.x, h.y)), R:h.R * 1.2, dmg:base * 20 * armPow('hole'), t:0, big:true, d:0});
+    }
+  }
+}
 function step(dt){
   if (state !== 'play') return;
   lastTap += dt; save.st.time += dt;
@@ -676,6 +776,7 @@ function step(dt){
       fireDrone(d); if (SP('rl2')) fireDrone(d);
     }
   }
+  stepArms(dt);
   for (let k = bullets.length - 1; k >= 0; k--){
     const u = bullets[k]; u.x += u.vx * dt; u.y += u.vy * dt; u.life -= dt;
     if (u.life <= 0){
@@ -772,6 +873,7 @@ achSet('f', 'フィーバー', [1, 10, 50, 100, 250], ['熱い', '沸騰', '燃�
 achSet('p', '砕いた回数', [1, 2, 5, 10], ['宇宙、粉砕', '二度目の宇宙', '創造と破壊', '神話'], () => save.runs, n => n + '回');
 achSet('u', '強化レベル合計', [10, 100, 300, 1000, 3000], ['初心者', '育成中', '鍛え上げ', '完全体', '極限'], () => UPG.reduce((s, u) => s + L(u.id), 0), n => n);
 achSet('h', 'プレイ時間', [600, 3600, 3 * 3600, 10 * 3600, 24 * 3600], ['10分', '1時間', '3時間', '10時間', '丸一日'], () => save.st.time, fmtT);
+ACH.push({id:'arms4', name:'兵器工場', desc:'4種類の兵器をすべてそろえる', ok:() => ARMS.every(a => L(a.id + 'N') > 0)});
 ACH.push({id:'mall', name:'全モジュール', desc:'7種のモジュールを全部解放', ok:() => MODS.every(m => ML(m.id) > 0)});
 ACH.push({id:'slot4', name:'フル装備', desc:'装備枠を4つにする', ok:() => save.slots >= 4});
 ACH.push({id:'off1', name:'おかえり', desc:'オフライン収入を受け取る', ok:() => save.st.offline >= 1});
@@ -791,6 +893,7 @@ function prestige(){
   save.st.earnedRun = 0;
   for (const k in buffs) buffs[k] = 0;
   combo = 0; fever = 0; heat = 0; boss = null; lucky = null; luckyT = 30;
+  shells = []; beams = []; missiles = []; holes = [];
   return d;
 }
 
@@ -849,6 +952,14 @@ const sfxShot = () => { if (!actx) return; const n = actx.currentTime; if (n - l
 const sfxBoss = () => { tone(55, 1.2, 'sawtooth', .25, 0, .7); noise(.8, 400, .35); };
 const sfxLucky = () => { [784, 988, 1175, 1568].forEach((f, k) => tone(f, .18, 'sine', .1, k * .05, 1)); };
 const sfxJackpot = () => { [523, 659, 784, 1047, 1319, 1568, 2093].forEach((f, k) => tone(f, .3, 'square', .08, k * .05, 1)); noise(.8, 4000, .25); };
+let lastArm = 0;
+const sfxArm = kind => {
+  if (!actx || save.muted) return; const n = actx.currentTime; if (n - lastArm < .08) return; lastArm = n;
+  if (kind === 'cannon') tone(150, .18, 'sine', .14, 0, .5);
+  else if (kind === 'laser') tone(520, .3, 'sawtooth', .05, 0, 2.4);
+  else if (kind === 'missile') noise(.35, 1800, .1);
+  else { tone(60, 1.4, 'sine', .25, 0, .4); noise(1, 300, .15); }
+};
 const sfxAch = () => { tone(1047, .12, 'triangle', .12, 0, 1); tone(1568, .25, 'triangle', .12, .1, 1); };
 
 /* ---- エフェクト ---- */
@@ -908,11 +1019,16 @@ fx.brk = (i, b, gain) => {
   }
   shake = Math.min(shake + .4, 16);
 };
+fx.arm = (kind, x, y) => { sfxArm(kind); if (kind === 'cannon') sparks(x, y, 4, '#ffd84d', 5); };
+fx.beam = b => { shake += 2; const y = b.kind === 'row' ? offY + (b.k + .5) * cell : null;
+  if (y !== null) for (let k = 0; k < 6; k++) sparks(rnd(0, W), y, 2, '#ff5a6e', 6); };
+fx.hole = (x, y, R) => { sfxArm('hole'); rings.push({x, y, to:R, life:.5, max:.5, c:'#b48cff', w:.3}); };
 fx.boom = e => {
   rings.push({x:e.x, y:e.y, to:e.R * 1.2, life:.35, max:.35, c:e.quiet ? '#ffffff' : '#ff8a1f', w:.22});
   if (!e.quiet) flashes.push({x:e.x, y:e.y, r:e.R * 1.1, life:.18, max:.18});
   sparks(e.x, e.y, e.big ? 22 : 8, e.quiet ? '#ffffff' : '#ffb13b', 11);
-  if (!e.quiet){ freeze = Math.max(freeze, e.big ? .05 : .02); shake += e.big ? 8 : 3; if (e.big) zoom = Math.max(zoom, .03); sfxBoom(e.big); }
+  if (e.arm){ shake += e.missile ? 3 : 1.5; sfxBoom(false); }
+  else if (!e.quiet){ freeze = Math.max(freeze, e.big ? .05 : .02); shake += e.big ? 8 : 3; if (e.big) zoom = Math.max(zoom, .03); sfxBoom(e.big); }
 };
 fx.bolt = pts => { bolts.push({pts:jag(pts), life:.22, max:.22}); for (let k = 1; k < pts.length; k++) sparks(pts[k][0], pts[k][1], 3, '#bfe9ff', 8); shake += 1.5; sfxZap(); };
 fx.split = (x, y) => { if (parts.length < MAXP - 50) sparks(x, y, 2, '#ffffff', 5); };
@@ -1122,6 +1238,61 @@ function batchParts(kind, add, fill){
   }
   ctx.globalAlpha = 1;
 }
+function drawArms(){
+  const st = STAGES[save.stage], n = L('cannonN');
+  // 砲台（画面の下端に並ぶ）
+  for (let k = 0; k < n; k++){
+    const x = W * (k + .5) / n, y = H - ucell * .05, s = ucell * .32;
+    ctx.fillStyle = '#2a3340'; ctx.beginPath(); ctx.arc(x, y, s * .7, Math.PI, 0); ctx.fill();
+    ctx.fillStyle = '#5a6778'; ctx.fillRect(x - s * .12, y - s * 1.1, s * .24, s * .6);
+    ctx.fillStyle = '#ffd84d'; ctx.beginPath(); ctx.arc(x, y - s * .25, s * .14, 0, 6.283); ctx.fill();
+  }
+  ctx.globalCompositeOperation = 'lighter';
+  // 砲弾（山なりに飛ぶ）
+  for (const o of shells){
+    const p = o.t / o.dur, x = o.x0 + (o.tx - o.x0) * p, y = o.y0 + (o.ty - o.y0) * p - cell * 3 * 4 * p * (1 - p);
+    ctx.fillStyle = '#ffb13b'; ctx.globalAlpha = .35; ctx.beginPath(); ctx.arc(x, y, cell * .3, 0, 6.283); ctx.fill();
+    ctx.globalAlpha = 1; ctx.fillStyle = '#fff3b0'; ctx.beginPath(); ctx.arc(x, y, cell * .13, 0, 6.283); ctx.fill();
+  }
+  // レーザー（照準線 → 太いビーム）
+  for (const b of beams){
+    const row = b.kind === 'row', pos = row ? offY + (b.k + .5) * cell : offX + (b.k + .5) * cell;
+    if (!b.fired){
+      ctx.globalAlpha = .5 + .5 * Math.sin(clock * 60); ctx.strokeStyle = '#ff5a6e'; ctx.lineWidth = 1.5; ctx.beginPath();
+      if (row){ ctx.moveTo(0, pos); ctx.lineTo(W, pos); } else { ctx.moveTo(pos, offY); ctx.lineTo(pos, H); } ctx.stroke();
+    } else {
+      const a = Math.max(0, b.t / (b.fireAt || .25));
+      for (const [w, c, al] of [[cell * .9, '#ff3355', .35], [cell * .45, '#ff8a9a', .7], [cell * .15, '#ffffff', 1]]){
+        ctx.globalAlpha = al * a; ctx.strokeStyle = c; ctx.lineWidth = w; ctx.beginPath();
+        if (row){ ctx.moveTo(0, pos); ctx.lineTo(W, pos); } else { ctx.moveTo(pos, offY); ctx.lineTo(pos, H); } ctx.stroke();
+      }
+    }
+  }
+  // ミサイル（煙を引いて曲がって飛ぶ）
+  for (const m of missiles){
+    const a = Math.atan2(m.vy, m.vx), s = cell * .35;
+    ctx.globalAlpha = 1; ctx.save(); ctx.translate(m.x, m.y); ctx.rotate(a);
+    ctx.fillStyle = '#ff8a1f'; ctx.beginPath(); ctx.arc(-s * .9, 0, s * .35, 0, 6.283); ctx.fill();
+    ctx.fillStyle = '#e8edf3'; ctx.fillRect(-s * .7, -s * .18, s * 1.3, s * .36);
+    ctx.fillStyle = '#ff4c88'; ctx.beginPath(); ctx.moveTo(s * .6, -s * .18); ctx.lineTo(s * .95, 0); ctx.lineTo(s * .6, s * .18); ctx.fill();
+    ctx.restore();
+    if (parts.length < MAXP && Math.random() < .5) parts.push({k:'flame', x:m.x - Math.cos(a) * s, y:m.y - Math.sin(a) * s, vx:rnd(-.2, .2) * cell, vy:rnd(-.2, .2) * cell, life:.5, max:.5, c:Math.random() < .5 ? '#8a94a3' : '#ff8a1f', s:cell * .12});
+  }
+  // ブラックホール（暗い中心と回る輪）
+  for (const h of holes){
+    const a = Math.min(1, h.life / .4, (h.max - h.life) / .3);
+    ctx.globalAlpha = .45 * a; ctx.strokeStyle = '#b48cff'; ctx.lineWidth = cell * .14;
+    for (let q = 0; q < 3; q++){ const r = h.R * (.45 + .25 * q), o = clock * (3 - q) + q; ctx.beginPath(); ctx.arc(h.x, h.y, r, o, o + 2.2); ctx.stroke(); }
+    if (parts.length < MAXP && Math.random() < .8){ const an = Math.random() * 6.283, r = h.R; parts.push({k:'spark', x:h.x + Math.cos(an) * r, y:h.y + Math.sin(an) * r, vx:-Math.cos(an) * cell * 5, vy:-Math.sin(an) * cell * 5, life:.35, max:.35, c:'#d9b8ff'}); }
+  }
+  ctx.globalCompositeOperation = 'source-over'; ctx.globalAlpha = 1;
+  for (const h of holes){
+    const a = Math.min(1, h.life / .4, (h.max - h.life) / .3), r = h.R * .32 * (1 + .08 * Math.sin(clock * 9));
+    ctx.globalAlpha = a; ctx.fillStyle = '#05010d'; ctx.beginPath(); ctx.arc(h.x, h.y, r, 0, 6.283); ctx.fill();
+    ctx.strokeStyle = '#e0c8ff'; ctx.lineWidth = 2; ctx.stroke();
+  }
+  ctx.globalAlpha = 1;
+}
 function render(){
   const st = STAGES[save.stage];
   ctx.save();
@@ -1149,6 +1320,7 @@ function render(){
     ctx.moveTo(p.x - c + n, p.y - n - c); ctx.lineTo(p.x + c + n, p.y + n - c); ctx.lineTo(p.x + c - n, p.y + n + c); ctx.lineTo(p.x - c - n, p.y - n + c); ctx.closePath();
   }, true);
   ctx.globalAlpha = 1;
+  drawArms();
   if (lucky) drawLucky();
 
   ctx.globalCompositeOperation = 'lighter';
@@ -1306,7 +1478,7 @@ const NEWS = [
   () => '炎上した。ブロックが。', () => `今日のプレイ時間：${fmtT(save.st.time)}`, () => `実績 ${achCount()} / ${ACH.length}　（1個ごとに報酬+1%）`,
   () => 'フレンジー中は何をしても儲かる。', () => '「破片が多すぎて前が見えない」と苦情。', () => 'オフラインでも壊れ続ける。でも半分しか持ち帰れない。',
   () => '跳弾は壁に当たるほど痛い。', () => '誘導破片、ブロックのほうへ勝手に行く。賢い。', () => '宇宙を砕くのは物理的に可能だと判明。',
-  () => '上から降ってくるブロックは、着地の衝撃でも壊れる。', () => 'ドローン12台体制。もはや軍隊。', () => '「コインに使い道がない」——いや、強化しろ。',
+  () => '上から降ってくるブロックは、着地の衝撃でも壊れる。', () => 'ドローン12台体制。もはや軍隊。', () => '砲台の弾は山なりに飛ぶ。物理の授業で習ったやつ。', () => 'レーザーは横一列を一瞬で焼き払う。前に立つな。', () => 'ミサイルは狙ったブロックを最後まで追いかける。', () => 'ブラックホールの中で何が起きているかは誰も知らない。', () => '「コインに使い道がない」——いや、強化しろ。',
 ];
 let newsT = 0, newsPinned = 0;
 function pushNews(h){ newsEl.innerHTML = h; newsT = 0; newsPinned = 14; }
@@ -1325,7 +1497,7 @@ cv.addEventListener('pointerup', stopHold); cv.addEventListener('pointercancel',
 
 /* ---- シート（強化） ---- */
 let tab = 'idle';
-const TABS = [['idle', '放置'], ['tap', '操作'], ['core', '共通'], ['build', 'ビルド'], ['ach', '実績'], ['dust', '砕く']];
+const TABS = [['idle', '放置'], ['arms', '兵器'], ['tap', '操作'], ['core', '共通'], ['build', 'ビルド'], ['ach', '実績'], ['dust', '砕く']];
 const cs = n => fmt(n);
 const specialsFor = cat => SPECIALS.filter(s => s.cat === cat && !SP(s.id) && s.req());
 function anyAffordable(kind){
@@ -1337,11 +1509,11 @@ function anyAffordable(kind){
 function renderTabs(){
   tabsEl.innerHTML = TABS.map(([k, n]) => `<button class="tab" role="tab" data-tab="${k}" aria-selected="${tab === k}">${n}${tab !== k && anyAffordable(k) ? '<span class="dot"></span>' : ''}</button>`).join('');
 }
-const HINTS = {idle:'ドローンは目を離していても撃ち続ける。放置の稼ぎはここで伸びる。', tap:'タップは加速役。叩くほどフィーバーゲージが溜まり、満タンで全部が速くなる。長押しで連打できる。', core:'ドローンにもタップにも効く土台の強化。', build:'モジュールは装備枠に入れたものだけが効く。組み合わせでビルドが決まる。', ach:'実績1個ごとに全部の報酬が+1%。', dust:'宇宙を砕くと星屑が手に入り、すべてがリセットされる代わりに永続強化が買える。'};
+const HINTS = {arms:'放置で勝手に戦ってくれる兵器。素材を進めるほど新しい兵器が手に入る（値段が届くようになる）。', idle:'ドローンは目を離していても撃ち続ける。放置の稼ぎはここで伸びる。', tap:'タップは加速役。叩くほどフィーバーゲージが溜まり、満タンで全部が速くなる。長押しで連打できる。', core:'ドローンにもタップにも効く土台の強化。', build:'モジュールは装備枠に入れたものだけが効く。組み合わせでビルドが決まる。', ach:'実績1個ごとに全部の報酬が+1%。', dust:'宇宙を砕くと星屑が手に入り、すべてがリセットされる代わりに永続強化が買える。'};
 function buyN(u){ return save.buyMode === 'max' ? Math.max(1, upMaxN(u)) : Math.min(save.buyMode, u.max - L(u.id)); }
 function sheetHtml(){
   let h = `<p class="hint">${HINTS[tab]}</p>`;
-  if (tab === 'idle' || tab === 'tap' || tab === 'core'){
+  if (tab === 'idle' || tab === 'arms' || tab === 'tap' || tab === 'core'){
     h += `<div class="modes">${[[1, '×1'], [10, '×10'], ['max', '×MAX']].map(([m, n]) => `<button class="mode ${save.buyMode === m ? 'on' : ''}" data-mode="${m}">${n}</button>`).join('')}</div>`;
     h += '<ul class="list">';
     for (const u of UPG){
