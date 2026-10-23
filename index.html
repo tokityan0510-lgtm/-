@@ -252,9 +252,9 @@ const STAGES = [
 const PRESTIGE_STAGE = 8;   // この素材に到達したら「砕く」が解放される
 const F_VAL = 1e5;
 const sv = s => Math.pow(F_VAL, s);
-// 値段は価値の伸びに加えて、コンボや金ブロックなど倍率の積み上がりぶん（costStage）も上乗せする
-const priceSv = s => sv(s) * Math.pow(TUNE.costStage, s);
-const TUNE = {fhp:4000, fhpLate:3000, fdmg:2000, gaugeBase:42000, gaugeGrow:3.0, gaugeCapK:6, gaugeLate:1.8, tapProg:2, dustBase:18, dustDiv:8, dustBonus:.001, pmultBonus:.1, idleBonus:5, idleRamp:30, feverReward:2, costX:3, costStage:1.45, droneDmg:5, droneInt:1.5, bossHp:1500, bossGrow:1.35, bossReward:300, comboDecay:.6};
+// 値段の素材倍率。ブロックの価値（F_VAL＝10万倍/段）より小さくして、ボスを倒すたびに買える量が増えるようにする
+const priceSv = s => Math.pow(TUNE.priceStage, s);
+const TUNE = {fhp:4000, fhpLate:3000, fdmg:2000, gaugeBase:42000, gaugeGrow:3.0, gaugeCapK:6, gaugeLate:1.8, tapProg:2, dustBase:18, dustDiv:8, dustBonus:.001, pmultBonus:.1, idleBonus:5, idleRamp:30, feverReward:2, costX:3, priceStage:14500, droneDmg:5, droneInt:1.5, bossHp:1500, bossGrow:1.35, bossReward:300, comboDecay:.6};
 const DEFAULT = {
   coins:0, stage:0, lv:{}, mods:{}, equip:[], slots:2, best:0, ended:false, muted:false, t:0, idleRate:0, prog:0, started:false, kills:0, boss:null,
   sp:{}, ach:{}, dust:0, perm:{}, runs:0, buyMode:1, endSeen:false,
