@@ -1,0 +1,630 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>ロボット最短パズル</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DotGothic16&family=Zen+Maru+Gothic:wght@500;700&display=swap" rel="stylesheet">
+<style>
+/* 盤面が主役。左に盤、右に操作パネル。狭い画面では縦に積む。 */
+:root{
+  --bg:#e8ecf1; --surface:#f8fafc; --ink:#16202c; --muted:#596476; --line:#ccd4de;
+  --cell:#f1f4f8; --grid:#d3dae3; --wall:#1c2a3c; --center:#253549; --on-wall:#f1f4f8;
+  --r0:#d8383b; --r1:#2a68d4; --r2:#16955a; --r3:#d79c00; --edge:rgba(10,16,24,.55);
+  --good:#16955a; --scrim:rgba(232,236,241,.88);
+  --f-display:"DotGothic16","Osaka-Mono","MS Gothic",monospace;
+  --f-body:"Zen Maru Gothic","Hiragino Maru Gothic ProN","Hiragino Sans","Noto Sans JP","Yu Gothic",system-ui,sans-serif;
+  color-scheme:light;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0e131a; --surface:#171f2a; --ink:#e7ecf2; --muted:#94a0b1; --line:#2a3443;
+    --cell:#1b2430; --grid:#111820; --wall:#c7d3e3; --center:#2c3c52; --on-wall:#0e131a;
+    --r0:#ff6767; --r1:#5e9cff; --r2:#3fcf86; --r3:#ffcf3d; --edge:rgba(0,0,0,.6);
+    --good:#3fcf86; --scrim:rgba(14,19,26,.9);
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0e131a; --surface:#171f2a; --ink:#e7ecf2; --muted:#94a0b1; --line:#2a3443;
+  --cell:#1b2430; --grid:#111820; --wall:#c7d3e3; --center:#2c3c52; --on-wall:#0e131a;
+  --r0:#ff6767; --r1:#5e9cff; --r2:#3fcf86; --r3:#ffcf3d; --edge:rgba(0,0,0,.6);
+  --good:#3fcf86; --scrim:rgba(14,19,26,.9);
+  color-scheme:dark;
+}
+*,*::before,*::after{box-sizing:border-box}
+[hidden]{display:none!important}
+html{background:var(--bg)}
+body{
+  margin:0;background:var(--bg);color:var(--ink);font-family:var(--f-body);font-weight:500;
+  font-size:15px;line-height:1.55;
+  padding-left:max(16px,env(safe-area-inset-left,0px));
+  padding-right:max(16px,env(safe-area-inset-right,0px));
+  padding-block:14px 24px;
+}
+button{font:inherit;color:inherit}
+button:focus-visible,canvas:focus-visible{outline:3px solid var(--r1);outline-offset:2px}
+
+.top{max-width:1080px;margin:0 auto 12px;display:flex;flex-wrap:wrap;align-items:center;gap:8px 16px}
+.top h1{margin:0;font-family:var(--f-display);font-weight:400;font-size:26px;letter-spacing:.04em;line-height:1.2}
+.top p{margin:0;color:var(--muted);font-size:13px;flex:1 1 260px;min-width:0}
+.top .btns{display:flex;gap:8px}
+
+.game{max-width:1080px;margin:0 auto;display:grid;grid-template-columns:minmax(0,min(700px,max(300px,calc(100dvh - 110px)))) minmax(280px,340px);gap:20px;align-items:start;justify-content:center}
+.board-wrap{position:relative;width:100%;aspect-ratio:1;max-width:100%}
+#board{display:block;width:100%;height:100%;border-radius:10px;touch-action:none;cursor:pointer}
+
+.panel{display:flex;flex-direction:column;gap:12px;min-width:0}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px 14px}
+.label{font-size:11px;letter-spacing:.12em;color:var(--muted);font-weight:700}
+
+.target{display:flex;gap:12px;align-items:center}
+.target .chip{width:56px;height:56px;flex:none;border-radius:10px;background:var(--center);display:grid;place-items:center}
+.target .chip svg{width:40px;height:40px}
+.target .txt{min-width:0}
+.target .what{font-weight:700;font-size:16px}
+.target .round{font-family:var(--f-display);color:var(--muted);font-size:13px}
+
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;text-align:center}
+.stat .num{font-family:var(--f-display);font-size:28px;line-height:1.1;font-variant-numeric:tabular-nums}
+.stat button.num{background:none;border:1px dashed var(--line);border-radius:8px;width:100%;cursor:pointer;padding:0}
+.stat button.num:hover{border-color:var(--muted)}
+
+.history{display:flex;flex-wrap:wrap;gap:4px;min-height:28px;margin-top:6px}
+.history .mv{display:inline-flex;align-items:center;gap:3px;padding:1px 7px 1px 4px;border-radius:99px;background:var(--cell);border:1px solid var(--line);font-size:13px;font-weight:700}
+.history .dot{width:12px;height:12px;border-radius:50%;border:1px solid var(--edge)}
+.history .empty{color:var(--muted);font-size:13px}
+
+.ctrl{display:flex;gap:14px;align-items:center;justify-content:space-between;flex-wrap:wrap}
+.robots{display:grid;grid-template-columns:repeat(2,44px);gap:8px}
+.rbtn{width:44px;height:44px;border-radius:50%;border:2px solid var(--edge);cursor:pointer;position:relative;font-family:var(--f-display);font-size:14px;color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.5)}
+.rbtn[aria-pressed="true"]{box-shadow:0 0 0 3px var(--surface),0 0 0 6px var(--ink)}
+.dpad{display:grid;grid-template-columns:repeat(3,42px);grid-template-rows:repeat(3,42px);gap:4px}
+.dpad button{border:1px solid var(--line);background:var(--cell);border-radius:8px;cursor:pointer;font-size:18px}
+.dpad button:hover{border-color:var(--muted)}
+.dpad .u{grid-area:1/2}.dpad .l{grid-area:2/1}.dpad .r{grid-area:2/3}.dpad .d{grid-area:3/2}
+
+.actions{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.btn{border:1px solid var(--line);background:var(--surface);border-radius:9px;padding:8px 10px;cursor:pointer;font-weight:700;font-size:14px}
+.btn:hover:not(:disabled){border-color:var(--muted)}
+.btn:disabled{opacity:.45;cursor:default}
+.btn.primary{background:var(--wall);color:var(--on-wall);border-color:var(--wall)}
+
+.tally{display:grid;grid-template-columns:repeat(9,1fr);gap:4px;margin-top:8px}
+.slot{aspect-ratio:1;border-radius:6px;background:var(--cell);border:1px solid var(--line);display:grid;place-items:center;position:relative;max-width:100%}
+.slot svg{width:62%;height:62%;opacity:.35}
+.slot.cur{border-color:var(--ink)}
+.slot.cur svg{opacity:1}
+.slot.done svg{opacity:1}
+.slot .pt{position:absolute;right:1px;bottom:-1px;font-family:var(--f-display);font-size:11px;line-height:1}
+.total{display:flex;justify-content:space-between;align-items:baseline}
+.total .num{font-family:var(--f-display);font-size:22px}
+.keys{font-size:12px;color:var(--muted);margin:0}
+
+.banner{position:absolute;inset:0;display:grid;place-items:center;background:var(--scrim);border-radius:10px;padding:16px}
+.banner .box{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:18px 20px;text-align:center;max-width:340px;width:100%;box-shadow:0 10px 30px rgba(0,0,0,.18)}
+.banner h2{margin:0 0 4px;font-family:var(--f-display);font-weight:400;font-size:26px}
+.banner .sub{margin:0 0 14px;color:var(--muted)}
+.banner .row{display:flex;gap:8px;justify-content:center;flex-wrap:wrap}
+.stars{font-size:26px;letter-spacing:4px;color:var(--r3);margin-bottom:6px}
+
+.modal{position:fixed;inset:0;background:var(--scrim);display:grid;place-items:center;z-index:20;padding:16px max(16px,env(safe-area-inset-right,0px)) 16px max(16px,env(safe-area-inset-left,0px))}
+.modal .box{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:18px 22px;max-width:520px;width:100%;max-height:90%;overflow:auto}
+.modal h2{margin:0 0 8px;font-family:var(--f-display);font-weight:400;font-size:22px}
+.modal ul{padding-left:1.2em;margin:0 0 12px}
+.modal li{margin-bottom:4px}
+
+@media (max-width:760px){
+  .game{grid-template-columns:minmax(0,1fr);justify-items:center}
+  .board-wrap{width:min(100%, 560px)}
+  .panel{width:100%;max-width:560px}
+  .top h1{font-size:22px}
+}
+</style>
+</head>
+<body>
+<header class="top">
+  <h1>ロボット最短パズル</h1>
+  <p>ハイパーロボット（Ricochet Robots）のルールで遊ぶひとり用パズル。壁かロボットにぶつかるまで止まらないロボットを、最短手数でターゲットへ。</p>
+  <div class="btns">
+    <button class="btn" id="btnRules" type="button">遊び方</button>
+    <button class="btn" id="btnNew" type="button">新しい盤面</button>
+  </div>
+</header>
+
+<main class="game">
+  <section class="board-wrap" id="wrap">
+    <canvas id="board" tabindex="0" aria-label="16×16の盤面。ロボットを選んで矢印キーで動かします"></canvas>
+    <div class="banner" id="banner" hidden>
+      <div class="box">
+        <div class="stars" id="bStars"></div>
+        <h2 id="bTitle"></h2>
+        <p class="sub" id="bSub"></p>
+        <div class="row" id="bRow"></div>
+      </div>
+    </div>
+  </section>
+
+  <aside class="panel">
+    <div class="card target">
+      <div class="chip" id="tChip"></div>
+      <div class="txt">
+        <div class="round" id="tRound"></div>
+        <div class="what" id="tWhat"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="stats">
+        <div class="stat"><div class="label">手数</div><div class="num" id="sMoves">0</div></div>
+        <div class="stat"><div class="label">最短</div><button class="num" id="sOpt" type="button" title="押すと最短手数を表示">?</button></div>
+        <div class="stat"><div class="label">時間</div><div class="num" id="sTime">0:00</div></div>
+      </div>
+      <div class="history" id="history"></div>
+    </div>
+
+    <div class="card ctrl">
+      <div class="robots" id="robotBtns"></div>
+      <div class="dpad" aria-label="移動">
+        <button class="u" data-d="0" type="button" aria-label="上へ">▲</button>
+        <button class="l" data-d="3" type="button" aria-label="左へ">◀</button>
+        <button class="r" data-d="1" type="button" aria-label="右へ">▶</button>
+        <button class="d" data-d="2" type="button" aria-label="下へ">▼</button>
+      </div>
+    </div>
+
+    <div class="actions">
+      <button class="btn" id="btnUndo" type="button">1手戻す</button>
+      <button class="btn" id="btnReset" type="button">最初から</button>
+      <button class="btn" id="btnSolve" type="button">答えを見る</button>
+    </div>
+
+    <div class="card">
+      <div class="total"><span class="label">得点（17チップ）</span><span class="num" id="score">0</span></div>
+      <div class="tally" id="tally"></div>
+    </div>
+    <p class="keys">キーボード：1〜4 / R B G Y でロボット選択、矢印キーか WASD で移動、Z で1手戻す、Enter で次へ</p>
+  </aside>
+</main>
+
+<div class="modal" id="rules" hidden>
+  <div class="box" role="dialog" aria-modal="true" aria-labelledby="rulesTitle">
+    <h2 id="rulesTitle">遊び方</h2>
+    <ul>
+      <li>ターゲットチップと<b>同じ色のロボット</b>を、同じマークのマスまで動かします。虹色の渦のチップは<b>どのロボットでも</b>かまいません。</li>
+      <li>ロボットは上下左右にまっすぐ進み、<b>壁か他のロボットにぶつかるまで止まりません</b>。途中で止めることはできません。</li>
+      <li>他の色のロボットを先に動かして「止め役」にしてもかまいません。どのロボットを1回動かしても1手です。</li>
+      <li>1手で届いてしまうチップは出ません。ロボットは前のラウンドで止まった場所から次のラウンドを始めます。</li>
+      <li>得点：最短と同じ手数で3点、最短+1手で2点、それより多いと1点、「答えを見る」を使うと0点。</li>
+    </ul>
+    <p><b>操作</b>：ロボットをタップすると止まれるマスが光るので、そこをタップ。ロボットからスワイプしても動かせます。</p>
+    <div style="text-align:right"><button class="btn primary" id="btnRulesClose" type="button">はじめる</button></div>
+  </div>
+</div>
+
+<script>
+// ---------- ソルバー（ワーカーでも動くよう、この関数だけで完結させる） ----------
+function solveCore(job){
+  const wE=job.wE, wS=job.wS, target=job.target, who=job.who;
+  const maxDepth=job.maxDepth||24, timeLimit=job.timeLimit||15000;
+  const DR=[-16,1,16,-1];
+  const blocked=(c,d)=>{const r=c>>4,k=c&15;
+    if(d===0) return r===0||!!wS[c-16];
+    if(d===1) return k===15||!!wE[c];
+    if(d===2) return r===15||!!wS[c];
+    return k===0||!!wE[c-1];};
+  const stop=new Int16Array(1024);
+  for(let c=0;c<256;c++)for(let d=0;d<4;d++){let p=c;while(!blocked(p,d))p+=DR[d];stop[c*4+d]=p;}
+  // 下限：途中のどのマスでも止まれると仮定したときの手数
+  const h=new Uint8Array(256).fill(99); h[target]=0;
+  for(let changed=true;changed;){changed=false;
+    for(let c=0;c<256;c++)for(let d=0;d<4;d++){let p=c;
+      while(!blocked(p,d)){p+=DR[d];if(h[p]+1<h[c]){h[c]=h[p]+1;changed=true;}}}}
+  const pos=Int16Array.from(job.robots), n=pos.length;
+  function mv(i,d){const from=pos[i];let s=stop[from*4+d];if(s===from)return from;
+    for(let j=0;j<n;j++){if(j===i)continue;const p=pos[j];
+      if(d===0){if((p&15)===(from&15)&&p<from&&p>=s)s=p+16;}
+      else if(d===2){if((p&15)===(from&15)&&p>from&&p<=s)s=p-16;}
+      else if(d===1){if((p>>4)===(from>>4)&&p>from&&p<=s)s=p-1;}
+      else{if((p>>4)===(from>>4)&&p<from&&p>=s)s=p+1;}}
+    return s;}
+  const tmp=new Int16Array(n);
+  function key(){let m=0;
+    if(who>=0){for(let j=0;j<n;j++)if(j!==who)tmp[m++]=pos[j];}
+    else{for(let j=0;j<n;j++)tmp[m++]=pos[j];}
+    const a=tmp.subarray(0,m).sort();let k=who>=0?pos[who]:0;
+    for(let j=0;j<m;j++)k=k*256+a[j];return k;}
+  const heur=()=>{if(who>=0)return h[pos[who]];let m=99;for(let j=0;j<n;j++)if(h[pos[j]]<m)m=h[pos[j]];return m;};
+  const goal=()=>{if(who>=0)return pos[who]===target;for(let j=0;j<n;j++)if(pos[j]===target)return true;return false;};
+  const order=[];if(who>=0)order.push(who);for(let j=0;j<n;j++)if(j!==who)order.push(j);
+  let tt,nodes=0,timedOut=false;const t0=Date.now(),path=[];
+  function dfs(g,bound){
+    if(goal())return true;
+    if(g+heur()>bound)return false;
+    const k=key(),prev=tt.get(k);if(prev!==undefined&&prev<=g)return false;tt.set(k,g);
+    if((++nodes&8191)===0&&Date.now()-t0>timeLimit)timedOut=true;
+    if(timedOut)return false;
+    for(const i of order)for(let d=0;d<4;d++){
+      const from=pos[i],to=mv(i,d);if(to===from)continue;
+      pos[i]=to;path.push([i,d]);
+      if(dfs(g+1,bound))return true;
+      path.pop();pos[i]=from;
+    }
+    return false;
+  }
+  if(goal())return {moves:[]};
+  for(let b=heur();b<=maxDepth;b++){tt=new Map();if(dfs(0,b))return {moves:path.slice()};if(timedOut)return null;}
+  return null;
+}
+
+// ---------- ワーカー（使えなければ同じ関数をその場で実行） ----------
+const Solver=(()=>{
+  let worker=null,seq=0;const waits=new Map();
+  try{
+    const src=solveCore.toString()+"\nonmessage=function(e){postMessage({id:e.data.id,res:solveCore(e.data.job)})};";
+    worker=new Worker(URL.createObjectURL(new Blob([src],{type:"text/javascript"})));
+    worker.onmessage=e=>{const w=waits.get(e.data.id);if(w){waits.delete(e.data.id);w(e.data.res);}};
+    worker.onerror=()=>{worker=null;for(const [,w] of waits)w(undefined);waits.clear();};
+  }catch(e){worker=null;}
+  return {solve(job){
+    if(worker){const id=++seq;return new Promise(res=>{waits.set(id,r=>res(r===undefined?solveCore(job):r));worker.postMessage({id,job});});}
+    return new Promise(res=>setTimeout(()=>res(solveCore(job)),30));
+  }};
+})();
+
+// ---------- 盤面 ----------
+const N=16, DR=[-16,1,16,-1];
+const COLORS=["赤","青","緑","黄"], SYMS=["丸","三角","四角","星"], ARROWS=["↑","→","↓","←"];
+const KEYS_R={r:0,b:1,g:2,y:3,"1":0,"2":1,"3":2,"4":3};
+const CENTER=[119,120,135,136];
+const rint=n=>Math.floor(Math.random()*n);
+function shuffle(a){for(let i=a.length-1;i>0;i--){const j=rint(i+1);[a[i],a[j]]=[a[j],a[i]];}return a;}
+
+function genBoard(){
+  const wE=new Array(256).fill(0), wS=new Array(256).fill(0);
+  // 中央2×2を囲む
+  wS[103]=wS[104]=wS[135]=wS[136]=1; wE[118]=wE[134]=wE[120]=wE[136]=1;
+  const targets=[]; const vq=rint(4);
+  const near=(a,b)=>Math.abs((a>>4)-(b>>4))<=1&&Math.abs((a&15)-(b&15))<=1;
+  for(let q=0;q<4;q++){
+    const r0=(q>>1)*8, c0=(q&1)*8;
+    wE[(q<2?0:15)*16+c0+1+rint(5)]=1;          // 外周の上下辺から生える壁
+    wS[(r0+1+rint(5))*16+((q&1)?15:0)]=1;       // 外周の左右辺から生える壁
+    const want=[0,1,2,3].map(c=>({color:c,sym:(c+q)%4}));
+    if(q===vq) want.push({color:-1,sym:-1});
+    for(const t of want){
+      for(let tries=0;tries<500;tries++){
+        const r=r0+1+rint(6), c=c0+1+rint(6), cell=r*16+c;
+        if(r>=6&&r<=9&&c>=6&&c<=9) continue;
+        if(targets.some(o=>near(o.cell,cell))) continue;
+        if(r===(q<2?1:14)&&wE[(q<2?0:15)*16+c-1]+wE[(q<2?0:15)*16+c]) continue;
+        targets.push({...t,cell});
+        if(Math.random()<.5){ if(r>0) wS[cell-16]=1; } else wS[cell]=1;
+        if(Math.random()<.5){ if(c>0) wE[cell-1]=1; } else wE[cell]=1;
+        break;
+      }
+    }
+  }
+  return {wE,wS,targets};
+}
+
+// ---------- 状態 ----------
+const KEY="robot-puzzle-v1";
+let S=null;            // 保存する状態
+let opt=null;          // 現在ラウンドの解 {moves} / null=未計算 / false=見つからず
+let solveTok=0, sel=0, optShown=false, anim=null, playing=false;
+let timerBase=0;       // ラウンド開始の時刻（経過時間 = now - timerBase）
+
+function newGame(){
+  const b=genBoard();
+  const taken=new Set([...CENTER,...b.targets.map(t=>t.cell)]);
+  const robots=[];
+  while(robots.length<4){const c=rint(256);if(!taken.has(c)){taken.add(c);robots.push(c);}}
+  S={wE:b.wE,wS:b.wS,targets:b.targets,robots,deck:shuffle([...b.targets.keys()]),k:0,
+     start:null,hist:[],recs:[],phase:"play",elapsed:0};
+  startRound();
+}
+const cur=()=>S.targets[S.deck[S.k]];
+function job(robots,t,extra){return Object.assign({wE:S.wE,wS:S.wS,robots,target:t.cell,who:t.color},extra);}
+
+function startRound(){
+  // 0〜1手で届くチップは後ろのチップと入れ替える（全部そうなら仕方なく出す）
+  for(let j=S.k+1;j<=S.deck.length;j++){
+    const quick=solveCore(job(S.robots,cur(),{maxDepth:1}));
+    if(!quick||j===S.deck.length) break;
+    [S.deck[S.k],S.deck[j]]=[S.deck[j],S.deck[S.k]];
+  }
+  S.start=S.robots.slice(); S.hist=[]; S.phase="play"; S.elapsed=0;
+  sel=cur().color>=0?cur().color:sel;
+  beginRound();
+}
+function beginRound(){
+  optShown=false; opt=null; timerBase=performance.now()-S.elapsed*1000; playing=false; anim=null;
+  const tok=++solveTok;
+  Solver.solve(job(S.start,cur())).then(r=>{ if(tok!==solveTok) return; opt=r||false; updateRecOpt(); render(); });
+  render(); save();
+}
+function updateRecOpt(){const rec=S.recs[S.k];if(rec&&opt)rec.opt=opt.moves.length;}
+
+// ---------- 移動 ----------
+const stopCache={key:null,t:null};
+function stops(){
+  if(stopCache.key===S.wE){return stopCache.t;}
+  const t=new Int16Array(1024);
+  const blocked=(c,d)=>{const r=c>>4,k=c&15;
+    if(d===0) return r===0||!!S.wS[c-16]; if(d===1) return k===15||!!S.wE[c];
+    if(d===2) return r===15||!!S.wS[c]; return k===0||!!S.wE[c-1];};
+  for(let c=0;c<256;c++)for(let d=0;d<4;d++){let p=c;while(!blocked(p,d))p+=DR[d];t[c*4+d]=p;}
+  stopCache.key=S.wE; stopCache.t=t; return t;
+}
+function slide(robots,i,d){
+  const from=robots[i];let s=stops()[from*4+d];if(s===from)return from;
+  robots.forEach((p,j)=>{ if(j===i) return;
+    if(d===0){if((p&15)===(from&15)&&p<from&&p>=s)s=p+16;}
+    else if(d===2){if((p&15)===(from&15)&&p>from&&p<=s)s=p-16;}
+    else if(d===1){if((p>>4)===(from>>4)&&p>from&&p<=s)s=p-1;}
+    else{if((p>>4)===(from>>4)&&p<from&&p>=s)s=p+1;}});
+  return s;
+}
+const reduced=matchMedia("(prefers-reduced-motion: reduce)");
+function doMove(i,d,fromSolver){
+  if(S.phase!=="play"||(playing&&!fromSolver)) return false;
+  finishAnim();
+  const from=S.robots[i], to=slide(S.robots,i,d);
+  if(to===from) return false;
+  S.robots[i]=to; S.hist.push({i,d,from,to}); sel=i;
+  const dist=Math.abs((to>>4)-(from>>4))+Math.abs((to&15)-(from&15));
+  anim={i,from,to,t0:performance.now(),dur:reduced.matches?1:90+dist*38,look:d};
+  look[i]=d;
+  if(!fromSolver&&reached()) win(false);
+  render(); save(); kick();
+  return true;
+}
+function reached(){const t=cur();return t.color>=0?S.robots[t.color]===t.cell:S.robots.includes(t.cell);}
+function undo(){
+  if(S.phase!=="play"||playing||!S.hist.length) return;
+  finishAnim(); const h=S.hist.pop(); S.robots[h.i]=h.from; sel=h.i; render(); save();
+}
+function resetRound(){
+  if(playing) return;
+  finishAnim(); S.robots=S.start.slice(); S.hist=[];
+  if(S.phase==="won") S.phase="play";
+  render(); save();
+}
+function win(gaveUp){
+  const n=S.hist.length, prev=S.recs[S.k];
+  const rec={moves:n,gaveUp,opt:opt?opt.moves.length:null};
+  // もう一度挑戦したときは、良いほうの結果を残す
+  if(!prev||(prev.gaveUp&&!gaveUp)||(!gaveUp&&n<prev.moves)) S.recs[S.k]=rec;
+  else if(rec.opt!=null) prev.opt=rec.opt;
+  S.phase="won"; S.elapsed=(performance.now()-timerBase)/1000; optShown=true;
+}
+function points(r){if(!r)return 0;if(r.gaveUp)return 0;if(r.opt==null)return 1;return r.moves<=r.opt?3:r.moves===r.opt+1?2:1;}
+
+async function showSolution(){
+  if(playing||!opt||S.phase==="over") return;
+  finishAnim(); S.robots=S.start.slice(); S.hist=[]; S.phase="play"; playing=true; optShown=true; render();
+  const tok=solveTok;
+  for(const [i,d] of opt.moves){
+    await wait(reduced.matches?250:420); if(tok!==solveTok) return;
+    doMove(i,d,true);
+    await wait(anim?anim.dur:0); if(tok!==solveTok) return;
+  }
+  await wait(300); if(tok!==solveTok) return;
+  playing=false; win(true); render(); save();
+}
+const wait=ms=>new Promise(r=>setTimeout(r,ms));
+function nextRound(){
+  if(S.phase!=="won") return;
+  if(S.k+1>=S.deck.length){S.phase="over";render();save();return;}
+  S.k++; startRound();
+}
+
+// ---------- 描画 ----------
+const cv=document.getElementById("board"), ctx=cv.getContext("2d"), wrap=document.getElementById("wrap");
+let C={}, cs=0, px=0;
+const look=[2,2,2,2];
+function readColors(){const st=getComputedStyle(document.documentElement);
+  for(const k of ["cell","grid","wall","center","on-wall","r0","r1","r2","r3","edge","ink","surface"])C[k]=st.getPropertyValue("--"+k).trim();}
+const rc=c=>C["r"+c];
+function resize(){
+  const w=wrap.clientWidth, dpr=Math.min(devicePixelRatio||1,3);
+  px=w; cv.width=Math.round(w*dpr); cv.height=Math.round(w*dpr);
+  ctx.setTransform(dpr,0,0,dpr,0,0); cs=w/N; draw();
+}
+const STAR=(()=>{let d="";for(let i=0;i<10;i++){const a=-Math.PI/2+i*Math.PI/5,r=i%2?19:44;d+=(i?"L":"M")+(50+r*Math.cos(a)).toFixed(1)+" "+(52+r*Math.sin(a)).toFixed(1);}return d+"Z";})();
+const SYM_D=["M12 50a38 38 0 1 0 76 0a38 38 0 1 0 -76 0Z","M50 10L93 86H7Z","M15 15H85V85H15Z",STAR];
+const VORTEX_D=["M50 50L50 8A42 42 0 0 1 92 50Z","M50 50L92 50A42 42 0 0 1 50 92Z","M50 50L50 92A42 42 0 0 1 8 50Z","M50 50L8 50A42 42 0 0 1 50 8Z"];
+const P2=SYM_D.map(d=>new Path2D(d)), PV=VORTEX_D.map(d=>new Path2D(d));
+function symbolAt(t,x,y,size,alpha){
+  ctx.save();ctx.translate(x-size/2,y-size/2);ctx.scale(size/100,size/100);ctx.globalAlpha=alpha;
+  if(t.color<0){PV.forEach((p,i)=>{ctx.fillStyle=rc(i);ctx.fill(p);});ctx.fillStyle=C.surface;ctx.beginPath();ctx.arc(50,50,12,0,7);ctx.fill();}
+  else{ctx.fillStyle=rc(t.color);ctx.fill(P2[t.sym]);ctx.lineWidth=4;ctx.strokeStyle=C.edge;ctx.stroke(P2[t.sym]);}
+  ctx.restore();
+}
+function symSVG(t){
+  if(t.color<0) return `<svg viewBox="0 0 100 100" aria-hidden="true">${VORTEX_D.map((d,i)=>`<path d="${d}" fill="var(--r${i})"/>`).join("")}<circle cx="50" cy="50" r="12" fill="var(--surface)"/></svg>`;
+  return `<svg viewBox="0 0 100 100" aria-hidden="true"><path d="${SYM_D[t.sym]}" fill="var(--r${t.color})" stroke="var(--edge)" stroke-width="4"/></svg>`;
+}
+const xy=c=>[(c&15)*cs+cs/2,(c>>4)*cs+cs/2];
+function robotXY(i,now){
+  if(anim&&anim.i===i){const k=Math.min(1,(now-anim.t0)/anim.dur),e=1-Math.pow(1-k,3);
+    const a=xy(anim.from),b=xy(anim.to);return [a[0]+(b[0]-a[0])*e,a[1]+(b[1]-a[1])*e];}
+  return xy(S.robots[i]);
+}
+function draw(now=performance.now()){
+  if(!S||!cs) return;
+  const s=cs,W=px;
+  ctx.clearRect(0,0,W,W);
+  ctx.fillStyle=C.cell;ctx.fillRect(0,0,W,W);
+  ctx.strokeStyle=C.grid;ctx.lineWidth=1;ctx.beginPath();
+  for(let i=1;i<N;i++){ctx.moveTo(i*s,0);ctx.lineTo(i*s,W);ctx.moveTo(0,i*s);ctx.lineTo(W,i*s);}ctx.stroke();
+  // 中央：いまのチップを置く
+  ctx.fillStyle=C.center;ctx.fillRect(7*s,7*s,2*s,2*s);
+  const t=cur();
+  symbolAt(t,8*s,8*s,s*1.3,1);
+  // ターゲットのマス
+  const pulse=reduced.matches?1:.5+.5*Math.sin(now/260);
+  for(const g of S.targets){
+    const [x,y]=xy(g.cell), act=g===t;
+    if(act){ctx.save();ctx.globalAlpha=.18+.22*pulse;ctx.fillStyle=g.color<0?C.ink:rc(g.color);ctx.fillRect(x-s/2,y-s/2,s,s);ctx.restore();}
+    symbolAt(g,x,y,s*(act?.62:.5),act?1:.42);
+  }
+  // 壁
+  ctx.strokeStyle=C.wall;ctx.lineWidth=Math.max(2.5,s*.13);ctx.lineCap="round";ctx.beginPath();
+  for(let c=0;c<256;c++){const r=c>>4,k=c&15;
+    if(S.wE[c]&&k<15){ctx.moveTo((k+1)*s,r*s);ctx.lineTo((k+1)*s,(r+1)*s);}
+    if(S.wS[c]&&r<15){ctx.moveTo(k*s,(r+1)*s);ctx.lineTo((k+1)*s,(r+1)*s);}}
+  ctx.stroke();
+  ctx.lineWidth=Math.max(3,s*.16);ctx.strokeRect(0,0,W,W);
+  // ラウンド開始位置（動かしたロボットだけ）
+  S.start.forEach((c,i)=>{if(S.robots[i]===c)return;const [x,y]=xy(c);
+    ctx.save();ctx.globalAlpha=.55;ctx.strokeStyle=rc(i);ctx.lineWidth=2;ctx.setLineDash([3,3]);
+    ctx.beginPath();ctx.arc(x,y,s*.3,0,7);ctx.stroke();ctx.restore();});
+  // 選択中ロボットの止まれる場所
+  if(S.phase==="play"&&!playing&&!anim){
+    const from=S.robots[sel],[fx,fy]=xy(from);
+    for(let d=0;d<4;d++){const to=slide(S.robots,sel,d);if(to===from)continue;const [tx,ty]=xy(to);
+      ctx.save();ctx.globalAlpha=.4;ctx.strokeStyle=rc(sel);ctx.lineWidth=s*.12;ctx.lineCap="round";
+      ctx.beginPath();ctx.moveTo(fx,fy);ctx.lineTo(tx,ty);ctx.stroke();
+      ctx.globalAlpha=.85;ctx.lineWidth=Math.max(2,s*.07);ctx.setLineDash([s*.12,s*.08]);
+      ctx.beginPath();ctx.arc(tx,ty,s*.34,0,7);ctx.stroke();ctx.restore();}
+  }
+  // ロボット
+  for(let i=0;i<4;i++){
+    const [x,y]=robotXY(i,now), r=s*.36;
+    ctx.fillStyle="rgba(0,0,0,.22)";ctx.beginPath();ctx.ellipse(x,y+r*.72,r*.85,r*.32,0,0,7);ctx.fill();
+    if(i===sel&&S.phase==="play"){ctx.strokeStyle=C.ink;ctx.lineWidth=Math.max(2,s*.06);ctx.beginPath();ctx.arc(x,y,r+s*.08,0,7);ctx.stroke();}
+    ctx.fillStyle=rc(i);ctx.beginPath();ctx.arc(x,y,r,0,7);ctx.fill();
+    ctx.strokeStyle=C.edge;ctx.lineWidth=Math.max(1.5,s*.045);ctx.stroke();
+    ctx.fillStyle="rgba(255,255,255,.35)";ctx.beginPath();ctx.arc(x-r*.35,y-r*.4,r*.28,0,7);ctx.fill();
+    // 目は最後に動いた向きを見る
+    const lx=[0,1,0,-1][look[i]]*r*.16, ly=[-1,0,1,0][look[i]]*r*.16;
+    for(const sx of [-1,1]){const ex=x+sx*r*.36,ey=y-r*.05;
+      ctx.fillStyle="#fff";ctx.beginPath();ctx.ellipse(ex,ey,r*.2,r*.24,0,0,7);ctx.fill();
+      ctx.fillStyle="#111";ctx.beginPath();ctx.arc(ex+lx,ey+ly,r*.1,0,7);ctx.fill();}
+  }
+}
+let raf=0;
+function loop(now){
+  raf=0;
+  if(anim&&now-anim.t0>=anim.dur){anim=null;render();}
+  draw(now);
+  if(S&&S.phase==="play"){const el=(now-timerBase)/1000;const t=fmt(el);if(sTime.textContent!==t)sTime.textContent=t;}
+  if(anim||!reduced.matches||(S&&S.phase==="play")) raf=requestAnimationFrame(loop);
+}
+function kick(){if(!raf)raf=requestAnimationFrame(loop);}
+function finishAnim(){if(anim){anim=null;}}
+const fmt=sec=>{sec=Math.floor(sec);return Math.floor(sec/60)+":"+String(sec%60).padStart(2,"0");};
+
+// ---------- パネル ----------
+const $=id=>document.getElementById(id);
+const sMoves=$("sMoves"),sOpt=$("sOpt"),sTime=$("sTime"),hist=$("history"),banner=$("banner");
+const robotBtns=$("robotBtns");
+COLORS.forEach((n,i)=>{const b=document.createElement("button");b.type="button";b.className="rbtn";b.style.background=`var(--r${i})`;
+  b.textContent=i+1;b.setAttribute("aria-label",n+"のロボット");b.onclick=()=>{sel=i;render();};robotBtns.appendChild(b);});
+function render(){
+  if(!S) return;
+  const t=cur();
+  $("tChip").innerHTML=symSVG(t);
+  $("tRound").textContent=`チップ ${S.k+1} / ${S.deck.length}`;
+  $("tWhat").textContent=t.color<0?"どのロボットでも 渦 へ":`${COLORS[t.color]}のロボットを ${COLORS[t.color]}の${SYMS[t.sym]} へ`;
+  sMoves.textContent=S.hist.length;
+  sOpt.textContent=!optShown?"?":opt===null?"…":opt===false?"—":opt.moves.length;
+  sOpt.title=optShown?(opt===false?"時間内に見つかりませんでした":"最短手数"):"押すと最短手数を表示";
+  if(S.phase!=="play") sTime.textContent=fmt(S.elapsed);
+  hist.innerHTML=S.hist.length?S.hist.map(h=>`<span class="mv"><span class="dot" style="background:var(--r${h.i})"></span>${ARROWS[h.d]}</span>`).join(""):`<span class="empty">まだ動かしていません</span>`;
+  [...robotBtns.children].forEach((b,i)=>b.setAttribute("aria-pressed",String(i===sel)));
+  $("btnUndo").disabled=S.phase!=="play"||playing||!S.hist.length;
+  $("btnReset").disabled=playing||(!S.hist.length&&S.phase==="play")||S.phase==="over";
+  $("btnSolve").disabled=playing||!opt||S.phase==="over";
+  $("btnSolve").textContent=opt===null?"計算中…":"答えを見る";
+  // 得点表
+  let total=0;
+  $("tally").innerHTML=S.deck.map((ti,k)=>{const r=S.recs[k],p=points(r);total+=p;
+    const cls=k===S.k&&S.phase!=="over"?"cur":r?"done":"";
+    return `<div class="slot ${cls}" title="${k+1}">${k<=S.k||S.phase==="over"?symSVG(S.targets[ti]):""}${r?`<span class="pt">${p}</span>`:""}</div>`;}).join("");
+  $("score").textContent=`${total} / ${S.deck.length*3}`;
+  // 結果
+  if(S.phase==="won"&&!playing){
+    const r=S.recs[S.k],p=points(r),o=opt?opt.moves.length:null;
+    $("bStars").textContent="★".repeat(p)+"☆".repeat(3-p);
+    $("bTitle").textContent=r.gaveUp?"答えはこちら":S.hist.length<=(o??Infinity)?"最短でゴール！":"ゴール！";
+    $("bSub").textContent=r.gaveUp?`最短は ${o} 手でした`:`${S.hist.length} 手（最短 ${o??"不明"} 手）・${fmt(S.elapsed)}`;
+    $("bRow").innerHTML=`<button class="btn" type="button" id="bRetry">もう一度</button><button class="btn primary" type="button" id="bNext">${S.k+1>=S.deck.length?"結果を見る":"次のチップへ"}</button>`;
+    $("bRetry").onclick=resetRound; $("bNext").onclick=nextRound; banner.hidden=false;
+  }else if(S.phase==="over"){
+    $("bStars").textContent="";
+    $("bTitle").textContent=`${total} 点`;
+    const perfect=S.recs.filter(r=>points(r)===3).length;
+    $("bSub").textContent=`17枚のうち ${perfect} 枚を最短で解きました（満点 ${S.deck.length*3} 点）`;
+    $("bRow").innerHTML=`<button class="btn primary" type="button" id="bAgain">新しい盤面で遊ぶ</button>`;
+    $("bAgain").onclick=()=>{newGame();}; banner.hidden=false;
+  }else banner.hidden=true;
+  kick();
+}
+sOpt.onclick=()=>{optShown=!optShown;render();};
+$("btnUndo").onclick=undo; $("btnReset").onclick=resetRound; $("btnSolve").onclick=showSolution;
+$("btnNew").onclick=()=>{solveTok++;playing=false;newGame();};
+document.querySelectorAll(".dpad button").forEach(b=>b.onclick=()=>doMove(sel,+b.dataset.d));
+const rules=$("rules");
+$("btnRules").onclick=()=>{rules.hidden=false;$("btnRulesClose").focus();};
+$("btnRulesClose").onclick=()=>{rules.hidden=true;try{localStorage.setItem(KEY+"-seen","1");}catch(e){}};
+
+// ---------- 入力 ----------
+let down=null;
+function cellAt(e){const b=cv.getBoundingClientRect();const c=Math.floor((e.clientX-b.left)/b.width*N),r=Math.floor((e.clientY-b.top)/b.height*N);
+  return r>=0&&r<N&&c>=0&&c<N?r*16+c:-1;}
+cv.addEventListener("pointerdown",e=>{
+  if(!S||S.phase!=="play"||playing) return;
+  const c=cellAt(e),i=S.robots.indexOf(c);
+  down={x:e.clientX,y:e.clientY,robot:i,cell:c};
+  if(i>=0){sel=i;render();}
+  cv.setPointerCapture(e.pointerId);
+});
+cv.addEventListener("pointerup",e=>{
+  if(!down) return; const d0=down; down=null;
+  const dx=e.clientX-d0.x,dy=e.clientY-d0.y,dist=Math.hypot(dx,dy);
+  if(d0.robot>=0&&dist>Math.max(14,cs*.35)){
+    const d=Math.abs(dx)>Math.abs(dy)?(dx>0?1:3):(dy>0?2:0); doMove(d0.robot,d); return;
+  }
+  if(d0.robot<0&&d0.cell>=0){
+    for(let d=0;d<4;d++){if(slide(S.robots,sel,d)===d0.cell&&S.robots[sel]!==d0.cell){doMove(sel,d);return;}}
+  }
+});
+cv.addEventListener("pointercancel",()=>{down=null;});
+document.addEventListener("keydown",e=>{
+  if(!S||e.ctrlKey||e.metaKey||e.altKey) return;
+  if(!rules.hidden){if(e.key==="Escape"||e.key==="Enter"){rules.hidden=true;e.preventDefault();}return;}
+  const k=e.key.toLowerCase();
+  const dir={arrowup:0,w:0,arrowright:1,d:1,arrowdown:2,s:2,arrowleft:3,a:3}[k];
+  if(dir!==undefined){e.preventDefault();doMove(sel,dir);return;}
+  if(k in KEYS_R){sel=KEYS_R[k];render();return;}
+  if(k==="z"||k==="backspace"){e.preventDefault();undo();return;}
+  if(k==="enter"&&S.phase==="won"&&!playing){e.preventDefault();nextRound();}
+});
+
+// ---------- 保存・テーマ・起動 ----------
+function save(){try{localStorage.setItem(KEY,JSON.stringify(S));}catch(e){}}
+function snapshot(){if(S&&S.phase==="play")S.elapsed=(performance.now()-timerBase)/1000;return {S,sel};}
+function boot(data){
+  readColors();
+  let saved=data&&data.S;
+  if(!saved){try{saved=JSON.parse(localStorage.getItem(KEY)||"null");}catch(e){saved=null;}}
+  if(saved&&saved.targets&&saved.deck){S=saved;sel=data&&data.sel!=null?data.sel:(cur().color>=0?cur().color:0);beginRound();}
+  else newGame();
+  new ResizeObserver(resize).observe(wrap); resize();
+  let seen=false;try{seen=!!localStorage.getItem(KEY+"-seen");}catch(e){}
+  if(!seen&&!(data&&data.S)) rules.hidden=false;
+}
+addEventListener("pagehide",()=>{snapshot();save();});
+matchMedia("(prefers-color-scheme: dark)").addEventListener("change",()=>{readColors();draw();});
+new MutationObserver(()=>{readColors();draw();}).observe(document.documentElement,{attributes:true,attributeFilter:["data-theme"]});
+window.claude?.hot?.snapshot?.(snapshot);
+window.claude?.hot?.ready ? window.claude.hot.ready(boot) : boot(window.claude?.hot?.data ?? {});
+</script>
+</body>
+</html>
