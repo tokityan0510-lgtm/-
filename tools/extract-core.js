@@ -6,6 +6,6 @@ const b = src.findIndex(l => l.includes('/* ===== 表示まわり ===== */'));
 let core = src.slice(a, b).join('\n');
 core = core.replace("let save = JSON.parse(JSON.stringify(DEFAULT));", "let save = JSON.parse(JSON.stringify(DEFAULT));\nconst setSave = s => { save = s; };");
 fs.writeFileSync('core.js', core + `
-module.exports = { get save(){ return save; }, setSave, L, ML, M, UPG, MODS, STAGES, SLOT_COST, upCost, modCost, slotCost, stat, layout, buildGrid, step, tap, cx, cy, fmt,
-  get blocks(){ return blocks; }, get boss(){ return boss; }, get combo(){ return combo; }, get fever(){ return fever; }, setState(s){ state = s; }, fx };
+module.exports = { get save(){ return save; }, setSave, DEFAULT, L, ML, M, SP, P, UPG, MODS, SPECIALS, PERM, STAGES, PRESTIGE_STAGE, SLOT_COST, upCost, modCost, slotCost, spCost, permCost, stat, layout, buildGrid, step, tap, cx, cy, fmt,
+  checkAch, prestige, dustGain, ACH, get blocks(){ return blocks; }, get boss(){ return boss; }, get lucky(){ return lucky; }, get combo(){ return combo; }, get fever(){ return fever; }, setState(s){ state = s; }, fx };
 `);

@@ -11,7 +11,7 @@
 :root{
   --bg:#e3e8ef; --surface:#f6f8fb; --ink:#1a2130; --muted:#5a6577; --line:#c4cdd9;
   --accent:#e0215f; --accent-deep:#a3123f; --coin:#a86f00; --coin-bg:#f6b400;
-  --scrim:rgba(227,232,239,.9); --on-accent:#ffffff; --good:#0f8a5f;
+  --scrim:rgba(227,232,239,.9); --on-accent:#ffffff; --good:#0f8a5f; --dust:#6a43c4;
   color-scheme:light;
   box-sizing:border-box;
   padding-top:env(safe-area-inset-top,0px);
@@ -21,14 +21,14 @@
   :root:not([data-theme="light"]){
     --bg:#10161f; --surface:#1a2330; --ink:#edf1f6; --muted:#93a0b3; --line:#2b3645;
     --accent:#ff4c88; --accent-deep:#b21b50; --coin:#ffc53a; --coin-bg:#ffc53a;
-    --scrim:rgba(16,22,31,.92); --on-accent:#ffffff; --good:#3ddc97;
+    --scrim:rgba(16,22,31,.92); --on-accent:#ffffff; --good:#3ddc97; --dust:#b48cff;
     color-scheme:dark;
   }
 }
 :root[data-theme="dark"]{
   --bg:#10161f; --surface:#1a2330; --ink:#edf1f6; --muted:#93a0b3; --line:#2b3645;
   --accent:#ff4c88; --accent-deep:#b21b50; --coin:#ffc53a; --coin-bg:#ffc53a;
-  --scrim:rgba(16,22,31,.92); --on-accent:#ffffff; --good:#3ddc97;
+  --scrim:rgba(16,22,31,.92); --on-accent:#ffffff; --good:#3ddc97; --dust:#b48cff;
   color-scheme:dark;
 }
 *,*::before,*::after{box-sizing:inherit}
@@ -44,120 +44,49 @@ body{
 button{font:inherit;color:inherit}
 
 /* HUD */
-.hud{padding:8px 14px 8px;display:flex;align-items:center;justify-content:space-between;gap:10px}
+.hud{padding:6px 14px 4px;display:flex;align-items:center;justify-content:space-between;gap:10px}
 .purse{min-width:0;line-height:1}
 .coins{display:flex;align-items:baseline;gap:6px}
 #coins{font-size:clamp(28px,8.6vw,44px);color:var(--coin);white-space:nowrap;font-variant-numeric:tabular-nums}
 .coins small{font-size:12px;color:var(--muted);font-weight:700}
 #prod{display:block;margin-top:4px;font-size:12px;color:var(--muted);font-weight:700;white-space:nowrap}
 #prod b{color:var(--good)}
-.hud-side{display:flex;align-items:center;gap:8px;flex-shrink:0}
-#stageName{font-size:14px;padding:5px 10px;border-radius:8px;background:var(--surface);border:1.5px solid var(--line);white-space:nowrap}
+#prod .mul{color:var(--accent);margin-left:6px}
+.hud-side{display:flex;flex-direction:column;align-items:flex-end;gap:5px;flex-shrink:0}
+#stageName{font-size:13px;padding:4px 10px;border-radius:8px;background:var(--surface);border:1.5px solid var(--line);white-space:nowrap}
 #stageSwatch{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:6px}
-.icon-btn{width:38px;height:38px;border-radius:10px;border:1.5px solid var(--line);background:var(--surface);font-size:17px;cursor:pointer;display:grid;place-items:center;padding:0}
+#dustTag{font-size:12px;font-weight:700;color:var(--dust);white-space:nowrap}
+#dustTag[hidden]{display:none}
+.icon-btn{width:34px;height:34px;border-radius:10px;border:1.5px solid var(--line);background:var(--surface);font-size:16px;cursor:pointer;display:grid;place-items:center;padding:0}
+.news{padding:0 14px 4px;font-size:11px;color:var(--muted);font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-height:16px}
+.news b{color:var(--accent)}
 
 /* Arena */
 #stage{position:relative;flex:1;min-height:0;overflow:hidden;background:#0b0f15}
 #cv{display:block;touch-action:none;cursor:crosshair}
-.chain{position:absolute;left:0;right:0;top:10px;text-align:center;pointer-events:none;opacity:0;line-height:1;color:#fff}
+.chain{position:absolute;left:0;right:0;top:8px;text-align:center;pointer-events:none;opacity:0;line-height:1;color:#fff}
 #chainNum{font-size:clamp(44px,14vw,80px);display:inline-block;transform-origin:50% 60%;
   text-shadow:0 0 18px currentColor,0 3px 0 #000,0 -2px 0 #000,3px 0 0 #000,-3px 0 0 #000}
 #chainLabel{font-size:18px;margin-left:4px;text-shadow:0 2px 0 #000,0 0 10px currentColor}
 #chainMult{display:block;margin-top:4px;font-size:15px;font-weight:700;color:#ffd84d;text-shadow:0 2px 0 #000}
+#chainTier{display:block;margin-top:2px;font-size:14px;text-shadow:0 2px 0 #000,0 0 8px currentColor}
 #fever{position:absolute;left:0;right:0;top:44%;text-align:center;pointer-events:none;opacity:0;transform:translateY(-50%)}
 #fever span{font-size:clamp(40px,13vw,76px);color:#fff;display:inline-block;
   text-shadow:0 0 20px #ff4c88,0 0 40px #ffd84d,0 4px 0 #000;animation:pulse .5s ease-in-out infinite alternate}
 #fever small{display:block;font-size:14px;color:#fff;font-weight:700;margin-top:6px;text-shadow:0 2px 0 #000}
 @keyframes pulse{from{transform:scale(1) rotate(-3deg);filter:hue-rotate(0)}to{transform:scale(1.08) rotate(3deg);filter:hue-rotate(160deg)}}
+#buffs{position:absolute;left:8px;bottom:8px;display:flex;flex-direction:column;gap:4px;pointer-events:none}
+.buff{font-size:12px;font-weight:700;color:#fff;background:rgba(0,0,0,.55);border-radius:8px;padding:4px 8px;border-left:4px solid var(--c,#ffd84d);text-shadow:0 1px 0 #000}
+.toast{position:absolute;left:50%;top:14px;transform:translate(-50%,-140%);background:rgba(0,0,0,.8);color:#fff;border-radius:12px;padding:8px 14px;
+  font-size:13px;font-weight:700;border:2px solid #ffd84d;max-width:88%;text-align:center;transition:transform .35s cubic-bezier(.2,1.4,.4,1);pointer-events:none;z-index:3}
+.toast.show{transform:translate(-50%,0)}
+.toast b{color:#ffd84d;display:block;font-size:11px;margin-bottom:2px}
 
 /* Bottom bar */
 .bar{padding:6px 14px 10px}
 .gauge{height:5px;border-radius:3px;background:var(--surface);overflow:hidden;margin-bottom:8px;border:1px solid var(--line)}
 #feverFill{height:100%;width:0;background:linear-gradient(90deg,#ff4c88,#ffd84d,#3ddc97,#4cc9ff,#b48cff)}
 .row{display:flex;align-items:center;gap:12px}
-.stat{white-space:nowrap;font-size:13px;color:var(--muted);font-weight:700}
-.stat b{font-family:"Dela Gothic One",system-ui,sans-serif;font-weight:400;font-size:20px;color:var(--ink);margin-left:4px}
-.timer{flex:1;height:12px;border-radius:6px;background:var(--surface);border:1.5px solid var(--line);overflow:hidden}
-#timeFill{height:100%;width:100%;background:var(--accent);transform-origin:left center}
-#timeText{min-width:50px;text-align:right;font-variant-numeric:tabular-nums;font-weight:700;font-size:14px}
-
-/* Overlay */
-.overlay{position:absolute;inset:0;background:var(--scrim);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);
-  overflow-y:auto;-webkit-overflow-scrolling:touch;display:flex;flex-direction:column;color:var(--ink)}
-.overlay[hidden]{display:none}
-.panel{width:100%;max-width:540px;margin:0 auto;padding:16px 16px 8px;flex:1}
-.center{display:flex;flex-direction:column;justify-content:center;gap:18px;min-height:100%}
-.big-title{margin:0;font-size:clamp(72px,24vw,132px);line-height:.92;letter-spacing:-.02em;color:var(--accent)}
-.big-title span{display:block;color:var(--ink);transform:translateX(.5em)}
-.center p{margin:0;max-width:32em;line-height:1.75;font-size:15px}
-.center h1.display{margin:0;font-size:clamp(44px,14vw,80px);line-height:1.05;color:var(--accent)}
-.welcome-num{font-size:clamp(36px,11vw,60px);color:var(--coin);line-height:1.1}
-
-.result{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:0 0 4px}
-.result div{min-width:0}
-.result dt{font-size:12px;color:var(--muted);font-weight:700}
-.result dd{margin:4px 0 0;font-size:clamp(17px,5.6vw,26px);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.result .earn dd{color:var(--coin)}
-.result .best dd{color:var(--accent)}
-
-.next{margin-top:12px;padding:12px 14px;border-radius:14px;border:2px dashed var(--accent);display:grid;grid-template-columns:auto 1fr;gap:3px 12px;align-items:center}
-.next .sw{width:42px;height:42px;border-radius:10px;grid-row:1 / span 2;box-shadow:inset 0 8px 0 rgba(255,255,255,.25)}
-.next b{font-size:16px}
-.next p{margin:0;font-size:12px;color:var(--muted);line-height:1.6}
-.next button{grid-column:1 / -1;margin-top:8px}
-.next.done{border-style:solid;border-color:var(--line)}
-
-.tabs{position:sticky;top:-16px;z-index:2;display:grid;grid-template-columns:repeat(4,1fr);gap:4px;margin:16px -16px 0;padding:10px 16px 8px;background:var(--scrim)}
-.tab{appearance:none;border:1.5px solid var(--line);background:var(--surface);border-radius:10px;padding:9px 4px;font-weight:700;font-size:14px;cursor:pointer;position:relative}
-.tab[aria-selected="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
-.tab .dot{position:absolute;top:5px;right:6px;width:7px;height:7px;border-radius:50%;background:var(--accent)}
-.hint{font-size:12px;color:var(--muted);margin:10px 0 6px;line-height:1.6}
-
-.list{list-style:none;margin:6px 0 0;padding:0;border-top:1.5px solid var(--line)}
-.list li{border-bottom:1.5px solid var(--line)}
-.item{display:grid;grid-template-columns:1fr auto;gap:3px 12px;padding:11px 2px;align-items:center}
-.item.btn{all:unset;box-sizing:border-box;width:100%;display:grid;grid-template-columns:1fr auto;gap:3px 12px;padding:11px 2px;align-items:center;cursor:pointer}
-.name{font-weight:700;font-size:15px}
-.name .lv{font-size:12px;color:var(--muted);margin-left:6px}
-.val{font-size:13px;font-weight:700;color:var(--accent)}
-.note{grid-column:1 / -1;font-size:12px;color:var(--muted);line-height:1.5}
-.cost{grid-column:2;grid-row:1 / span 2;justify-self:end;font-family:"Dela Gothic One",system-ui,sans-serif;font-size:14px;
-  padding:7px 12px;border-radius:999px;border:1.5px solid var(--line);color:var(--muted);white-space:nowrap;background:none;cursor:pointer}
-.can .cost,.cost.can{background:var(--coin-bg);border-color:var(--coin-bg);color:#1a1200}
-.item.btn[aria-disabled="true"]{cursor:default}
-.item.btn[aria-disabled="true"] .name,.item.btn[aria-disabled="true"] .val{opacity:.6}
-.acts{grid-column:2;grid-row:1 / span 2;display:flex;flex-direction:column;gap:6px;align-items:flex-end}
-.eq{appearance:none;border:1.5px solid var(--line);background:var(--surface);border-radius:999px;padding:6px 12px;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap}
-.eq.on{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
-.eq:disabled{opacity:.45;cursor:default}
-.locked .name{color:var(--muted)}
-.slots{display:flex;gap:6px;margin-top:10px;flex-wrap:wrap}
-.slot{flex:1;min-width:64px;padding:10px 6px;border-radius:10px;border:2px solid var(--accent);text-align:center;font-weight:700;font-size:14px}
-.slot.empty{border-style:dashed;border-color:var(--line);color:var(--muted)}
-.slot.lockd{border-style:dashed;border-color:var(--line);color:var(--muted);font-size:12px}
-.toggle{appearance:none;border:1.5px solid var(--line);background:var(--surface);border-radius:999px;padding:7px 14px;font-weight:700;cursor:pointer;white-space:nowrap}
-.toggle.on{background:var(--good);border-color:var(--good);color:#fff}
-
-.go,.buy{appearance:none;border:0;cursor:pointer;width:100%;border-radius:999px;
-  font-family:"Dela Gothic One",system-ui,sans-serif;font-size:20px;padding:15px 20px;
-  background:var(--accent);color:var(--on-accent);box-shadow:0 5px 0 var(--accent-deep);transition:transform .06s,box-shadow .06s}
-.go:active,.buy:active{transform:translateY(4px);box-shadow:0 1px 0 var(--accent-deep)}
-.buy{font-size:15px;padding:10px 16px}
-.buy:disabled{background:var(--surface);color:var(--muted);box-shadow:0 5px 0 var(--line);cursor:default}
-.dock{position:sticky;bottom:0;padding:10px 16px 14px;background:var(--scrim);z-index:2}
-.dock .go{display:block;max-width:508px;margin:0 auto}
-.small{appearance:none;background:none;border:0;color:var(--muted);font-size:12px;text-decoration:underline;padding:18px 0 4px;cursor:pointer}
-.small.armed{color:var(--accent);font-weight:700}
-.go:focus-visible,.buy:focus-visible,.item.btn:focus-visible,.cost:focus-visible,.eq:focus-visible,.tab:focus-visible,.toggle:focus-visible,.icon-btn:focus-visible,.small:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
-
-/* sheet */
-.sheet{position:absolute;left:0;right:0;bottom:0;height:72%;background:var(--scrim);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);
-  border-radius:18px 18px 0 0;display:flex;flex-direction:column;box-shadow:0 -6px 30px rgba(0,0,0,.25);color:var(--ink)}
-.sheet[hidden]{display:none}
-.sheet-head{display:flex;align-items:center;gap:8px;padding:10px 12px 6px}
-.sheet-head .tabs{flex:1;margin:0;padding:0;position:static;background:none;grid-template-columns:repeat(4,1fr)}
-.sheet-body{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:0 14px 24px}
-.close{flex-shrink:0}
 .prog{flex:1;min-width:0}
 .prog-label{display:flex;justify-content:space-between;font-size:12px;color:var(--muted);font-weight:700;margin-bottom:4px}
 .prog-label span:last-child{color:var(--ink);font-variant-numeric:tabular-nums}
@@ -169,8 +98,87 @@ button{font:inherit;color:inherit}
 .shop-btn:active{transform:translateY(3px);box-shadow:0 1px 0 rgba(0,0,0,.35)}
 .shop-btn .dot{position:absolute;top:6px;right:8px;width:10px;height:10px;border-radius:50%;background:var(--accent);box-shadow:0 0 0 2px var(--bg)}
 .shop-btn .dot[hidden]{display:none}
+
+/* Overlay */
+.overlay{position:absolute;inset:0;background:var(--scrim);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);
+  overflow-y:auto;-webkit-overflow-scrolling:touch;display:flex;flex-direction:column;color:var(--ink);z-index:4}
+.overlay[hidden]{display:none}
+.panel{width:100%;max-width:540px;margin:0 auto;padding:16px 16px 8px;flex:1}
+.center{display:flex;flex-direction:column;justify-content:center;gap:18px;min-height:100%}
+.big-title{margin:0;font-size:clamp(72px,24vw,132px);line-height:.92;letter-spacing:-.02em;color:var(--accent)}
+.big-title span{display:block;color:var(--ink);transform:translateX(.5em)}
+.center p{margin:0;max-width:32em;line-height:1.75;font-size:15px}
+.center h1.display{margin:0;font-size:clamp(44px,14vw,80px);line-height:1.05;color:var(--accent)}
+.welcome-num{font-size:clamp(36px,11vw,60px);color:var(--coin);line-height:1.1}
+.dust-num{font-size:clamp(36px,11vw,60px);color:var(--dust);line-height:1.1}
+
+.go,.buy{appearance:none;border:0;cursor:pointer;width:100%;border-radius:999px;
+  font-family:"Dela Gothic One",system-ui,sans-serif;font-size:20px;padding:15px 20px;
+  background:var(--accent);color:var(--on-accent);box-shadow:0 5px 0 var(--accent-deep);transition:transform .06s,box-shadow .06s}
+.go:active,.buy:active{transform:translateY(4px);box-shadow:0 1px 0 var(--accent-deep)}
+.go.ghost{background:var(--surface);color:var(--ink);box-shadow:0 5px 0 var(--line)}
+.buy{font-size:15px;padding:10px 16px}
+.buy:disabled{background:var(--surface);color:var(--muted);box-shadow:0 5px 0 var(--line);cursor:default}
+.small{appearance:none;background:none;border:0;color:var(--muted);font-size:12px;text-decoration:underline;padding:18px 0 4px;cursor:pointer}
+.small.armed{color:var(--accent);font-weight:700}
+
+/* sheet */
+.sheet{position:absolute;left:0;right:0;bottom:0;height:74%;background:var(--scrim);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);
+  border-radius:18px 18px 0 0;display:flex;flex-direction:column;box-shadow:0 -6px 30px rgba(0,0,0,.25);color:var(--ink);z-index:2}
+.sheet[hidden]{display:none}
+.sheet-head{display:flex;align-items:center;gap:8px;padding:10px 12px 6px}
+.tabs{flex:1;display:flex;gap:4px;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+.tabs::-webkit-scrollbar{display:none}
+.tab{appearance:none;border:1.5px solid var(--line);background:var(--surface);border-radius:10px;padding:8px 10px;font-weight:700;font-size:13px;cursor:pointer;position:relative;white-space:nowrap;flex-shrink:0}
+.tab[aria-selected="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.tab .dot{position:absolute;top:4px;right:5px;width:7px;height:7px;border-radius:50%;background:var(--accent)}
+.sheet-body{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:0 14px 24px}
+.close{flex-shrink:0}
+.hint{font-size:12px;color:var(--muted);margin:10px 0 6px;line-height:1.6}
+.modes{display:flex;gap:4px;margin:6px 0 2px}
+.mode{appearance:none;border:1.5px solid var(--line);background:var(--surface);border-radius:8px;padding:5px 12px;font-size:12px;font-weight:700;cursor:pointer}
+.mode.on{background:var(--accent);border-color:var(--accent);color:#fff}
+
+.list{list-style:none;margin:6px 0 0;padding:0;border-top:1.5px solid var(--line)}
+.list li{border-bottom:1.5px solid var(--line)}
+.item{display:grid;grid-template-columns:1fr auto;gap:3px 12px;padding:11px 2px;align-items:center}
+.item.btn{all:unset;box-sizing:border-box;width:100%;display:grid;grid-template-columns:1fr auto;gap:3px 12px;padding:11px 2px;align-items:center;cursor:pointer}
+.name{font-weight:700;font-size:15px}
+.name .lv{font-size:12px;color:var(--muted);margin-left:6px}
+.val{font-size:13px;font-weight:700;color:var(--accent)}
+.note{grid-column:1 / -1;font-size:12px;color:var(--muted);line-height:1.5}
+.cost{grid-column:2;grid-row:1 / span 2;justify-self:end;font-family:"Dela Gothic One",system-ui,sans-serif;font-size:14px;
+  padding:7px 12px;border-radius:999px;border:1.5px solid var(--line);color:var(--muted);white-space:nowrap;background:none;cursor:pointer}
+.cost small{font-family:inherit;font-size:10px;display:block;text-align:center;line-height:1}
+.can .cost,.cost.can{background:var(--coin-bg);border-color:var(--coin-bg);color:#1a1200}
+.cost.dust{border-color:var(--dust);color:var(--dust)}
+.can .cost.dust,.cost.dust.can{background:var(--dust);border-color:var(--dust);color:#fff}
+.item.btn[aria-disabled="true"]{cursor:default}
+.item.btn[aria-disabled="true"] .name,.item.btn[aria-disabled="true"] .val{opacity:.6}
+.acts{grid-column:2;grid-row:1 / span 2;display:flex;flex-direction:column;gap:6px;align-items:flex-end}
+.eq{appearance:none;border:1.5px solid var(--line);background:var(--surface);border-radius:999px;padding:6px 12px;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap}
+.eq.on{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
+.eq:disabled{opacity:.45;cursor:default}
+.locked .name{color:var(--muted)}
+.done .name{color:var(--good)}
+.slots{display:flex;gap:6px;margin-top:10px;flex-wrap:wrap}
+.slot{flex:1;min-width:64px;padding:10px 6px;border-radius:10px;border:2px solid var(--accent);text-align:center;font-weight:700;font-size:14px}
+.slot.empty{border-style:dashed;border-color:var(--line);color:var(--muted)}
+.slot.lockd{border-style:dashed;border-color:var(--line);color:var(--muted);font-size:12px}
 .section-title{font-size:13px;color:var(--muted);font-weight:700;margin:14px 0 2px}
-#bossbar{position:absolute;left:12px;right:12px;top:0;pointer-events:none}
+.stats{display:grid;grid-template-columns:1fr 1fr;gap:6px 12px;margin:8px 0;font-size:13px}
+.stats div{display:flex;justify-content:space-between;gap:8px;border-bottom:1px dashed var(--line);padding:3px 0}
+.stats b{font-variant-numeric:tabular-nums;white-space:nowrap}
+.ach{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:6px;margin-top:8px}
+.ach div{border:1.5px solid var(--line);border-radius:10px;padding:8px;font-size:12px;line-height:1.4;background:var(--surface)}
+.ach div.got{border-color:var(--coin-bg);background:color-mix(in srgb,var(--coin-bg) 15%,var(--surface))}
+.ach b{display:block;font-size:13px}
+.ach .d{color:var(--muted)}
+.ach div:not(.got){opacity:.55}
+.prestige-box{margin:10px 0;padding:14px;border-radius:14px;border:2px solid var(--dust);text-align:center}
+.prestige-box .dust-num{font-size:clamp(30px,9vw,48px)}
+.prestige-box p{margin:6px 0;font-size:13px;line-height:1.6}
+.go:focus-visible,.buy:focus-visible,.item.btn:focus-visible,.cost:focus-visible,.eq:focus-visible,.tab:focus-visible,.icon-btn:focus-visible,.small:focus-visible,.mode:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
 
 @media (prefers-reduced-motion: reduce){#fever span{animation:none}.go,.buy{transition:none}}
 </style>
@@ -182,14 +190,20 @@ button{font:inherit;color:inherit}
     <span id="prod"></span>
   </div>
   <div class="hud-side">
-    <span id="stageName"><span id="stageSwatch"></span><span id="stageText"></span></span>
-    <button id="mute" class="icon-btn" aria-label="音を消す">🔊</button>
+    <div style="display:flex;gap:6px;align-items:center">
+      <span id="stageName"><span id="stageSwatch"></span><span id="stageText"></span></span>
+      <button id="mute" class="icon-btn" aria-label="音を消す">🔊</button>
+    </div>
+    <span id="dustTag" hidden></span>
   </div>
 </header>
+<div class="news" id="news"></div>
 <main id="stage">
   <canvas id="cv" aria-label="ブロックのフィールド。タップで壊す"></canvas>
-  <div class="chain" id="chain"><span id="chainNum" class="display">0</span><span id="chainLabel" class="display">コンボ</span><span id="chainMult"></span></div>
+  <div class="chain" id="chain"><span id="chainNum" class="display">0</span><span id="chainLabel" class="display">コンボ</span><span id="chainTier" class="display"></span><span id="chainMult"></span></div>
   <div id="fever"><span class="display">フィーバー！</span><small>報酬3倍・威力2倍・連射2倍</small></div>
+  <div id="buffs"></div>
+  <div class="toast" id="toast"><b>実績解除</b><span id="toastText"></span></div>
   <div class="overlay" id="overlay" hidden></div>
   <section class="sheet" id="sheet" hidden aria-label="強化">
     <div class="sheet-head">
@@ -219,43 +233,55 @@ function fmt(n){
   return (v < 10 ? v.toFixed(2) : v < 100 ? v.toFixed(1) : v.toFixed(0)) + UNITS[k];
 }
 const fmtX = x => x < 100 ? x.toFixed(x < 10 ? 2 : 1) : fmt(x);
+const fmtT = s => { const h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60); return h ? `${h}時間${m}分` : `${m}分`; };
 
 const STAGES = [
-  {name:'木箱', color:'#d08a45', dark:'#8a5726', glow:'#ffb36b', bg:'#1a1410'},
-  {name:'石',   color:'#a3acb7', dark:'#636d79', glow:'#e4ecf5', bg:'#12161c'},
-  {name:'鉄',   color:'#6f88a0', dark:'#3c4f63', glow:'#a9d4ff', bg:'#0d141d'},
-  {name:'水晶', color:'#7fe0f0', dark:'#2f9db5', glow:'#c9fbff', bg:'#071a22'},
-  {name:'溶岩', color:'#ff6a2b', dark:'#a3300f', glow:'#ffb15c', bg:'#1f0b06'},
-  {name:'隕石', color:'#9a74b0', dark:'#563b6c', glow:'#e0b8ff', bg:'#130b1c'},
-  {name:'星',   color:'#ffd84d', dark:'#c99a10', glow:'#fff3b0', bg:'#14110a'},
-  {name:'銀河', color:'#b48cff', dark:'#6a43c4', glow:'#ffb3ff', bg:'#0c0820'},
+  {name:'木箱',     color:'#d08a45', dark:'#8a5726', glow:'#ffb36b', bg:'#1a1410'},
+  {name:'石',       color:'#a3acb7', dark:'#636d79', glow:'#e4ecf5', bg:'#12161c'},
+  {name:'鉄',       color:'#6f88a0', dark:'#3c4f63', glow:'#a9d4ff', bg:'#0d141d'},
+  {name:'水晶',     color:'#7fe0f0', dark:'#2f9db5', glow:'#c9fbff', bg:'#071a22'},
+  {name:'溶岩',     color:'#ff6a2b', dark:'#a3300f', glow:'#ffb15c', bg:'#1f0b06'},
+  {name:'隕石',     color:'#9a74b0', dark:'#563b6c', glow:'#e0b8ff', bg:'#130b1c'},
+  {name:'星',       color:'#ffd84d', dark:'#c99a10', glow:'#fff3b0', bg:'#14110a'},
+  {name:'銀河',     color:'#b48cff', dark:'#6a43c4', glow:'#ffb3ff', bg:'#0c0820'},
+  {name:'暗黒物質', color:'#4a4f6a', dark:'#23263a', glow:'#8f9bff', bg:'#05050c'},
+  {name:'時空',     color:'#3fd9c0', dark:'#1a7f70', glow:'#b8fff2', bg:'#031a18'},
+  {name:'次元',     color:'#ff7ad9', dark:'#a3287f', glow:'#ffd1f4', bg:'#1a0616'},
+  {name:'宇宙',     color:'#ffffff', dark:'#6a6a7a', glow:'#ffffff', bg:'#000000'},
 ];
+const PRESTIGE_STAGE = 8;   // この素材に到達したら「砕く」が解放される
 const F_VAL = 1e5;
 const sv = s => Math.pow(F_VAL, s);
-const TUNE = {fhp:4000, fdmg:2000, gaugeBase:300, gaugeGrow:1.9, bossHp:1500, bossGrow:1.35, bossReward:300, comboDecay:.6};
-const DEFAULT = {coins:0, stage:0, lv:{}, mods:{}, equip:[], slots:2, best:0, ended:false, muted:false, t:0, idleRate:0, prog:0, started:false, kills:0, boss:null};
+const TUNE = {fhp:4000, fhpLate:2000, fdmg:2000, gaugeBase:300, gaugeGrow:1.75, bossHp:1500, bossGrow:1.35, bossReward:300, comboDecay:.6};
+const DEFAULT = {
+  coins:0, stage:0, lv:{}, mods:{}, equip:[], slots:2, best:0, ended:false, muted:false, t:0, idleRate:0, prog:0, started:false, kills:0, boss:null,
+  sp:{}, ach:{}, dust:0, perm:{}, runs:0, buyMode:1, endSeen:false,
+  st:{destroyed:0, taps:0, bosses:0, lucky:0, fevers:0, time:0, earnedRun:0, earnedAll:0, offline:0, bestDust:0, bigCombo:0},
+};
 let save = JSON.parse(JSON.stringify(DEFAULT));
 const L = id => save.lv[id] || 0;
 const ML = id => save.mods[id] || 0;
 const M = id => save.equip.includes(id) ? ML(id) : 0;
+const SP = id => !!save.sp[id];
+const P = id => save.perm[id] || 0;
 
 const UPG = [
   // 放置
-  {cat:'idle', id:'drones',   name:'ドローンの台数', note:'勝手に撃ち続けるドローン',           cost:800,   g:3.10,  max:11,  v:l => `${1+l}台`},
-  {cat:'idle', id:'droneint', name:'連射速度',       note:'ドローンが撃つ間隔',                 cost:600,   g:2.40,  max:14,  v:l => `${(3*Math.pow(.85,l)).toFixed(2)}秒`},
+  {cat:'idle', id:'drones',   name:'ドローンの台数', note:'勝手に撃ち続けるドローン',           cost:800,   g:3.10,  max:11,  v:l => `${1+l+P('pdrone')}台`},
+  {cat:'idle', id:'droneint', name:'連射速度',       note:'ドローンが撃つ間隔',                 cost:600,   g:2.40,  max:14,  v:l => `${(3*Math.pow(.85,l)*(SP('rl1')?.8:1)).toFixed(2)}秒`},
   {cat:'idle', id:'dronedmg', name:'弾の威力',       note:'ドローンの弾が与えるダメージ',       cost:900,   g:2.30,  max:999, v:l => `×${fmtX(2*Math.pow(1.4,l))}`},
-  {cat:'idle', id:'spawn',    name:'湧き速度',       note:'壊れたブロックが戻ってくる速さ',     cost:1200,  g:2.50,  max:15,  v:l => `${(8*Math.pow(.85,l)).toFixed(1)}秒`},
-  {cat:'idle', id:'drburst',  name:'弾の炸裂',       note:'弾が当たったとき追加で飛ぶ破片',     cost:2500,  g:2.70,  max:10,  v:l => `+${l*2}個`},
+  {cat:'idle', id:'spawn',    name:'湧き速度',       note:'壊れたブロックが戻ってくる速さ',     cost:1200,  g:2.50,  max:15,  v:l => `${(8*Math.pow(.85,l)*(SP('sp1')?.7:1)).toFixed(1)}秒`},
+  {cat:'idle', id:'drburst',  name:'弾の炸裂',       note:'弾が当たったとき追加で飛ぶ破片',     cost:2500,  g:2.70,  max:10,  v:l => `+${l*2*(SP('bu1')?2:1)}個`},
   // 操作
   {cat:'tap',  id:'tapburst', name:'タップの破片',   note:'タップで壊したときの破片の倍率',     cost:500,   g:2.40,  max:20,  v:l => `×${2+l}`},
-  {cat:'tap',  id:'heat',     name:'熱量',           note:'1タップで溜まるフィーバーゲージ',     cost:1500,  g:2.50,  max:12,  v:l => `+${8+2*l}`},
+  {cat:'tap',  id:'heat',     name:'熱量',           note:'1タップで溜まるフィーバーゲージ',     cost:1500,  g:2.50,  max:12,  v:l => `+${((8+2*l)*(SP('ht1')?1.5:1)).toFixed(0)}`},
   {cat:'tap',  id:'fever',    name:'フィーバー',     note:'ゲージ満タンで報酬3倍・威力2倍になる時間', cost:4000, g:2.70, max:10, v:l => `${5+l}秒`},
-  {cat:'tap',  id:'tapboom',  name:'衝撃波',         note:'タップした周りのブロックにもダメージ', cost:3000, g:2.80,  max:8,   v:l => l ? `半径${(1+.3*l).toFixed(1)}・威力×${l*2}` : 'なし'},
+  {cat:'tap',  id:'tapboom',  name:'衝撃波',         note:'タップした周りのブロックにもダメージ', cost:3000, g:2.80,  max:8,   v:l => l ? `半径${(1+.3*l+(SP('sw1')?1:0)).toFixed(1)}・威力×${l*2}` : 'なし'},
   // 共通
   {cat:'core', id:'shards',   name:'破片の数',       note:'ブロックが壊れたときに飛び散る破片', cost:1000,  g:2.50,  max:25,  v:l => `${3+l}個`},
   {cat:'core', id:'power',    name:'破片の威力',     note:'破片1つが与えるダメージ',             cost:1500,  g:2.40,  max:999, v:l => `×${fmtX(Math.pow(1.35,l))}`},
   {cat:'core', id:'chain',    name:'コンボ係数',     note:'コンボが高いほど報酬が増える',       cost:5000,  g:2.70,  max:99,  v:l => `${(0.1+0.1*l).toFixed(1)}`},
-  {cat:'core', id:'crit',     name:'クリティカル',   note:'ダメージ4倍が出る確率',               cost:4000,  g:2.70,  max:15,  v:l => `${5+3*l}%`},
+  {cat:'core', id:'crit',     name:'クリティカル',   note:'大ダメージが出る確率',               cost:4000,  g:2.70,  max:15,  v:l => `${5+3*l}%`},
   {cat:'core', id:'bomb',     name:'爆弾ブロック',   note:'壊すと周りを吹き飛ばすブロックの出現率', cost:6000, g:2.70, max:15, v:l => `${(Math.min(.25,.02+.015*l)*100).toFixed(1)}%`},
   {cat:'core', id:'gold',     name:'金ブロック',     note:'価値15倍のブロックの出現率',           cost:8000,  g:2.70,  max:15,  v:l => `${Math.round(Math.min(.2,.01+.01*l)*100)}%`},
 ];
@@ -268,38 +294,97 @@ const MODS = [
   {id:'burn',     name:'炎上', note:'当たったブロックを燃やし、壊れると隣に燃え移る',   unlock:250000, cost:120000, g:2.70, max:10, v:l => `毎秒 威力×${(0.8*(1+.3*(l-1))).toFixed(1)}`},
   {id:'blast',    name:'誘爆', note:'壊れたブロックがときどき爆発する',                 unlock:400000, cost:180000, g:2.70, max:10, v:l => `${Math.round(Math.min(.5,.08+.04*(l-1))*100)}%`},
 ];
+// 特殊強化：強化Lvなどが条件で現れる一発もの
+const SPECIALS = [
+  {cat:'idle', id:'dr1', name:'ドローン改良 I',   note:'ドローンの弾の威力 ×2',               cost:15000, req:() => L('drones') >= 3,  rq:'ドローンの台数 Lv3'},
+  {cat:'idle', id:'dr2', name:'ドローン改良 II',  note:'ドローンの弾の威力 ×2',               cost:3e5,   req:() => L('drones') >= 6,  rq:'ドローンの台数 Lv6'},
+  {cat:'idle', id:'dr3', name:'ドローン改良 III', note:'ドローンの弾の威力 ×3',               cost:5e6,   req:() => L('drones') >= 9,  rq:'ドローンの台数 Lv9'},
+  {cat:'idle', id:'dr4', name:'ドローン軍団',     note:'ドローンの弾の威力 ×5',               cost:1e8,   req:() => L('drones') >= 11, rq:'ドローンの台数 Lv11'},
+  {cat:'idle', id:'rl1', name:'速射機構',         note:'ドローンの発射間隔 ×0.8',             cost:5e4,   req:() => L('droneint') >= 5, rq:'連射速度 Lv5'},
+  {cat:'idle', id:'rl2', name:'二連装',           note:'ドローンが2発同時に撃つ',             cost:2e6,   req:() => L('droneint') >= 10, rq:'連射速度 Lv10'},
+  {cat:'idle', id:'sp1', name:'再生促進',         note:'ブロックの湧き速度 ×0.7',             cost:1e5,   req:() => L('spawn') >= 5,   rq:'湧き速度 Lv5'},
+  {cat:'idle', id:'bu1', name:'榴弾',             note:'弾の炸裂で飛ぶ破片 ×2',               cost:8e5,   req:() => L('drburst') >= 5, rq:'弾の炸裂 Lv5'},
+  {cat:'tap',  id:'tp1', name:'鉄拳',             note:'タップのボスへの威力と衝撃波 ×2',     cost:3e4,   req:() => L('tapburst') >= 5, rq:'タップの破片 Lv5'},
+  {cat:'tap',  id:'tp2', name:'連打の達人',       note:'長押しの連打が速くなる（0.17秒→0.11秒）', cost:1e6, req:() => L('tapburst') >= 10, rq:'タップの破片 Lv10'},
+  {cat:'tap',  id:'ht1', name:'発熱体',           note:'タップで溜まる熱量 ×1.5',             cost:2e5,   req:() => L('heat') >= 5,    rq:'熱量 Lv5'},
+  {cat:'tap',  id:'fv1', name:'延長戦',           note:'フィーバー中もタップで熱量が溜まり、時間が延びる', cost:3e6, req:() => L('fever') >= 5, rq:'フィーバー Lv5'},
+  {cat:'tap',  id:'sw1', name:'衝撃波拡大',       note:'衝撃波の半径 +1',                     cost:2e6,   req:() => L('tapboom') >= 4, rq:'衝撃波 Lv4'},
+  {cat:'core', id:'sh1', name:'破片強化 I',       note:'破片の威力 ×2',                       cost:5e4,   req:() => L('power') >= 5,   rq:'破片の威力 Lv5'},
+  {cat:'core', id:'sh2', name:'破片強化 II',      note:'破片の威力 ×2',                       cost:2e6,   req:() => L('power') >= 10,  rq:'破片の威力 Lv10'},
+  {cat:'core', id:'sh3', name:'破片強化 III',     note:'破片の威力 ×3',                       cost:1e8,   req:() => L('power') >= 15,  rq:'破片の威力 Lv15'},
+  {cat:'core', id:'cr1', name:'致命傷',           note:'クリティカルの倍率 ×4 → ×6',          cost:5e5,   req:() => L('crit') >= 5,    rq:'クリティカル Lv5'},
+  {cat:'core', id:'cr2', name:'超致命傷',         note:'クリティカルの倍率 → ×8',             cost:5e7,   req:() => L('crit') >= 10,   rq:'クリティカル Lv10'},
+  {cat:'core', id:'cb1', name:'コンボ維持',       note:'コンボの減衰が半分になる',           cost:3e5,   req:() => L('chain') >= 5,   rq:'コンボ係数 Lv5'},
+  {cat:'core', id:'cb2', name:'コンボ記憶',       note:'コンボの減衰がさらに半分になる',     cost:2e7,   req:() => L('chain') >= 10,  rq:'コンボ係数 Lv10'},
+  {cat:'core', id:'go1', name:'金塊',             note:'金ブロックの価値 ×2',                 cost:1e6,   req:() => L('gold') >= 5,    rq:'金ブロック Lv5'},
+  {cat:'core', id:'bm1', name:'大爆発',           note:'爆弾の半径 ×1.3・威力 ×2',            cost:1e6,   req:() => L('bomb') >= 5,    rq:'爆弾ブロック Lv5'},
+  {cat:'core', id:'lk1', name:'幸運の星 I',       note:'幸運ブロックの出現間隔 −25%',        cost:2e5,   req:() => save.st.destroyed >= 2000, rq:'累計2,000個破壊'},
+  {cat:'core', id:'lk2', name:'幸運の星 II',      note:'幸運ブロックの出現間隔 さらに −25%', cost:1e7,   req:() => save.st.lucky >= 10, rq:'幸運ブロック10回'},
+  {cat:'core', id:'lk3', name:'幸運の持続',       note:'幸運ブロックの効果時間 ×1.5',        cost:1e8,   req:() => save.st.lucky >= 25, rq:'幸運ブロック25回'},
+  {cat:'core', id:'lk4', name:'幸運の連鎖',       note:'幸運ブロックを叩くと破片が100個飛ぶ', cost:5e6, req:() => save.st.lucky >= 5, rq:'幸運ブロック5回'},
+];
+// 星屑で買う永続強化（砕いても残る）
+const PERM = [
+  {id:'pmult',  name:'星屑の輝き',     note:'全部の報酬 +25%',                       cost:5,  g:1.6, max:20, v:l => `+${l*25}%`},
+  {id:'pdrone', name:'初期ドローン',   note:'最初からドローンが多い',                cost:8,  g:1.8, max:5,  v:l => `+${l}台`},
+  {id:'pstage', name:'先の素材から',   note:'砕いたあと、先の素材から始まる',        cost:20, g:2.0, max:6,  v:l => l ? `${STAGES[l].name}から` : '木箱から'},
+  {id:'plucky', name:'幸運の軌道',     note:'幸運ブロックの出現間隔 −15%',           cost:12, g:1.7, max:5,  v:l => `−${Math.round((1-Math.pow(.85,l))*100)}%`},
+  {id:'pauto',  name:'自動タップ',     note:'毎秒勝手にタップする（放置でもフィーバーが起きる）', cost:40, g:2.0, max:3, v:l => `毎秒${l}回`},
+  {id:'poff',   name:'長期休暇',       note:'オフライン収入の上限時間 +4時間',      cost:10, g:1.7, max:4,  v:l => `${8+4*l}時間`},
+  {id:'pslot',  name:'広い装備枠',     note:'最初から装備枠が多い',                  cost:30, g:2.5, max:2,  v:l => `${2+l}枠から`},
+  {id:'pkeep',  name:'モジュール記憶', note:'砕いてもモジュールのLvが残る',          cost:80, g:1,   max:1,  v:l => l ? '有効' : '無効'},
+  {id:'pcrit',  name:'星の眼',         note:'クリティカル率 +5%',                    cost:15, g:1.8, max:4,  v:l => `+${5*l}%`},
+];
 const SLOT_COST = [0, 0, 3e5, 1e8];
-const upCost  = u => Math.ceil(u.cost * Math.pow(u.g, L(u.id)) * sv(save.stage));
+const upCost  = (u, l = L(u.id)) => Math.ceil(u.cost * Math.pow(u.g, l) * sv(save.stage));
+const upCostN = (u, n) => { let s = 0; for (let k = 0; k < n; k++) s += upCost(u, L(u.id) + k); return s; };
+const upMaxN  = u => { let n = 0, s = 0; while (L(u.id) + n < u.max){ const c = upCost(u, L(u.id) + n); if (s + c > save.coins) break; s += c; n++; } return n; };
 const modCost = m => Math.ceil((ML(m.id) ? m.cost * Math.pow(m.g, ML(m.id) - 1) : m.unlock) * sv(save.stage));
 const slotCost = () => SLOT_COST[save.slots] * sv(save.stage);
+const spCost = s => Math.ceil(s.cost * sv(save.stage));
+const permCost = p => Math.ceil(p.cost * Math.pow(p.g, P(p.id)));
+
+// 幸運ブロックの効果（バフ）
+const buffs = {frenzy:0, barrage:0, awaken:0, storm:0};
+const BUFF_INFO = {frenzy:['フレンジー 報酬×7', '#ffd84d'], barrage:['弾幕 連射×8', '#4cc9ff'], awaken:['覚醒 クリティカル100%', '#ffe14d'], storm:['破片嵐', '#ff4c88']};
+const achCount = () => Object.keys(save.ach).length;
+const rewardMult = () => (1 + .01 * achCount()) * (1 + .25 * P('pmult')) * (1 + .02 * save.dust) * (buffs.frenzy > 0 ? 7 : 1) * (fever > 0 ? 3 : 1);
+const comboMult = () => 1 + Math.sqrt(combo) * stat.chain();
+const luckyInterval = () => 110 * (SP('lk1') ? .75 : 1) * (SP('lk2') ? .75 : 1) * Math.pow(.85, P('plucky'));
 
 const stat = {
   shards:   () => 3 + L('shards'),
-  dmg:      () => 100 * Math.pow(TUNE.fdmg, save.stage) * Math.pow(1.35, L('power')),
-  drones:   () => 1 + L('drones'),
-  droneInt: () => 3 * Math.pow(.85, L('droneint')),
-  droneDmg: () => 2 * Math.pow(1.4, L('dronedmg')),
-  spawn:    () => 8 * Math.pow(.85, L('spawn')),
-  drburst:  () => L('drburst') * 2,
+  dmg:      () => 100 * Math.pow(TUNE.fdmg, save.stage) * Math.pow(1.35, L('power')) * (SP('sh1') ? 2 : 1) * (SP('sh2') ? 2 : 1) * (SP('sh3') ? 3 : 1),
+  drones:   () => Math.min(12, 1 + L('drones') + P('pdrone')),
+  droneInt: () => 3 * Math.pow(.85, L('droneint')) * (SP('rl1') ? .8 : 1) * (buffs.barrage > 0 ? .125 : 1),
+  droneDmg: () => 2 * Math.pow(1.4, L('dronedmg')) * (SP('dr1') ? 2 : 1) * (SP('dr2') ? 2 : 1) * (SP('dr3') ? 3 : 1) * (SP('dr4') ? 5 : 1),
+  spawn:    () => 8 * Math.pow(.85, L('spawn')) * (SP('sp1') ? .7 : 1),
+  drburst:  () => L('drburst') * 2 * (SP('bu1') ? 2 : 1),
   tapburst: () => 2 + L('tapburst'),
-  heat:     () => 8 + 2 * L('heat'),
+  tapPow:   () => SP('tp1') ? 2 : 1,
+  heat:     () => (8 + 2 * L('heat')) * (SP('ht1') ? 1.5 : 1),
   fever:    () => 5 + L('fever'),
   tapboom:  () => L('tapboom'),
   chain:    () => 0.1 + 0.1 * L('chain'),
-  crit:     () => 0.05 + 0.03 * L('crit'),
+  crit:     () => buffs.awaken > 0 ? 1 : 0.05 + 0.03 * L('crit') + .05 * P('pcrit'),
+  critX:    () => SP('cr2') ? 8 : SP('cr1') ? 6 : 4,
   bomb:     () => Math.min(.25, .02 + .015 * L('bomb')),
   gold:     () => Math.min(.2, .01 + .01 * L('gold')),
+  decay:    () => TUNE.comboDecay * (SP('cb1') ? .5 : 1) * (SP('cb2') ? .5 : 1),
+  holdMs:   () => SP('tp2') ? 110 : 170,
 };
-const blockHp = s => 300 * Math.pow(TUNE.fhp, s);
+// 暗黒物質以降はHPの伸びをダメージと揃える（差が積み重なって終盤だけ詰まるのを防ぐ）
+const blockHp = s => 300 * Math.pow(TUNE.fhp, Math.min(s, PRESTIGE_STAGE)) * Math.pow(TUNE.fhpLate, Math.max(0, s - PRESTIGE_STAGE));
 const gaugeNeed = () => Math.round(TUNE.gaugeBase * Math.pow(TUNE.gaugeGrow, save.kills));
 const bossHp = () => blockHp(save.stage) * TUNE.bossHp * Math.pow(TUNE.bossGrow, save.kills);
+const dustGain = () => save.stage < PRESTIGE_STAGE ? 0 : Math.floor(10 * Math.pow(2, (Math.log10(Math.max(1, save.st.earnedRun)) - 37) / 5));
 
 let W = 390, H = 560, cols = 7, rows = 9, cell = 55.7, offX = 0, offY = 0, topBand = 0;
-let blocks = [], shards = [], booms = [], zaps = [], bullets = [], drones = [], boss = null;
-let combo = 0, fever = 0, heat = 0, state = 'title', lastTap = 99, earnedTick = 0, bossGone = 0;
+let blocks = [], shards = [], booms = [], zaps = [], bullets = [], drones = [], boss = null, lucky = null;
+let combo = 0, fever = 0, heat = 0, state = 'title', lastTap = 99, earnedTick = 0, luckyT = 60, autoT = 0;
 const MAXS = 1500;
-const fx = {hit(){}, brk(){}, boom(){}, bolt(){}, fever(){}, milestone(){}, tap(){}, split(){}, bossHit(){}, bossSpawn(){}, bossDie(){}, shoot(){}, spawn(){}};
-const MILESTONES = new Set([50, 100, 250, 500, 1000, 2500, 5000, 10000, 25000, 50000, 100000]);
+const fx = {hit(){}, brk(){}, boom(){}, bolt(){}, fever(){}, milestone(){}, tap(){}, split(){}, bossHit(){}, bossSpawn(){}, bossDie(){}, shoot(){}, spawn(){}, lucky(){}, luckyHit(){}, ach(){}};
+const TIERS = [[25, 'いいぞ', '#ffe14d'], [50, 'ナイス！', '#ffe14d'], [100, 'スゴい！', '#ff9a3c'], [250, 'ヤバい！', '#ff4c88'], [500, '狂気', '#c38bff'], [1000, '神', '#4cc9ff'], [2500, '宇宙', '#ffffff'], [5000, '無量大数', '#ffffff']];
 let milestoneSeen = 0;
 
 function layout(w, h){
@@ -315,7 +400,7 @@ function newBlock(){
   let type = 'n';
   if (r < bp) type = 'bomb'; else if (r < bp + gp) type = 'gold'; else if (r < bp + gp + .1) type = 'hard';
   const hp = blockHp(save.stage) * (.8 + Math.random() * .6) * (type === 'hard' ? 4 : 1) * (type === 'gold' ? 1.5 : 1);
-  const value = 100 * sv(save.stage) * (type === 'gold' ? 15 : type === 'hard' ? 3 : 1);
+  const value = 100 * sv(save.stage) * (type === 'gold' ? 15 * (SP('go1') ? 2 : 1) : type === 'hard' ? 3 : 1);
   return {alive:true, hp, max:hp, type, value, burn:0, burnDps:0, spawn:0, flash:0, cracks:null, re:0};
 }
 function deadBlock(delay){ return {alive:false, re:delay, spawn:0, flash:0, burn:0}; }
@@ -341,10 +426,11 @@ function spawnBoss(saved){
 }
 const bossX = () => (cx(boss.cells[0]) + cx(boss.cells[1])) / 2;
 const bossY = () => (cy(boss.cells[0]) + cy(boss.cells[2])) / 2;
+function earn(gain){ save.coins += gain; earnedTick += gain; save.st.earnedRun += gain; save.st.earnedAll += gain; return gain; }
 function hitBoss(dmg, src){
   if (!boss) return;
   let crit = false;
-  if (src !== 'burn' && Math.random() < stat.crit()){ dmg *= 4; crit = true; }
+  if (src !== 'burn' && Math.random() < stat.crit()){ dmg *= stat.critX(); crit = true; }
   if (fever > 0) dmg *= 2;
   boss.hp -= dmg; boss.flash = 1; save.boss.hp = boss.hp;
   fx.bossHit(dmg, crit);
@@ -352,25 +438,46 @@ function hitBoss(dmg, src){
 }
 function killBoss(){
   const b = boss; boss = null; save.boss = null;
-  const gain = 100 * sv(save.stage) * TUNE.bossReward * (1 + Math.sqrt(combo) * stat.chain()) * (fever > 0 ? 3 : 1);
-  save.coins += gain; earnedTick += gain; save.kills++; save.prog = 0;
+  const gain = earn(100 * sv(save.stage) * TUNE.bossReward * comboMult() * rewardMult());
+  save.kills++; save.st.bosses++; save.prog = 0;
   const prevStage = save.stage;
   if (save.stage < STAGES.length - 1) save.stage++; else save.ended = true;
   for (let i = 0; i < blocks.length; i++) blocks[i] = newBlock();
   fx.bossDie(b, gain, prevStage);
 }
 
-function tap(x, y){
+function spawnLucky(){
+  const side = Math.random() < .5 ? -1 : 1, y = offY + cell * (1 + Math.random() * (rows - 2));
+  lucky = {x:side < 0 ? -cell : W + cell, y, vx:-side * cell * .55, vy:0, life:14 + (SP('lk3') ? 4 : 0), ph:Math.random() * 6, r:cell * .42};
+  fx.lucky(lucky);
+}
+function hitLucky(){
+  const lk = lucky; lucky = null; save.st.lucky++;
+  const dur = SP('lk3') ? 1.5 : 1;
+  const roll = Math.random(); let kind, text;
+  if (roll < .36){ kind = 'frenzy'; buffs.frenzy = 60 * dur; text = 'フレンジー！　報酬 ×7'; }
+  else if (roll < .58){ kind = 'barrage'; buffs.barrage = 25 * dur; text = '弾幕！　ドローン連射 ×8'; }
+  else if (roll < .76){ kind = 'rain'; const g = earn(Math.max(100 * sv(save.stage) * 200, save.idleRate * 900) * rewardMult()); text = 'コイン雨！　+' + fmt(g); }
+  else if (roll < .92){ kind = 'awaken'; buffs.awaken = 20 * dur; text = '覚醒！　クリティカル100%'; }
+  else { kind = 'storm'; buffs.storm = 1; text = '破片嵐！'; spawnShards(lk.x, lk.y, 400, -1, 0); }
+  if (SP('lk4')) spawnShards(lk.x, lk.y, 100, -1, 0);
+  heat = Math.min(100, heat + 30);
+  fx.luckyHit(lk, text, kind);
+}
+
+function tap(x, y, auto){
   if (state !== 'play') return false;
-  lastTap = 0;
-  heat += stat.heat();
-  if (fever <= 0 && heat >= 100){ heat = 0; fever = stat.fever(); fx.fever(); }
+  if (!auto){ lastTap = 0; save.st.taps++; }
+  if (lucky && Math.hypot(lucky.x - x, lucky.y - y) < lucky.r * 1.6){ hitLucky(); fx.tap(x, y); return true; }
+  const fv = stat.fever();
+  if (fever > 0){ if (SP('fv1')) fever = Math.min(fv * 2, fever + stat.heat() / 100 * fv * .5); }
+  else { heat += stat.heat(); if (heat >= 100){ heat = 0; fever = fv; save.st.fevers++; fx.fever(); } }
   const i = cellAt(x, y);
-  if (i >= 0 && blocks[i].boss && boss){ hitBoss(stat.dmg() * 25, 'tap'); spawnShards(x, y, stat.shards() * stat.tapburst(), i, 0); }
+  if (i >= 0 && blocks[i].boss && boss){ hitBoss(stat.dmg() * 25 * stat.tapPow(), 'tap'); spawnShards(x, y, stat.shards() * stat.tapburst(), i, 0); }
   else if (i >= 0 && blocks[i].alive) breakBlock(i, stat.tapburst(), 'tap');
   else spawnShards(x, y, stat.shards() * stat.tapburst(), i, 0);
   const tb = stat.tapboom();
-  if (tb) booms.push({x, y, i:Math.max(0, i), R:cell * (1 + .3 * tb), dmg:stat.dmg() * tb * 2, t:.04, big:false, quiet:true});
+  if (tb) booms.push({x, y, i:Math.max(0, i), R:cell * (1 + .3 * tb + (SP('sw1') ? 1 : 0)), dmg:stat.dmg() * tb * 2 * stat.tapPow(), t:.04, big:false, quiet:true});
   fx.tap(x, y);
   return true;
 }
@@ -407,7 +514,7 @@ function hit(i, dmg, src){
   if (b.boss){ hitBoss(dmg, src); return; }
   if (!b.alive) return;
   let crit = false;
-  if (src !== 'burn' && Math.random() < stat.crit()){ dmg *= 4; crit = true; }
+  if (src !== 'burn' && Math.random() < stat.crit()){ dmg *= stat.critX(); crit = true; }
   if (fever > 0) dmg *= 2;
   b.hp -= dmg; b.flash = 1;
   fx.hit(i, dmg, crit, src);
@@ -417,13 +524,12 @@ function hit(i, dmg, src){
 function breakBlock(i, burst, src){
   const b = blocks[i]; if (!b.alive) return;
   blocks[i] = deadBlock(stat.spawn() * (.7 + Math.random() * .6));
-  combo += 1;
-  const gain = b.value * (1 + Math.sqrt(combo) * stat.chain()) * (fever > 0 ? 3 : 1);
-  save.coins += gain; earnedTick += gain;
+  combo += 1; save.st.destroyed++;
+  const gain = earn(b.value * comboMult() * rewardMult());
   if (!boss){ save.prog++; if (save.prog >= gaugeNeed()) spawnBoss(null); }
   const x = cx(i), y = cy(i);
   spawnShards(x, y, stat.shards() * burst, i, 0);
-  if (b.type === 'bomb') booms.push({x, y, i, R:cell * 1.7, dmg:stat.dmg() * 5, t:.08, big:true});
+  if (b.type === 'bomb') booms.push({x, y, i, R:cell * 1.7 * (SP('bm1') ? 1.3 : 1), dmg:stat.dmg() * 5 * (SP('bm1') ? 2 : 1), t:.08, big:true});
   const bl = M('blast');
   if (bl && b.type !== 'bomb' && Math.random() < Math.min(.5, .08 + .04 * (bl - 1))) booms.push({x, y, i, R:cell * 1.25, dmg:stat.dmg() * 2, t:.08, big:false});
   const bo = M('bolt');
@@ -438,9 +544,8 @@ function breakBlock(i, burst, src){
   fx.brk(i, b, gain, src);
   const cm = Math.floor(combo);
   if (cm > save.best) save.best = cm;
-  if (MILESTONES.has(cm) && cm > milestoneSeen){ milestoneSeen = cm; fx.milestone(cm); }
+  for (const [n, name] of TIERS) if (cm === n && cm > milestoneSeen){ milestoneSeen = cm; fx.milestone(cm, name); }
 }
-function alive(){ let n = 0; for (const b of blocks) if (b.alive) n++; return n; }
 function droneTarget(){
   const pool = [];
   for (let j = 0; j < blocks.length; j++){ const b = blocks[j]; if (b.alive) pool.push(j); }
@@ -454,34 +559,54 @@ function droneTarget(){
   }
   return best;
 }
+function fireDrone(d){
+  const j = droneTarget();
+  if (j === -1) return;
+  const tx = j === -2 ? bossX() : cx(j), ty = j === -2 ? bossY() : cy(j);
+  const dx = tx - d.x, dy = ty - d.y, len = Math.hypot(dx, dy) || 1, v = cell * 16;
+  bullets.push({x:d.x, y:d.y, vx:dx / len * v, vy:dy / len * v, tx, ty, j, life:len / v + .05});
+  fx.shoot(d, tx, ty);
+}
 function step(dt){
   if (state !== 'play') return;
-  lastTap += dt;
-  let burning = false;
+  lastTap += dt; save.st.time += dt;
   for (let i = 0; i < blocks.length; i++){
     const b = blocks[i];
     if (b.flash > 0) b.flash -= dt * 8;
     if (b.alive){
       if (b.spawn < 1) b.spawn = Math.min(1, b.spawn + dt * 5);
-      if (b.burn > 0){ burning = true; b.burn -= dt; b.hp -= b.burnDps * dt * (fever > 0 ? 2 : 1); if (b.hp <= 0) breakBlock(i, 1, 'burn'); }
+      if (b.burn > 0){ b.burn -= dt; b.hp -= b.burnDps * dt * (fever > 0 ? 2 : 1); if (b.hp <= 0) breakBlock(i, 1, 'burn'); }
     } else if (!b.boss){
       b.re -= dt; if (b.re <= 0){ blocks[i] = newBlock(); fx.spawn(i); }
     }
   }
   if (boss){ if (boss.spawn < 1) boss.spawn = Math.min(1, boss.spawn + dt * 2); if (boss.flash > 0) boss.flash -= dt * 8; }
-  // drones
+  // 幸運ブロック
+  luckyT -= dt;
+  if (!lucky && luckyT <= 0){ spawnLucky(); luckyT = luckyInterval() * (.7 + Math.random() * .6); }
+  if (lucky){
+    lucky.ph += dt; lucky.x += lucky.vx * dt; lucky.y += Math.sin(lucky.ph * 1.3) * cell * .6 * dt; lucky.life -= dt;
+    if (lucky.life <= 0 || lucky.x < -cell * 1.5 || lucky.x > W + cell * 1.5) lucky = null;
+  }
+  // 自動タップ（星屑）
+  if (P('pauto')){
+    autoT += dt;
+    if (autoT >= 1 / P('pauto')){
+      autoT = 0;
+      const al = []; for (let j = 0; j < blocks.length; j++) if (blocks[j].alive) al.push(j);
+      if (lucky) tap(lucky.x, lucky.y, true);
+      else if (boss && Math.random() < .5) tap(bossX(), bossY(), true);
+      else if (al.length){ const j = al[(Math.random() * al.length) | 0]; tap(cx(j), cy(j), true); }
+    }
+  }
+  // ドローン
   const nd = stat.drones(), di = stat.droneInt() * (fever > 0 ? .5 : 1);
   for (let k = 0; k < nd; k++){
     const d = drones[k]; d.ph += dt;
     d.t -= dt;
     if (d.t <= 0){
       d.t = di * (.8 + Math.random() * .4);
-      const j = droneTarget();
-      if (j === -1) continue;
-      const tx = j === -2 ? bossX() : cx(j), ty = j === -2 ? bossY() : cy(j);
-      const dx = tx - d.x, dy = ty - d.y, len = Math.hypot(dx, dy) || 1, v = cell * 16;
-      bullets.push({x:d.x, y:d.y, vx:dx / len * v, vy:dy / len * v, tx, ty, j, life:len / v + .05});
-      fx.shoot(d, tx, ty);
+      fireDrone(d); if (SP('rl2')) fireDrone(d);
     }
   }
   for (let k = bullets.length - 1; k >= 0; k--){
@@ -560,10 +685,47 @@ function step(dt){
     if (pts.length > 1) fx.bolt(pts);
   }
   if (fever > 0) fever = Math.max(0, fever - dt); else heat = Math.max(0, heat - 6 * dt);
-  combo = Math.max(0, combo - combo * TUNE.comboDecay * dt);
+  for (const k in buffs) if (buffs[k] > 0) buffs[k] = Math.max(0, buffs[k] - dt);
+  combo = Math.max(0, combo - combo * stat.decay() * dt);
   if (combo < 1) milestoneSeen = 0;
 }
 
+/* ---- 実績 ---- */
+const ACH = [];
+function achSet(key, label, thresholds, names, get, fmtv = fmt){
+  thresholds.forEach((t, k) => ACH.push({id:`${key}${k}`, name:names[k], desc:`${label} ${fmtv(t)}`, ok:() => get() >= t}));
+}
+achSet('d', '累計破壊', [100, 1000, 1e4, 1e5, 1e6, 1e7], ['はじめの一撃', '壊し屋', '解体業者', '破壊神見習い', '破壊神', '粉砕機'], () => save.st.destroyed);
+achSet('c', '累計コイン', [1e4, 1e6, 1e8, 1e12, 1e16, 1e20, 1e24, 1e32, 1e40, 1e48, 1e56, 1e64], ['小銭', '札束', '億り人', '兆の壁', '京', '垓', '秭', '溝', '正', '極', '恒河沙', '無量大数'], () => save.st.earnedAll);
+achSet('k', 'コンボ', [25, 50, 100, 250, 500, 1000, 2500, 5000], ['つながった', 'ナイスコンボ', '百連', 'ゾーン', '狂気の沙汰', '神の領域', '宇宙規模', '無量大数コンボ'], () => save.best, n => n.toLocaleString('ja-JP'));
+achSet('b', 'ボス撃破', [1, 3, 5, 8, 12, 20, 30, 50], ['初撃破', 'ボスハンター', '常連', '銀河の壁', '宇宙の壁', '輪廻', '殲滅', 'ボスの天敵'], () => save.st.bosses, n => n + '体');
+achSet('t', 'タップ', [100, 1000, 5000, 2e4, 1e5], ['指慣らし', '連打', '腱鞘炎', '指が消えた', '指の神'], () => save.st.taps, n => n.toLocaleString('ja-JP') + '回');
+achSet('l', '幸運ブロック', [1, 5, 10, 25, 50, 100], ['ラッキー', '幸運体質', '運命の人', '星を掴む', '運を支配', '幸運そのもの'], () => save.st.lucky, n => n + '回');
+achSet('f', 'フィーバー', [1, 10, 50, 100, 250], ['熱い', '沸騰', '燃え尽きない', '永久機関', '太陽'], () => save.st.fevers, n => n + '回');
+achSet('p', '砕いた回数', [1, 2, 5, 10], ['宇宙、粉砕', '二度目の宇宙', '創造と破壊', '神話'], () => save.runs, n => n + '回');
+achSet('u', '強化レベル合計', [10, 50, 100, 200, 300], ['初心者', '育成中', '鍛え上げ', '完全体', '極限'], () => UPG.reduce((s, u) => s + L(u.id), 0), n => n);
+achSet('h', 'プレイ時間', [600, 3600, 3 * 3600, 10 * 3600, 24 * 3600], ['10分', '1時間', '3時間', '10時間', '丸一日'], () => save.st.time, fmtT);
+ACH.push({id:'mall', name:'全モジュール', desc:'7種のモジュールを全部解放', ok:() => MODS.every(m => ML(m.id) > 0)});
+ACH.push({id:'slot4', name:'フル装備', desc:'装備枠を4つにする', ok:() => save.slots >= 4});
+ACH.push({id:'off1', name:'おかえり', desc:'オフライン収入を受け取る', ok:() => save.st.offline >= 1});
+ACH.push({id:'sp10', name:'特殊部隊', desc:'特殊強化を10個買う', ok:() => Object.keys(save.sp).length >= 10});
+ACH.push({id:'spall', name:'全部入り', desc:'特殊強化を全部買う', ok:() => SPECIALS.every(s => SP(s.id))});
+ACH.push({id:'dust100', name:'星屑の山', desc:'星屑を累計100集める', ok:() => save.st.bestDust >= 100});
+function checkAch(){
+  for (const a of ACH) if (!save.ach[a.id] && a.ok()){ save.ach[a.id] = 1; fx.ach(a); }
+}
+
+/* ---- 砕く（転生） ---- */
+function prestige(){
+  const d = dustGain();
+  save.dust += d; save.st.bestDust += d; save.runs++;
+  const keepMods = P('pkeep') ? save.mods : {};
+  Object.assign(save, {coins:0, stage:Math.min(P('pstage'), STAGES.length - 1), lv:{}, mods:keepMods, equip:[], slots:2 + P('pslot'), ended:false, endSeen:false, prog:0, kills:0, boss:null, sp:{}, idleRate:0});
+  save.st.earnedRun = 0;
+  for (const k in buffs) buffs[k] = 0;
+  combo = 0; fever = 0; heat = 0; boss = null; lucky = null; luckyT = 30;
+  return d;
+}
 
 /* ===== 表示まわり ===== */
 const $ = s => document.querySelector(s);
@@ -571,8 +733,13 @@ const cv = $('#cv'), ctx = cv.getContext('2d');
 const stageEl = $('#stage'), overlay = $('#overlay'), sheet = $('#sheet'), sheetBody = $('#sheetBody'), tabsEl = $('#tabs');
 const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-const KEY = 'rensa-hakai-v4';
-function load(){ try { const s = localStorage.getItem(KEY); if (s) save = Object.assign(JSON.parse(JSON.stringify(DEFAULT)), JSON.parse(s)); } catch(e) {} }
+const KEY = 'rensa-hakai-v5';
+function load(){
+  try {
+    const s = localStorage.getItem(KEY);
+    if (s){ const o = JSON.parse(s); save = Object.assign(JSON.parse(JSON.stringify(DEFAULT)), o); save.st = Object.assign(JSON.parse(JSON.stringify(DEFAULT.st)), o.st || {}); }
+  } catch(e) {}
+}
 function persist(){ save.t = Date.now(); try { localStorage.setItem(KEY, JSON.stringify(save)); } catch(e) {} }
 
 /* ---- 音 ---- */
@@ -613,10 +780,13 @@ const sfxFever = () => { [523, 659, 784, 1047, 1319].forEach((f, k) => tone(f, .
 const sfxBuy = () => tone(1200, .07, 'triangle', .1, 0, 1.4);
 const sfxShot = () => { if (!actx) return; const n = actx.currentTime; if (n - lastShot < .05) return; lastShot = n; tone(900, .05, 'square', .035, 0, .5); };
 const sfxBoss = () => { tone(55, 1.2, 'sawtooth', .25, 0, .7); noise(.8, 400, .35); };
+const sfxLucky = () => { [784, 988, 1175, 1568].forEach((f, k) => tone(f, .18, 'sine', .1, k * .05, 1)); };
+const sfxJackpot = () => { [523, 659, 784, 1047, 1319, 1568, 2093].forEach((f, k) => tone(f, .3, 'square', .08, k * .05, 1)); noise(.8, 4000, .25); };
+const sfxAch = () => { tone(1047, .12, 'triangle', .12, 0, 1); tone(1568, .25, 'triangle', .12, .1, 1); };
 
 /* ---- エフェクト ---- */
 let parts = [], floats = [], rings = [], bolts = [], flashes = [];
-let freeze = 0, shake = 0, zoom = 0, flash = 0, clock = 0;
+let freeze = 0, shake = 0, zoom = 0, flash = 0, clock = 0, slow = 0, flashColor = '255,255,255';
 const MAXP = 1100;
 const rnd = (a, b) => a + Math.random() * (b - a);
 function sparks(x, y, n, color, speed = 8){
@@ -648,6 +818,7 @@ function blockColor(b){
   const s = STAGES[save.stage];
   return b.type === 'hard' ? s.dark : s.color;
 }
+const bigText = (t, y, c, life = 1.4, sz = 7) => addFloat({x:W / 2, y:H * y, t, life, max:life, c, size:Math.min(cell * .95, W / sz), vy:-cell * .3, pop:1, big:true});
 
 fx.tap = (x, y) => { rings.push({x, y, to:cell * 1.1, life:.28, max:.28, c:'#ffffff', w:.18}); shake += 2.5; sparks(x, y, 6, '#ffffff', 6); };
 fx.hit = (i, d, crit) => {
@@ -666,7 +837,7 @@ fx.brk = (i, b, gain) => {
     addFloat({x, y, t:'+' + fmt(gain), life:1, max:1, c:'#ffd84d', size:cell * .46, vy:-cell * 1.1, pop:1});
     rings.push({x, y, to:cell * 1.4, life:.35, max:.35, c:'#ffd84d', w:.16}); sparks(x, y, 14, '#ffe14d', 10); shake += 4; sfxGold();
   } else {
-    if (floats.length < 22) addFloat({x, y:y - cell * .2, t:'+' + fmt(gain), life:.7, max:.7, c:'#ffc53a', size:cell * .24, vy:-cell * 1.2});
+    if (floats.length < 22) addFloat({x, y:y - cell * .2, t:'+' + fmt(gain), life:.7, max:.7, c:buffs.frenzy > 0 ? '#ffe14d' : '#ffc53a', size:cell * (buffs.frenzy > 0 ? .3 : .24), vy:-cell * 1.2});
     sfxPop(combo);
   }
   shake = Math.min(shake + .4, 16);
@@ -680,16 +851,17 @@ fx.boom = e => {
 fx.bolt = pts => { bolts.push({pts:jag(pts), life:.22, max:.22}); for (let k = 1; k < pts.length; k++) sparks(pts[k][0], pts[k][1], 3, '#bfe9ff', 8); shake += 1.5; sfxZap(); };
 fx.split = (x, y) => { if (parts.length < MAXP - 50) sparks(x, y, 2, '#ffffff', 5); };
 fx.fever = () => { flash = 1; freeze = Math.max(freeze, .12); shake += 14; zoom = .06; sfxFever(); };
-fx.milestone = n => {
+fx.milestone = (n, name) => {
   freeze = Math.max(freeze, .06); shake += 10; zoom = Math.max(zoom, .04); flash = Math.max(flash, .3);
-  addFloat({x:W / 2, y:H * .42, t:`${n.toLocaleString('ja-JP')}コンボ！`, life:1.2, max:1.2, c:'#ff4c88', size:Math.min(cell * .95, W / 6.5), vy:-cell * .4, pop:1, big:true});
+  bigText(`${n.toLocaleString('ja-JP')}コンボ！`, .4, '#ff4c88', 1.2, 6.5);
+  bigText(name, .5, '#ffe14d', 1.2, 8);
   sfxChime();
 };
 fx.shoot = (d, tx, ty) => { d.fl = 1; sfxShot(); };
 fx.spawn = i => {};
 fx.bossSpawn = b => {
   shake += 16; zoom = .05; flash = .5; sfxBoss();
-  addFloat({x:W / 2, y:H * .3, t:'ボス出現！', life:1.6, max:1.6, c:'#ff4c88', size:Math.min(cell * .9, W / 7), vy:-cell * .25, pop:1, big:true});
+  bigText('ボス出現！', .3, '#ff4c88', 1.6, 7);
   rings.push({x:bossX(), y:bossY(), to:Math.max(W, H) * .8, life:.6, max:.6, c:'#ff4c88', w:.3});
   updateProgLabel();
 };
@@ -700,16 +872,25 @@ fx.bossHit = (d, crit) => {
 };
 fx.bossDie = (b, gain, prevStage) => {
   const x = (cx(b.cells[0]) + cx(b.cells[1])) / 2, y = (cy(b.cells[0]) + cy(b.cells[2])) / 2;
-  freeze = Math.max(freeze, .16); shake += 26; zoom = .1; flash = 1;
+  freeze = Math.max(freeze, .16); slow = .9; shake += 26; zoom = .1; flash = 1;
   debris(x, y, 40, STAGES[prevStage].dark, true); sparks(x, y, 60, '#ffffff', 16); sparks(x, y, 40, STAGES[prevStage].glow, 12);
   flashes.push({x, y, r:Math.max(W, H), life:.5, max:.5});
   rings.push({x, y, to:Math.max(W, H) * 1.2, life:.8, max:.8, c:'#ffffff', w:.5});
-  addFloat({x:W / 2, y:H * .4, t:'撃破！', life:1.8, max:1.8, c:'#ffe14d', size:Math.min(cell * 1.2, W / 5), vy:-cell * .2, pop:1, big:true});
-  addFloat({x:W / 2, y:H * .52, t:'+' + fmt(gain), life:1.8, max:1.8, c:'#ffd84d', size:Math.min(cell * .6, W / 9), vy:-cell * .2, pop:1, big:true});
+  bigText('撃破！', .4, '#ffe14d', 1.8, 5);
+  bigText('+' + fmt(gain), .52, '#ffd84d', 1.8, 9);
   sfxBoom(true); sfxFever();
-  setTimeout(() => { updateStageLabel(); updateProgLabel(); if (save.ended && !save.endSeen){ save.endSeen = true; persist(); showEnding(); } }, 900);
+  setTimeout(() => { updateStageLabel(); updateProgLabel(); if (save.ended && !save.endSeen){ save.endSeen = true; persist(); showEnding(); } else if (save.stage === PRESTIGE_STAGE && save.kills === PRESTIGE_STAGE && !save.runs){ pushNews('<b>「砕く」が解放された。</b> 強化パネルの一番右を見てみよう'); } }, 900);
   persist();
 };
+fx.lucky = lk => { sfxLucky(); addFloat({x:lk.x < 0 ? cell : W - cell, y:lk.y - cell * .8, t:'幸運ブロック！', life:1.4, max:1.4, c:'#ffe14d', size:cell * .32, vy:-cell * .4, pop:1}); };
+fx.luckyHit = (lk, text, kind) => {
+  freeze = Math.max(freeze, .1); shake += 16; zoom = .08; flash = 1; flashColor = '255,225,120';
+  sparks(lk.x, lk.y, 50, '#ffe14d', 14); sparks(lk.x, lk.y, 30, '#ffffff', 10);
+  rings.push({x:lk.x, y:lk.y, to:Math.max(W, H), life:.7, max:.7, c:'#ffe14d', w:.4});
+  bigText(text, .42, '#ffe14d', 2, 9);
+  sfxJackpot();
+};
+fx.ach = a => { showToast(a.name, a.desc); sfxAch(); };
 
 /* ---- レイアウト ---- */
 let dpr = 1;
@@ -720,7 +901,7 @@ function resize(){
   cv.style.width = r.width + 'px'; cv.style.height = r.height + 'px';
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   const keepBoss = boss ? {hp:boss.hp, max:boss.max} : save.boss;
-  layout(r.width, r.height); boss = null; save.boss = keepBoss; buildGrid();
+  layout(r.width, r.height); boss = null; save.boss = keepBoss; lucky = null; buildGrid();
 }
 function makeCracks(){
   const out = [];
@@ -790,9 +971,21 @@ function drawBoss(){
   ctx.fillStyle = 'rgba(0,0,0,.6)'; rr(bx, by, bw, bh, bh / 2); ctx.fill();
   ctx.fillStyle = '#ff4c88'; rr(bx, by, Math.max(bh, bw * Math.max(0, boss.hp / boss.max)), bh, bh / 2); ctx.fill();
   ctx.font = `${cell * .22}px "Dela Gothic One","Hiragino Sans",sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
-  ctx.lineWidth = cell * .05; ctx.strokeStyle = 'rgba(0,0,0,.8)'; ctx.strokeText(`${st.name}の塊　${fmt(Math.max(0, boss.hp))}`, bossX(), by - 2);
-  ctx.fillStyle = '#fff'; ctx.fillText(`${st.name}の塊　${fmt(Math.max(0, boss.hp))}`, bossX(), by - 2);
+  const label = (save.stage === STAGES.length - 1 ? '宇宙の核' : st.name + 'の塊') + '　' + fmt(Math.max(0, boss.hp));
+  ctx.lineWidth = cell * .05; ctx.strokeStyle = 'rgba(0,0,0,.8)'; ctx.strokeText(label, bossX(), by - 2);
+  ctx.fillStyle = '#fff'; ctx.fillText(label, bossX(), by - 2);
   ctx.restore();
+}
+function drawLucky(){
+  const lk = lucky, r = lk.r * (1 + .08 * Math.sin(lk.ph * 5)), a = Math.min(1, lk.life / 2);
+  ctx.save(); ctx.translate(lk.x, lk.y); ctx.rotate(lk.ph * .8); ctx.globalAlpha = a;
+  ctx.shadowColor = '#ffe14d'; ctx.shadowBlur = cell * .6;
+  ctx.fillStyle = '#ffd84d'; ctx.beginPath();
+  for (let k = 0; k < 10; k++){ const rad = k % 2 ? r * .45 : r, an = k / 10 * 6.283 - 1.57; ctx.lineTo(Math.cos(an) * rad, Math.sin(an) * rad); }
+  ctx.closePath(); ctx.fill();
+  ctx.shadowBlur = 0; ctx.fillStyle = '#fff8d0'; ctx.beginPath(); ctx.arc(0, 0, r * .28, 0, 6.283); ctx.fill();
+  ctx.restore();
+  if (parts.length < MAXP && Math.random() < .6) parts.push({k:'spark', x:lk.x + rnd(-.3, .3) * cell, y:lk.y + rnd(-.3, .3) * cell, vx:rnd(-1, 1) * cell, vy:rnd(-2, -.5) * cell, life:.5, max:.5, c:'#ffe14d'});
 }
 function drawDrones(){
   const nd = stat.drones(), st = STAGES[save.stage];
@@ -812,6 +1005,7 @@ function render(){
   ctx.save();
   ctx.fillStyle = st.bg; ctx.fillRect(0, 0, W, H);
   if (fever > 0){ ctx.globalAlpha = .22 + .08 * Math.sin(clock * 12); ctx.fillStyle = `hsl(${(clock * 220) % 360},90%,45%)`; ctx.fillRect(0, 0, W, H); ctx.globalAlpha = 1; }
+  if (buffs.frenzy > 0){ ctx.globalAlpha = .1 + .05 * Math.sin(clock * 8); ctx.fillStyle = '#ffd84d'; ctx.fillRect(0, 0, W, H); ctx.globalAlpha = 1; }
   if (boss){ ctx.globalAlpha = .12 + .06 * Math.sin(clock * 4); ctx.fillStyle = '#ff4c88'; ctx.fillRect(0, 0, W, H); ctx.globalAlpha = 1; }
   ctx.strokeStyle = 'rgba(255,255,255,.04)'; ctx.lineWidth = 1; ctx.beginPath();
   for (let c = 0; c <= cols; c++){ ctx.moveTo(offX + c * cell, offY); ctx.lineTo(offX + c * cell, H); }
@@ -832,6 +1026,7 @@ function render(){
     ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.r); ctx.fillRect(-p.s / 2, -p.s / 2, p.s, p.s); ctx.restore();
   }
   ctx.globalAlpha = 1;
+  if (lucky) drawLucky();
 
   ctx.globalCompositeOperation = 'lighter';
   for (let i = 0; i < blocks.length; i++){
@@ -846,7 +1041,7 @@ function render(){
     ctx.fillStyle = grd; ctx.beginPath(); ctx.arc(f.x, f.y, f.r, 0, 6.283); ctx.fill();
   }
   if (bullets.length){
-    ctx.strokeStyle = st.glow; ctx.lineCap = 'round';
+    ctx.strokeStyle = buffs.barrage > 0 ? '#4cc9ff' : st.glow; ctx.lineCap = 'round';
     for (const pass of [0, 1]){
       ctx.globalAlpha = pass ? 1 : .3; ctx.lineWidth = pass ? Math.max(2, cell * .07) : cell * .22; ctx.beginPath();
       for (const u of bullets){ ctx.moveTo(u.x - u.vx * .03, u.y - u.vy * .03); ctx.lineTo(u.x, u.y); }
@@ -858,7 +1053,7 @@ function render(){
     ctx.lineCap = 'round';
     const buckets = fever > 0 ? 6 : 1;
     for (let bkt = 0; bkt < buckets; bkt++){
-      const col = fever > 0 ? `hsl(${(clock * 300 + bkt * 60) % 360},100%,65%)` : st.glow;
+      const col = fever > 0 ? `hsl(${(clock * 300 + bkt * 60) % 360},100%,65%)` : buffs.frenzy > 0 ? '#ffe14d' : st.glow;
       for (const pass of [0, 1]){
         ctx.strokeStyle = col; ctx.globalAlpha = pass ? 1 : .22; ctx.lineWidth = pass ? Math.max(1.5, cell * .05) : cell * .16; ctx.beginPath();
         for (let k = bkt; k < shards.length; k += buckets){ const o = shards[k], tl = pass ? .022 : .035; ctx.moveTo(o.x - o.vx * tl, o.y - o.vy * tl); ctx.lineTo(o.x, o.y); }
@@ -896,7 +1091,7 @@ function render(){
   }
   ctx.globalAlpha = 1;
   ctx.restore();
-  if (flash > 0){ ctx.fillStyle = `rgba(255,255,255,${flash * .55})`; ctx.fillRect(0, 0, W, H); }
+  if (flash > 0){ ctx.fillStyle = `rgba(${flashColor},${flash * .55})`; ctx.fillRect(0, 0, W, H); }
 }
 function updateFx(dt){
   const g = cell * 14;
@@ -920,21 +1115,24 @@ function updateFx(dt){
     }
   }
   if (!boss) bossCracks = null;
-  flash = Math.max(0, flash - dt * 3);
+  flash = Math.max(0, flash - dt * 3); if (flash <= 0) flashColor = '255,255,255';
   zoom *= Math.pow(.004, dt);
   shake *= Math.pow(.0006, dt);
+  slow = Math.max(0, slow - dt);
 }
 
 /* ---- HUD ---- */
 const el = id => document.getElementById(id);
-const coinsEl = el('coins'), prodEl = el('prod'), chainEl = el('chain'), chainNum = el('chainNum'), chainMult = el('chainMult'), feverEl = el('fever'), feverFill = el('feverFill');
-const progFill = el('progFill'), progNum = el('progNum'), progText = el('progText'), shopDot = el('shopDot');
-let shownCoins = '', shownProd = '', shownChain = -1, chainScale = 1, chainAlpha = 0, dispRate = 0, tickT = 0, tickEarn = 0;
-const CHAIN_COLORS = [[0, '#ffffff'], [50, '#ffe14d'], [100, '#ff9a3c'], [250, '#ff4c88'], [500, '#c38bff'], [1000, '#4cc9ff']];
+const coinsEl = el('coins'), prodEl = el('prod'), chainEl = el('chain'), chainNum = el('chainNum'), chainMult = el('chainMult'), chainTier = el('chainTier'), feverEl = el('fever'), feverFill = el('feverFill');
+const progFill = el('progFill'), progNum = el('progNum'), progText = el('progText'), shopDot = el('shopDot'), buffsEl = el('buffs'), dustTag = el('dustTag'), newsEl = el('news');
+let shownCoins = '', shownProd = '', shownChain = -1, chainScale = 1, chainAlpha = 0, dispRate = 0, tickT = 0, shownBuffs = '';
+const CHAIN_COLORS = [[0, '#ffffff'], [50, '#ffe14d'], [100, '#ff9a3c'], [250, '#ff4c88'], [500, '#c38bff'], [1000, '#4cc9ff'], [2500, '#ffffff']];
 function hud(dt){
   const c = fmt(save.coins); if (c !== shownCoins){ coinsEl.textContent = c; shownCoins = c; }
-  const ps = dispRate > 0 ? `毎秒 <b>+${fmt(dispRate)}</b>${lastTap > 8 ? '（放置中）' : ''}` : ''; if (ps !== shownProd){ prodEl.innerHTML = ps; shownProd = ps; }
-  feverFill.style.width = (fever > 0 ? fever / stat.fever() * 100 : Math.min(100, heat)) + '%';
+  const rm = rewardMult() / (fever > 0 ? 3 : 1) / (buffs.frenzy > 0 ? 7 : 1);
+  const ps = (dispRate > 0 ? `毎秒 <b>+${fmt(dispRate)}</b>${lastTap > 8 ? '（放置中）' : ''}` : '') + (rm > 1.001 ? `<span class="mul">報酬 ×${fmtX(rm)}</span>` : '');
+  if (ps !== shownProd){ prodEl.innerHTML = ps; shownProd = ps; }
+  feverFill.style.width = (fever > 0 ? Math.min(100, fever / stat.fever() * 100) : Math.min(100, heat)) + '%';
   feverEl.style.opacity = fever > 0 ? 1 : 0;
   if (boss){ progFill.classList.add('boss'); progFill.style.width = Math.max(0, boss.hp / boss.max * 100) + '%'; progNum.textContent = fmt(Math.max(0, boss.hp)); }
   else { progFill.classList.remove('boss'); progFill.style.width = Math.min(100, save.prog / gaugeNeed() * 100) + '%'; progNum.textContent = `${save.prog.toLocaleString('ja-JP')} / ${gaugeNeed().toLocaleString('ja-JP')}`; }
@@ -942,9 +1140,10 @@ function hud(dt){
   if (cm >= 5){
     if (cm !== shownChain){
       chainNum.textContent = cm.toLocaleString('ja-JP');
-      let col = '#fff'; for (const [n, cc] of CHAIN_COLORS) if (cm >= n) col = cc;
-      chainEl.style.color = col;
-      chainMult.textContent = `報酬 ×${fmtX((1 + Math.sqrt(combo) * stat.chain()) * (fever > 0 ? 3 : 1))}`;
+      let col = '#fff', tier = ''; for (const [n, cc] of CHAIN_COLORS) if (cm >= n) col = cc;
+      for (const [n, name] of TIERS) if (cm >= n) tier = name;
+      chainEl.style.color = col; chainTier.textContent = tier;
+      chainMult.textContent = `報酬 ×${fmtX(comboMult() * rewardMult())}`;
       if (cm > shownChain) chainScale = 1.2; shownChain = cm;
     }
     chainAlpha = 1;
@@ -952,19 +1151,44 @@ function hud(dt){
   chainScale += (1 - chainScale) * Math.min(1, dt * 14);
   chainEl.style.opacity = chainAlpha;
   chainNum.style.transform = reduceMotion ? '' : `scale(${chainScale})`;
+  let bh = '';
+  for (const k in buffs) if (buffs[k] > 0 && BUFF_INFO[k] && k !== 'storm') bh += `<div class="buff" style="--c:${BUFF_INFO[k][1]}">${BUFF_INFO[k][0]}　${Math.ceil(buffs[k])}秒</div>`;
+  if (bh !== shownBuffs){ buffsEl.innerHTML = bh; shownBuffs = bh; }
 }
-function updateStageLabel(){ const s = STAGES[save.stage]; el('stageText').textContent = '素材：' + s.name; el('stageSwatch').style.background = s.color; }
+function updateStageLabel(){ const s = STAGES[save.stage]; el('stageText').textContent = '素材：' + s.name; el('stageSwatch').style.background = s.color; dustTag.hidden = !save.dust && !save.runs; dustTag.textContent = `✦ 星屑 ${save.dust}`; }
 function updateProgLabel(){ progText.textContent = boss ? 'ボス戦中' : save.ended ? '次のボスまで（再戦）' : '次のボスまで'; }
 const muteBtn = el('mute');
 function syncMute(){ muteBtn.textContent = save.muted ? '🔇' : '🔊'; muteBtn.setAttribute('aria-label', save.muted ? '音を出す' : '音を消す'); }
 muteBtn.addEventListener('click', () => { save.muted = !save.muted; syncMute(); persist(); initAudio(); });
+
+let toastT = null;
+function showToast(name, desc){
+  el('toastText').innerHTML = `${name}<span style="display:block;font-weight:500;font-size:11px;opacity:.8">${desc}</span>`;
+  const t = el('toast'); t.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), 2800);
+}
+
+/* ---- ニュース ---- */
+const NEWS = [
+  () => 'ドローンは今日も黙々と撃っている。', () => '「叩くと速い」——近所の研究者談。', () => `累計${fmt(save.st.destroyed)}個のブロックが犠牲になった。`,
+  () => save.st.taps > 1000 ? '画面を叩きすぎて指紋が消えたという報告が相次いでいる。' : '長押しすると連打できるらしい。', () => '幸運ブロックを見逃した人、今日も世界で3億人。',
+  () => `${STAGES[save.stage].name}の相場が高騰中。壊せば壊すほど儲かる。`, () => save.best >= 100 ? `最高${save.best.toLocaleString('ja-JP')}コンボ。腕が鳴る。` : 'コンボは時間で減る。止まるな。',
+  () => '爆弾ブロックは隣の家まで吹き飛ばす。', () => '金ブロックを見ると条件反射で叩く人が増加。', () => 'ボスの塊はただのデカいブロックだと専門家。',
+  () => save.dust ? `星屑${save.dust}個。宇宙はもう${save.runs}回砕かれた。` : '暗黒物質まで行くと「砕く」ができるという噂。', () => '雷撃モジュールの電気代は誰が払っているのか。',
+  () => '炎上した。ブロックが。', () => `今日のプレイ時間：${fmtT(save.st.time)}`, () => `実績 ${achCount()} / ${ACH.length}　（1個ごとに報酬+1%）`,
+  () => 'フレンジー中は何をしても儲かる。', () => '「破片が多すぎて前が見えない」と苦情。', () => 'オフラインでも壊れ続ける。でも半分しか持ち帰れない。',
+  () => '跳弾は壁に当たるほど痛い。', () => '誘導破片、ブロックのほうへ勝手に行く。賢い。', () => '宇宙を砕くのは物理的に可能だと判明。',
+  () => '湧き速度を上げると「無限」に近づく。', () => 'ドローン12台体制。もはや軍隊。', () => '「コインに使い道がない」——いや、強化しろ。',
+];
+let newsT = 0, newsPinned = 0;
+function pushNews(h){ newsEl.innerHTML = h; newsT = 0; newsPinned = 14; }
+function tickNews(dt){ newsT += dt; if (newsT > (newsPinned || 9)){ newsT = 0; newsPinned = 0; newsEl.textContent = NEWS[(Math.random() * NEWS.length) | 0](); } }
 
 let holdTimer = null, holdX = 0, holdY = 0;
 function tapAt(clientX, clientY){ const r = cv.getBoundingClientRect(); holdX = clientX - r.left; holdY = clientY - r.top; tap(holdX, holdY); }
 cv.addEventListener('pointerdown', e => {
   initAudio(); if (!sheet.hidden) return;
   tapAt(e.clientX, e.clientY);
-  clearInterval(holdTimer); holdTimer = setInterval(() => tap(holdX, holdY), 170);
+  clearInterval(holdTimer); holdTimer = setInterval(() => tap(holdX, holdY), stat.holdMs());
 });
 cv.addEventListener('pointermove', e => { if (holdTimer){ const r = cv.getBoundingClientRect(); holdX = e.clientX - r.left; holdY = e.clientY - r.top; } });
 const stopHold = () => { clearInterval(holdTimer); holdTimer = null; };
@@ -972,31 +1196,49 @@ cv.addEventListener('pointerup', stopHold); cv.addEventListener('pointercancel',
 
 /* ---- シート（強化） ---- */
 let tab = 'idle';
-const TABS = [['idle', '放置'], ['tap', '操作'], ['core', '共通'], ['build', 'ビルド']];
+const TABS = [['idle', '放置'], ['tap', '操作'], ['core', '共通'], ['build', 'ビルド'], ['ach', '実績'], ['dust', '砕く']];
 const cs = n => fmt(n);
+const specialsFor = cat => SPECIALS.filter(s => s.cat === cat && !SP(s.id) && s.req());
 function anyAffordable(kind){
   if (kind === 'build') return MODS.some(m => ML(m.id) < m.max && save.coins >= modCost(m)) || (save.slots < 4 && save.coins >= slotCost());
-  return UPG.some(u => u.cat === kind && L(u.id) < u.max && save.coins >= upCost(u));
+  if (kind === 'ach') return false;
+  if (kind === 'dust') return PERM.some(p => P(p.id) < p.max && save.dust >= permCost(p));
+  return UPG.some(u => u.cat === kind && L(u.id) < u.max && save.coins >= upCost(u)) || specialsFor(kind).some(s => save.coins >= spCost(s));
 }
 function renderTabs(){
   tabsEl.innerHTML = TABS.map(([k, n]) => `<button class="tab" role="tab" data-tab="${k}" aria-selected="${tab === k}">${n}${tab !== k && anyAffordable(k) ? '<span class="dot"></span>' : ''}</button>`).join('');
 }
-const HINTS = {idle:'ドローンは目を離していても撃ち続ける。放置の稼ぎはここで伸びる。', tap:'タップは加速役。叩くほどフィーバーゲージが溜まり、満タンで全部が速くなる。長押しで連打できる。', core:'ドローンにもタップにも効く土台の強化。', build:'モジュールは装備枠に入れたものだけが効く。組み合わせでビルドが決まる。'};
+const HINTS = {idle:'ドローンは目を離していても撃ち続ける。放置の稼ぎはここで伸びる。', tap:'タップは加速役。叩くほどフィーバーゲージが溜まり、満タンで全部が速くなる。長押しで連打できる。', core:'ドローンにもタップにも効く土台の強化。', build:'モジュールは装備枠に入れたものだけが効く。組み合わせでビルドが決まる。', ach:'実績1個ごとに全部の報酬が+1%。', dust:'宇宙を砕くと星屑が手に入り、すべてがリセットされる代わりに永続強化が買える。'};
+function buyN(u){ return save.buyMode === 'max' ? Math.max(1, upMaxN(u)) : Math.min(save.buyMode, u.max - L(u.id)); }
 function sheetHtml(){
   let h = `<p class="hint">${HINTS[tab]}</p>`;
-  if (tab !== 'build'){
+  if (tab === 'idle' || tab === 'tap' || tab === 'core'){
+    h += `<div class="modes">${[[1, '×1'], [10, '×10'], ['max', '×MAX']].map(([m, n]) => `<button class="mode ${save.buyMode === m ? 'on' : ''}" data-mode="${m}">${n}</button>`).join('')}</div>`;
     h += '<ul class="list">';
     for (const u of UPG){
       if (u.cat !== tab) continue;
-      const l = L(u.id), mx = l >= u.max, c = upCost(u), can = !mx && save.coins >= c;
+      const l = L(u.id), mx = l >= u.max, n = mx ? 0 : buyN(u), c = upCostN(u, n), can = !mx && n > 0 && save.coins >= c;
       h += `<li><button class="item btn ${can ? 'can' : ''}" data-up="${u.id}" aria-disabled="${!can}">
         <span class="name">${u.name}<span class="lv">Lv ${l}</span></span>
-        <span class="val">${mx ? u.v(l) + '（最大）' : `${u.v(l)} → ${u.v(l + 1)}`}</span>
-        <span class="note">${u.note}</span><span class="cost" data-cid="up:${u.id}">${mx ? '最大' : cs(c)}</span></button></li>`;
+        <span class="val">${mx ? u.v(l) + '（最大）' : `${u.v(l)} → ${u.v(l + n)}`}</span>
+        <span class="note">${u.note}</span><span class="cost" data-cid="up:${u.id}">${mx ? '最大' : cs(c) + (n > 1 ? `<small>×${n}</small>` : '')}</span></button></li>`;
     }
     h += '</ul>';
+    const sps = specialsFor(tab);
+    if (sps.length){
+      h += '<div class="section-title">特殊強化（一度きり）</div><ul class="list">';
+      for (const s of sps){
+        const c = spCost(s), can = save.coins >= c;
+        h += `<li><button class="item btn ${can ? 'can' : ''}" data-sp="${s.id}" aria-disabled="${!can}">
+          <span class="name">✦ ${s.name}</span><span class="val">${s.note}</span>
+          <span class="note">条件：${s.rq}</span><span class="cost" data-cid="sp:${s.id}">${cs(c)}</span></button></li>`;
+      }
+      h += '</ul>';
+    }
+    const next = SPECIALS.filter(s => s.cat === tab && !SP(s.id) && !s.req()).slice(0, 2);
+    if (next.length) h += `<p class="hint">次の特殊強化：${next.map(s => `${s.name}（${s.rq}）`).join('、')}</p>`;
     if (tab === 'core') h += `<button class="small" data-act="reset">データを消す</button>`;
-  } else {
+  } else if (tab === 'build'){
     h += '<div class="slots">';
     for (let k = 0; k < 4; k++){
       if (k >= save.slots) h += `<div class="slot lockd">未解放</div>`;
@@ -1017,6 +1259,33 @@ function sheetHtml(){
         </span></div></li>`;
     }
     h += '</ul>';
+  } else if (tab === 'ach'){
+    const s = save.st;
+    h += `<div class="stats">
+      <div><span>累計コイン</span><b>${fmt(s.earnedAll)}</b></div><div><span>今の宇宙で</span><b>${fmt(s.earnedRun)}</b></div>
+      <div><span>破壊したブロック</span><b>${s.destroyed.toLocaleString('ja-JP')}</b></div><div><span>タップ</span><b>${s.taps.toLocaleString('ja-JP')}</b></div>
+      <div><span>最高コンボ</span><b>${save.best.toLocaleString('ja-JP')}</b></div><div><span>ボス撃破</span><b>${s.bosses}</b></div>
+      <div><span>幸運ブロック</span><b>${s.lucky}</b></div><div><span>フィーバー</span><b>${s.fevers}</b></div>
+      <div><span>プレイ時間</span><b>${fmtT(s.time)}</b></div><div><span>砕いた回数</span><b>${save.runs}</b></div>
+    </div>
+    <div class="section-title">実績 ${achCount()} / ${ACH.length}　→ 報酬 +${achCount()}%</div><div class="ach">`;
+    for (const a of ACH) h += `<div class="${save.ach[a.id] ? 'got' : ''}"><b>${save.ach[a.id] ? '🏆 ' : ''}${a.name}</b><span class="d">${a.desc}</span></div>`;
+    h += '</div>';
+  } else if (tab === 'dust'){
+    const d = dustGain(), ok = save.stage >= PRESTIGE_STAGE;
+    h += `<div class="prestige-box">
+      <div class="dust-num display">✦ ${save.dust}</div><p>持っている星屑</p>
+      <p>今砕くと <b style="color:var(--dust)">+${d}</b> 星屑（星屑1個ごとに報酬+2%）<br>${ok ? `${STAGES[Math.min(P('pstage'), STAGES.length - 1)].name}からやり直しになる。` : `<b>${STAGES[PRESTIGE_STAGE].name}</b>に到達すると砕ける（今：${STAGES[save.stage].name}）`}</p>
+      <button class="go ${ok && d > 0 ? '' : 'ghost'}" data-act="prestige" ${ok && d > 0 ? '' : 'disabled'}>宇宙を砕く</button>
+    </div><div class="section-title">星屑で買う永続強化</div><ul class="list">`;
+    for (const p of PERM){
+      const l = P(p.id), mx = l >= p.max, c = permCost(p), can = !mx && save.dust >= c;
+      h += `<li><button class="item btn ${can ? 'can' : ''}" data-perm="${p.id}" aria-disabled="${!can}">
+        <span class="name">${p.name}<span class="lv">Lv ${l}</span></span>
+        <span class="val">${mx ? p.v(l) + '（最大）' : `${p.v(l)} → ${p.v(l + 1)}`}</span>
+        <span class="note">${p.note}</span><span class="cost dust" data-cid="perm:${p.id}">${mx ? '最大' : '✦ ' + c}</span></button></li>`;
+    }
+    h += '</ul>';
   }
   return h;
 }
@@ -1024,34 +1293,55 @@ function renderSheet(keepScroll){
   const sc = keepScroll ? sheetBody.scrollTop : 0;
   renderTabs(); sheetBody.innerHTML = sheetHtml(); sheetBody.scrollTop = sc;
 }
+let sheetSig = '';
 function refreshSheet(){
   if (sheet.hidden) return;
+  // 特殊強化の出現やレベル変化でリストの形が変わるなら描き直す
+  const sig = tab + ':' + SPECIALS.filter(s => s.cat === tab && !SP(s.id) && s.req()).map(s => s.id).join(',') + (tab === 'ach' ? achCount() : '');
+  if (sig !== sheetSig){ sheetSig = sig; renderSheet(true); return; }
   sheetBody.querySelectorAll('[data-cid]').forEach(e => {
-    const [kind, id] = e.dataset.cid.split(':'); let c;
-    if (kind === 'up') c = upCost(UPG.find(u => u.id === id)); else if (kind === 'mod') c = modCost(MODS.find(m => m.id === id)); else c = slotCost();
-    const can = save.coins >= c;
+    const [kind, id] = e.dataset.cid.split(':'); let c, have = save.coins;
+    if (kind === 'up'){
+      const u = UPG.find(x => x.id === id), l = L(u.id); if (l >= u.max) return;
+      const n = buyN(u); c = upCostN(u, n);
+      // ×MAX は個数が変わるので、ボタンを作り直さずに表示だけ書き換える
+      if (save.buyMode === 'max'){
+        const txt = cs(c) + (n > 1 ? `<small>×${n}</small>` : '');
+        if (e.innerHTML !== txt){ e.innerHTML = txt; const v = e.closest('.item').querySelector('.val'); if (v) v.textContent = `${u.v(l)} → ${u.v(l + n)}`; }
+      }
+    }
+    else if (kind === 'mod') c = modCost(MODS.find(m => m.id === id));
+    else if (kind === 'sp') c = spCost(SPECIALS.find(s => s.id === id));
+    else if (kind === 'perm'){ c = permCost(PERM.find(p => p.id === id)); have = save.dust; }
+    else c = slotCost();
+    const can = have >= c;
     if (kind === 'slot'){ e.disabled = !can; return; }
-    const target = kind === 'up' ? e.closest('.item') : e;
+    const target = (kind === 'up' || kind === 'sp' || kind === 'perm') ? e.closest('.item') : e;
     target.classList.toggle('can', can); target.setAttribute('aria-disabled', String(!can));
   });
   tabsEl.querySelectorAll('.tab').forEach(t => { const k = t.dataset.tab, want = k !== tab && anyAffordable(k); const has = !!t.querySelector('.dot'); if (want && !has) t.insertAdjacentHTML('beforeend', '<span class="dot"></span>'); else if (!want && has) t.querySelector('.dot').remove(); });
 }
-function openSheet(){ sheet.hidden = false; renderSheet(false); stopHold(); }
+function openSheet(){ sheet.hidden = false; sheetSig = ''; renderSheet(false); stopHold(); }
 function closeSheet(){ sheet.hidden = true; }
 el('shopBtn').addEventListener('click', () => { initAudio(); sheet.hidden ? openSheet() : closeSheet(); });
 el('closeSheet').addEventListener('click', closeSheet);
 sheet.addEventListener('click', e => {
   initAudio();
   const t = e.target.closest('button'); if (!t) return; const d = t.dataset;
-  const buy = (c, f) => { if (save.coins >= c){ save.coins -= c; f(); persist(); sfxBuy(); renderSheet(true); } };
-  if (d.tab){ tab = d.tab; renderSheet(false); return; }
-  if (d.up){ const u = UPG.find(x => x.id === d.up); if (L(u.id) < u.max) buy(upCost(u), () => save.lv[u.id] = L(u.id) + 1); return; }
+  const buy = (c, f) => { if (save.coins >= c){ save.coins -= c; f(); persist(); sfxBuy(); sheetSig = ''; renderSheet(true); } };
+  if (d.tab){ tab = d.tab; sheetSig = ''; renderSheet(false); return; }
+  if (d.mode){ save.buyMode = d.mode === 'max' ? 'max' : +d.mode; persist(); sheetSig = ''; renderSheet(true); return; }
+  if (d.up){ const u = UPG.find(x => x.id === d.up); const n = buyN(u); if (n > 0) buy(upCostN(u, n), () => save.lv[u.id] = L(u.id) + n); return; }
+  if (d.sp){ const s = SPECIALS.find(x => x.id === d.sp); if (!SP(s.id) && s.req()) buy(spCost(s), () => { save.sp[s.id] = 1; showToast(s.name, s.note); }); return; }
   if (d.mod){ const m = MODS.find(x => x.id === d.mod); if (ML(m.id) < m.max) buy(modCost(m), () => { const was = ML(m.id); save.mods[m.id] = was + 1; if (!was && save.equip.length < save.slots) save.equip.push(m.id); }); return; }
   if (d.eq){ const i = save.equip.indexOf(d.eq); if (i >= 0) save.equip.splice(i, 1); else if (save.equip.length < save.slots) save.equip.push(d.eq); persist(); renderSheet(true); return; }
+  if (d.perm){ const p = PERM.find(x => x.id === d.perm); const c = permCost(p); if (P(p.id) < p.max && save.dust >= c){ save.dust -= c; save.perm[p.id] = P(p.id) + 1; persist(); sfxBuy(); updateStageLabel(); renderSheet(true); } return; }
   if (d.act === 'slot'){ if (save.slots < 4) buy(slotCost(), () => save.slots++); return; }
+  if (d.act === 'prestige'){ if (save.stage >= PRESTIGE_STAGE && dustGain() > 0){ closeSheet(); showPrestige(); } return; }
   if (d.act === 'reset'){
     if (t.classList.contains('armed')){
-      save = JSON.parse(JSON.stringify(DEFAULT)); persist(); boss = null; tab = 'idle';
+      save = JSON.parse(JSON.stringify(DEFAULT)); persist(); boss = null; lucky = null; tab = 'idle';
+      for (const k in buffs) buffs[k] = 0; combo = 0; fever = 0; heat = 0;
       updateStageLabel(); updateProgLabel(); syncMute(); buildGrid(); closeSheet(); showTitle();
     } else { t.classList.add('armed'); t.textContent = 'もう一度押すと全データが消えます'; }
   }
@@ -1064,35 +1354,56 @@ function showTitle(){
   overlay.innerHTML = `<div class="panel center">
     <h1 class="big-title display">連鎖<span>破壊</span></h1>
     <p>ドローンが勝手にブロックを壊し続ける。タップすれば一気に加速。飛び散った破片がまわりを壊し、そこからまた破片が飛ぶ。</p>
-    <p>目を離していても壊れ続ける。戻ってきたら、稼いだコインで放置と操作の両方を強くしよう。</p>
+    <p>目を離していても壊れ続ける。戻ってきたら、稼いだコインで放置と操作の両方を強くしよう。ときどき流れてくる<b>幸運ブロック</b>は見逃すな。</p>
     <button class="go" data-act="start">始める</button></div>`;
 }
 function showWelcome(gain, secs){
   state = 'welcome'; welcomeGain = gain; overlay.hidden = false;
-  const h = Math.floor(secs / 3600), m = Math.floor(secs % 3600 / 60);
   overlay.innerHTML = `<div class="panel center">
     <h1 class="display">おかえり！</h1>
-    <p>留守の${h ? h + '時間' : ''}${m}分のあいだ、ドローンが壊し続けていた。</p>
+    <p>留守の${fmtT(secs)}のあいだ、ドローンが壊し続けていた。</p>
     <div class="welcome-num display">+${fmt(gain)}</div>
     <button class="go" data-act="claim">受け取る</button></div>`;
 }
 function showEnding(){
   state = 'ending'; overlay.hidden = false; closeSheet();
-  overlay.innerHTML = `<div class="panel center"><h1 class="display">宇宙、粉砕。</h1>
-    <p>木箱から始めて、銀河の塊まで砕いた。最高コンボは${save.best.toLocaleString('ja-JP')}。</p>
-    <p>ここから先は、数字をどこまで伸ばせるかの勝負。ボスは何度でも現れる。</p>
-    <button class="go" data-act="resume">壊し続ける</button></div>`;
+  overlay.innerHTML = `<div class="panel center"><h1 class="display">宇宙の核、粉砕。</h1>
+    <p>木箱から始めて、宇宙そのものを砕いた。最高コンボは${save.best.toLocaleString('ja-JP')}。</p>
+    <p>ここで宇宙を砕けば <b style="color:var(--dust)">+${dustGain()}</b> 星屑。永続強化を買って、次の宇宙をもっと速く壊そう。</p>
+    <button class="go" data-act="prestige">宇宙を砕く　✦ +${dustGain()}</button>
+    <button class="go ghost" data-act="resume">このまま壊し続ける</button></div>`;
+}
+function showPrestige(){
+  state = 'ending'; overlay.hidden = false;
+  overlay.innerHTML = `<div class="panel center"><h1 class="display">宇宙を砕く？</h1>
+    <p>強化・モジュール${P('pkeep') ? '（Lvは残る）' : ''}・特殊強化・コインがリセットされ、${STAGES[Math.min(P('pstage'), STAGES.length - 1)].name}からやり直しになる。実績と星屑と永続強化は残る。</p>
+    <div class="dust-num display">✦ +${dustGain()}</div>
+    <button class="go" data-act="prestige">砕く</button>
+    <button class="go ghost" data-act="resume">やめておく</button></div>`;
+}
+function showNewUniverse(d){
+  state = 'ending'; overlay.hidden = false;
+  overlay.innerHTML = `<div class="panel center"><h1 class="display">新しい宇宙</h1>
+    <div class="dust-num display">✦ ${save.dust}</div>
+    <p>星屑を${d}個手に入れた。強化パネルの「砕く」タブで永続強化が買える。</p>
+    <p>${save.runs}回目の宇宙。今度はもっと速く、もっと派手に。</p>
+    <button class="go" data-act="resume">壊し始める</button></div>`;
 }
 overlay.addEventListener('click', e => {
   initAudio(); const t = e.target.closest('button'); if (!t) return;
   if (t.dataset.act === 'start'){ save.started = true; persist(); overlay.hidden = true; state = 'play'; }
-  else if (t.dataset.act === 'claim'){ save.coins += welcomeGain; welcomeGain = 0; persist(); sfxGold(); overlay.hidden = true; state = 'play'; }
+  else if (t.dataset.act === 'claim'){ earn(welcomeGain); welcomeGain = 0; save.st.offline++; persist(); sfxGold(); overlay.hidden = true; state = 'play'; }
   else if (t.dataset.act === 'resume'){ overlay.hidden = true; state = 'play'; }
+  else if (t.dataset.act === 'prestige'){
+    const d = prestige(); buildGrid(); updateStageLabel(); updateProgLabel(); persist();
+    freeze = .2; shake += 30; flash = 1; zoom = .12; sfxJackpot(); sfxBoom(true);
+    showNewUniverse(d);
+  }
 });
 
 /* ---- 放置・オフライン ---- */
 function offline(secsRaw){
-  const secs = Math.min(8 * 3600, secsRaw);
+  const secs = Math.min((8 + 4 * P('poff')) * 3600, secsRaw);
   if (secs > 60 && save.idleRate > 0){ showWelcome(save.idleRate * secs * .5, secs); return true; }
   return false;
 }
@@ -1103,19 +1414,21 @@ document.addEventListener('visibilitychange', () => {
 });
 
 /* ---- ループ ---- */
-let last = performance.now(), saveT = 0, refT = 0;
+let last = performance.now(), saveT = 0, refT = 0, achT = 0;
 function frame(now){
-  const dt = Math.min(.05, (now - last) / 1000); last = now; clock += dt;
-  if (freeze > 0) freeze -= dt; else { step(dt); updateFx(dt); }
-  tickT += dt;
+  const raw = Math.min(.05, (now - last) / 1000); last = now; clock += raw;
+  const dt = slow > 0 ? raw * .3 : raw;
+  if (freeze > 0) freeze -= raw; else { step(dt); updateFx(dt); }
+  tickT += raw;
   if (tickT >= 1){
     const rate = earnedTick / tickT; earnedTick = 0; tickT = 0;
     dispRate = dispRate ? dispRate * .7 + rate * .3 : rate;
     if (state === 'play' && lastTap > 8) save.idleRate = save.idleRate ? save.idleRate * .9 + rate * .1 : rate;
   }
-  render(); hud(dt);
-  refT += dt; if (refT > .4){ refT = 0; refreshSheet(); shopDot.hidden = !(sheet.hidden && TABS.some(([k]) => anyAffordable(k))); }
-  saveT += dt; if (saveT > 5){ saveT = 0; persist(); }
+  render(); hud(raw); tickNews(raw);
+  achT += raw; if (achT > 1){ achT = 0; if (state === 'play') checkAch(); }
+  refT += raw; if (refT > .4){ refT = 0; refreshSheet(); shopDot.hidden = !(sheet.hidden && TABS.some(([k]) => anyAffordable(k))); }
+  saveT += raw; if (saveT > 5){ saveT = 0; persist(); }
   requestAnimationFrame(frame);
 }
 load();
