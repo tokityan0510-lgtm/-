@@ -11,10 +11,9 @@ function run(mode, maxMin = 120, dt = 1/30, fresh = true){
   while (t < maxMin * 60 && !save.ended){
     G.step(dt); t += dt;
     if (mode === 'tap' || mode === 'ctap'){ tapT += dt; if (tapT >= (mode === 'ctap' ? .33 : G.stat.holdMs() / 1000)){ tapT = 0;
-      const lk = G.lucky, bl = G.blocks; let i = -1;
-      if (lk) G.tap(lk.x, lk.y);
-      else { if (G.boss) i = G.boss.cells[0]; else { const al = []; for (let k = 0; k < bl.length; k++) if (bl[k].alive) al.push(k); if (al.length) i = al[(Math.random()*al.length)|0]; }
-        if (i >= 0) G.tap(G.cx(i), G.cy(i)); } } }
+      // 幸運ブロックが出ていれば叩き、それ以外は巨大ブロックのどこかを叩く
+      const lk = G.lucky;
+      if (lk) G.tap(lk.x, lk.y); else G.tap(G.BX + (Math.random() - .5) * G.BS * .8, G.BY + (Math.random() - .5) * G.BS * .8); } }
     achT += dt; if (achT >= 1){ achT = 0; G.checkAch(); }
     buyT += dt;
     const casual = mode === 'ctap' || mode === 'cidle';
