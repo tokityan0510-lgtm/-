@@ -252,11 +252,11 @@ const STAGES = [
 const PRESTIGE_STAGE = 8;   // この素材に到達したら「砕く」が解放される
 // ブロックの価値の素材倍率（TUNE.valStage）
 const sv = s => Math.pow(TUNE.valStage, s);
-const TUNE = {fhp:4000, fhpLate:4000, fdmg:4000, gaugeBase:8500, gaugeA:2.5, gaugePow:3.3, lvBonus:.01, tapProg:1.5, dustBase:18, dustDiv:8, dustBonus:.001, pmultBonus:.1, idleBonus:7, idleRamp:30, feverReward:2, costX:3, valStage:1e4, modSpan:7, droneDmg:5, droneInt:1.5, bossHp:1500, bossGrow:1.35, bossReward:300, comboDecay:.6};
+const TUNE = {fhp:4000, fhpLate:4000, fdmg:4000, digBase:25, digPow:1.2, digLeft:.25, lvBonus:.01, tapProg:1.5, dustBase:18, dustDiv:8, dustBonus:.001, pmultBonus:.1, idleBonus:7, idleRamp:30, feverReward:2, costX:3, valStage:1e4, modSpan:7, droneDmg:5, droneInt:1.5, bossHp:1500, bossGrow:1.35, bossReward:300, comboDecay:.6};
 const DEFAULT = {
   coins:0, stage:0, lv:{}, mods:{}, equip:[], slots:2, best:0, ended:false, muted:false, t:0, idleRate:0, prog:0, started:false, kills:0, boss:null,
   sp:{}, ach:{}, dust:0, perm:{}, runs:0, buyMode:1, endSeen:false,
-  st:{destroyed:0, taps:0, bosses:0, lucky:0, fevers:0, time:0, earnedRun:0, earnedAll:0, offline:0, bestDust:0, bigCombo:0},
+  st:{depth:0, destroyed:0, taps:0, bosses:0, lucky:0, fevers:0, time:0, earnedRun:0, earnedAll:0, offline:0, bestDust:0, bigCombo:0},
 };
 let save = JSON.parse(JSON.stringify(DEFAULT));
 const L = id => save.lv[id] || 0;
@@ -281,7 +281,7 @@ const UPG = [
   {cat:'idle', id:'drones',   name:'ドローンの台数', note:'勝手に撃ち続けるドローン',           cost:800,   span:10, max:11,  v:l => `${1+l+P('pdrone')}台`},
   {cat:'idle', id:'droneint', name:'連射速度',       note:'ドローンが撃つ間隔',                 cost:600,   span:9,  max:14,  v:l => `${(TUNE.droneInt*Math.pow(.85,l)*(SP('rl1')?.8:1)).toFixed(2)}秒`},
   {cat:'idle', id:'dronedmg', name:'弾の威力',       note:'ドローンの弾が与えるダメージ（上限なし）', cost:900, inf:true, g:1.2, max:1e9, v:l => `×${fmtX(TUNE.droneDmg*(1+.25*l))}`},
-  {cat:'idle', id:'spawn',    name:'落下衝撃',       note:'落ちてきたブロックが、着地した下のブロックにダメージ', cost:1200, span:8, max:15, v:l => l ? `威力×${fmtX(.6*l*(SP('sp1')?2:1))}` : 'なし'},
+  {cat:'idle', id:'spawn',    name:'崩落',           note:'上の段が崩れて掘り進むとき、すぐ下の段にダメージ', cost:1200, span:8, max:15, v:l => l ? `威力×${fmtX(1.5*l*(SP('sp1')?2:1))}` : 'なし'},
   {cat:'idle', id:'drburst',  name:'弾の炸裂',       note:'弾が当たったとき追加で飛ぶ破片',     cost:2500,  span:8,  max:10,  v:l => `+${l*2*(SP('bu1')?2:1)}個`},
   // 兵器（台数は上限あり、威力は上限なし）。値段は手に入る目安の段の価値に合わせる
   ...ARMS.flatMap(a => [
@@ -321,7 +321,7 @@ const SPECIALS = [
   {cat:'idle', id:'dr4', name:'ドローン軍団',     note:'ドローンの弾の威力 ×5',               ref:['drones',11],   req:() => L('drones') >= 11, rq:'ドローンの台数 Lv11'},
   {cat:'idle', id:'rl1', name:'速射機構',         note:'ドローンの発射間隔 ×0.8',             ref:['droneint',5],   req:() => L('droneint') >= 5, rq:'連射速度 Lv5'},
   {cat:'idle', id:'rl2', name:'二連装',           note:'ドローンが2発同時に撃つ',             ref:['droneint',10],   req:() => L('droneint') >= 10, rq:'連射速度 Lv10'},
-  {cat:'idle', id:'sp1', name:'重力加速',         note:'落下衝撃の威力 ×2',                   ref:['spawn',5],   req:() => L('spawn') >= 5, rq:'落下衝撃 Lv5'},
+  {cat:'idle', id:'sp1', name:'大崩落',           note:'崩落の威力 ×2',                       ref:['spawn',5],   req:() => L('spawn') >= 5, rq:'崩落 Lv5'},
   {cat:'idle', id:'bu1', name:'榴弾',             note:'弾の炸裂で飛ぶ破片 ×2',               ref:['drburst',5],   req:() => L('drburst') >= 5, rq:'弾の炸裂 Lv5'},
   {cat:'arms', id:'cn1', name:'徹甲弾',           note:'砲台の威力 ×2・爆発範囲 ×1.2',        ref:['cannonN',3], req:() => L('cannonN') >= 3, rq:'砲台の数 Lv3'},
   {cat:'arms', id:'lz1', name:'十字照射',         note:'レーザーが横と縦の十字に撃つ',        ref:['laserN',3], req:() => L('laserN') >= 3, rq:'レーザーの数 Lv3'},
@@ -393,7 +393,7 @@ const stat = {
   drones:   () => Math.min(12, 1 + L('drones') + P('pdrone')),
   droneInt: () => TUNE.droneInt * Math.pow(.85, L('droneint')) * (SP('rl1') ? .8 : 1) * (buffs.barrage > 0 ? .125 : 1),
   droneDmg: () => TUNE.droneDmg * (1 + .25 * L('dronedmg')) * (SP('dr1') ? 2 : 1) * (SP('dr2') ? 2 : 1) * (SP('dr3') ? 3 : 1) * (SP('dr4') ? 5 : 1),
-  fall:     () => .6 * L('spawn') * (SP('sp1') ? 2 : 1),
+  fall:     () => 1.5 * L('spawn') * (SP('sp1') ? 2 : 1),
   drburst:  () => L('drburst') * 2 * (SP('bu1') ? 2 : 1),
   tapburst: () => 2 + L('tapburst'),
   tapPow:   () => SP('tp1') ? 2 : 1,
@@ -416,7 +416,8 @@ const blockHp = s => 300 * Math.pow(TUNE.fhp, Math.min(s, PRESTIGE_STAGE)) * Mat
 const bossK = () => Math.max(save.stage, save.kills);
 // 稼ぎの倍率は「相場」×「コンボ係数」で、どちらもボス撃破のたびに買えるLvに比例して伸びる（段階の2乗ほど）。
 // ゲージはそれに合わせて (1 + gaugeA×段階)² で伸ばし、さらに (1 + 段階)^gaugePow で後半ほど少し長くする
-const gaugeNeed = () => Math.round(TUNE.gaugeBase * (1 + TUNE.gaugeA * bossK()) * Math.pow(1 + bossK(), TUNE.gaugePow) * Math.pow(.92, P('pgauge')));
+// 素材ごとに掘る段数（深さのノルマ）。掘り切るとボスが現れる
+const gaugeNeed = () => Math.max(5, Math.round(TUNE.digBase * Math.pow(1 + bossK(), TUNE.digPow) * Math.pow(.92, P('pgauge'))));
 const bossHp = () => blockHp(save.stage) * TUNE.bossHp * Math.pow(TUNE.bossGrow, bossK());
 const dustGain = () => { if (save.stage < PRESTIGE_STAGE) return 0; const lv = Math.log10(TUNE.valStage) / 5; return Math.floor(TUNE.dustBase * Math.pow(2, (Math.log10(Math.max(1, save.st.earnedRun)) - 37 * lv) / (TUNE.dustDiv * lv))); };
 
@@ -425,7 +426,7 @@ let blocks = [], shards = [], booms = [], zaps = [], bullets = [], drones = [], 
 let shells = [], beams = [], missiles = [], holes = [], armT = {}, armK = 0;
 let combo = 0, fever = 0, heat = 0, state = 'title', lastTap = 0, earnedTick = 0, luckyT = 60, autoT = 0;
 let MAXS = 900;   // 破片の上限（自動画質で変わる）
-const fx = {arm(){}, beam(){}, hole(){}, hit(){}, brk(){}, boom(){}, bolt(){}, fever(){}, milestone(){}, tap(){}, split(){}, bossHit(){}, bossSpawn(){}, bossDie(){}, shoot(){}, land(){}, lucky(){}, luckyHit(){}, ach(){}};
+const fx = {dig(){}, arm(){}, beam(){}, hole(){}, hit(){}, brk(){}, boom(){}, bolt(){}, fever(){}, milestone(){}, tap(){}, split(){}, bossHit(){}, bossSpawn(){}, bossDie(){}, shoot(){}, land(){}, lucky(){}, luckyHit(){}, ach(){}};
 const TIERS = [[25, 'いいぞ', '#ffe14d'], [50, 'ナイス！', '#ffe14d'], [100, 'スゴい！', '#ff9a3c'], [250, 'ヤバい！', '#ff4c88'], [500, '狂気', '#c38bff'], [1000, '神', '#4cc9ff'], [2500, '宇宙', '#ffffff'], [5000, '無量大数', '#ffffff']];
 let milestoneSeen = 0;
 
@@ -452,6 +453,29 @@ const solid = i => blocks[i].boss || (blocks[i].alive && blocks[i].fy < .3);
 function deadBlock(){ return {alive:false, spawn:0, flash:0, burn:0}; }
 // 落ち物式の補充：壊れたマスには上のブロックが落ち、空いた上端には新しいブロックが降ってくる。
 // ボスのマスは床として扱い、その上下で別々に詰める。fy は「何マス上に描くか」（落下中の見た目のずれ）。
+// ===== 掘り進む =====
+// 壊したブロックは空いたまま。一番上の段の残りが digLeft 以下になったら残りを崩し、全体を1段せり上げて下に新しい段を足す。
+let scrollOff = 0;
+function rowLeft(r){ let n = 0; for (let c = 0; c < cols; c++) if (blocks[r * cols + c].alive) n++; return n; }
+function digRow(){
+  for (let c = 0; c < cols; c++) if (blocks[c].alive) breakBlock(c, 0, 'dig');
+  blocks.splice(0, cols);
+  for (let c = 0; c < cols; c++) blocks.push(newBlock());
+  for (const o of shards) o.cell -= cols;
+  scrollOff += 1; save.prog++; save.st.depth = (save.st.depth || 0) + 1;
+  const fp = stat.fall();
+  if (fp) for (let c = 0; c < cols; c++) if (blocks[c].alive) hit(c, stat.dmg() * fp, 'fall');
+  fx.dig();
+  if (save.prog >= gaugeNeed()) spawnBoss(null);
+}
+function digCheck(){
+  if (boss) return;
+  let alive = 0; for (const b of blocks) if (b.alive) alive++;
+  for (let guard = 0; guard < 4 && !boss; guard++){
+    // 一番上の段がほぼ空、または盤面がほとんど空なら崩す
+    if (rowLeft(0) <= cols * TUNE.digLeft || alive < blocks.length * .2){ digRow(); alive += cols; } else break;
+  }
+}
 function settle(){
   for (let c = 0; c < cols; c++){
     let bottom = rows - 1;
@@ -603,7 +627,6 @@ function breakBlock(i, burst, src, d = 0){
   const gain = earn(b.value * comboMult() * rewardMult());
   // ボスゲージ：ブロックの価値 × 強化ボーナス × その場の倍率（フィーバー・放置・フレンジー）で進む。直接タップで壊すと tapProg 倍。
   // コンボ・相場・実績・星屑はコインだけに効く（特定の強化に頼りきりにならないように）
-  if (!boss){ save.prog += b.value / (100 * sv(save.stage)) * lvMult() * rewardMult() / permMult() * (src === 'tap' ? TUNE.tapProg : 1); if (save.prog >= gaugeNeed()) spawnBoss(null); }
   const x = cx(i), y = cy(i);
   const nd = d + 1, kp = Math.pow(stat.keep(), nd);
   spawnShards(x, y, stat.shards() * burst, i, 0, nd);
@@ -626,8 +649,11 @@ function breakBlock(i, burst, src, d = 0){
 }
 function droneTarget(){
   const pool = [];
-  for (let j = 0; j < blocks.length; j++){ const b = blocks[j]; if (b.alive) pool.push(j); }
   if (boss && Math.random() < .35) return -2;
+  // 7割は一番上から3段のうち残っているブロックを狙う（掘り進むのを手伝う）
+  let top = -1; for (let j = 0; j < blocks.length; j++) if (blocks[j].alive){ top = Math.floor(j / cols); break; }
+  const lim = Math.random() < .7 && top >= 0 ? (top + 3) * cols : blocks.length;
+  for (let j = 0; j < Math.min(lim, blocks.length); j++){ const b = blocks[j]; if (b.alive) pool.push(j); }
   if (!pool.length) return boss ? -2 : -1;
   let best = pool[(Math.random() * pool.length) | 0], bs = -1;
   for (let t = 0; t < 4; t++){
@@ -656,7 +682,8 @@ function fireArm(a, n){
     shells.push({x0, y0, tx, ty, t:0, dur:.45 + d / (cell * 18)});
     fx.arm('cannon', x0, y0);
   } else if (a.id === 'laser'){
-    const br = boss && Math.random() < .4 ? Math.floor((boss.cells[0] / cols)) + Math.floor(boss.bs / 2) : (Math.random() * rows) | 0;
+    // ボス戦以外は、上から3段のどれかを焼く
+    const br = boss && Math.random() < .4 ? Math.floor((boss.cells[0] / cols)) + Math.floor(boss.bs / 2) : (Math.random() * Math.min(3, rows)) | 0;
     beams.push({kind:'row', k:br, t:.55, fireAt:.25, fired:false});
     if (SP('lz1')){ const bc = boss && Math.random() < .4 ? boss.cells[0] % cols : (Math.random() * cols) | 0; beams.push({kind:'col', k:bc, t:.55, fireAt:.25, fired:false}); }
     fx.arm('laser', 0, offY + (br + .5) * cell);
@@ -732,7 +759,8 @@ function stepArms(dt){
 function step(dt){
   if (state !== 'play') return;
   lastTap += dt; save.st.time += dt;
-  settle();
+  digCheck();
+  if (scrollOff > 0) scrollOff = Math.max(0, scrollOff - dt * (6 + scrollOff * 8));
   const fallP = stat.fall();
   for (let i = 0; i < blocks.length; i++){
     const b = blocks[i];
@@ -910,6 +938,8 @@ function load(){
   try {
     const s = localStorage.getItem(KEY);
     if (s){ const o = JSON.parse(s); save = Object.assign(JSON.parse(JSON.stringify(DEFAULT)), o); save.st = Object.assign(JSON.parse(JSON.stringify(DEFAULT.st)), o.st || {}); }
+    // 掘削方式（段数のノルマ）より前のセーブは進み具合の単位が違うので、ノルマ未満に切り詰める
+    save.prog = Math.min(Math.floor(save.prog || 0), gaugeNeed() - 1);
   } catch(e) {}
 }
 function persist(){ save.t = Date.now(); try { localStorage.setItem(KEY, JSON.stringify(save)); } catch(e) {} }
@@ -954,7 +984,7 @@ const sfxShot = () => { if (!actx) return; const n = actx.currentTime; if (n - l
 const sfxBoss = () => { tone(55, 1.2, 'sawtooth', .25, 0, .7); noise(.8, 400, .35); };
 const sfxLucky = () => { [784, 988, 1175, 1568].forEach((f, k) => tone(f, .18, 'sine', .1, k * .05, 1)); };
 const sfxJackpot = () => { [523, 659, 784, 1047, 1319, 1568, 2093].forEach((f, k) => tone(f, .3, 'square', .08, k * .05, 1)); noise(.8, 4000, .25); };
-let lastArm = 0;
+let lastArm = 0, lastDig = 0;
 const sfxArm = kind => {
   if (!actx || save.muted) return; const n = actx.currentTime; if (n - lastArm < .08) return; lastArm = n;
   if (kind === 'cannon') tone(150, .18, 'sine', .14, 0, .5);
@@ -1042,6 +1072,7 @@ fx.milestone = (n, name) => {
   sfxChime();
 };
 fx.shoot = (d, tx, ty) => { d.fl = 1; sfxShot(); };
+fx.dig = () => { shake += .8; if (!actx || save.muted) return; const n = actx.currentTime; if (n - lastDig < .07) return; lastDig = n; noise(.12, 700, .12); tone(110, .12, 'sine', .1, 0, .6); };
 fx.land = (i, v) => { if (v > 9 && parts.length < MAXP - 100 && Math.random() < .3) sparks(cx(i), cy(i) + cell * .45, 2, stageGlow(), 3); };
 fx.bossSpawn = b => {
   shake += 16; zoom = .05; flash = .5; sfxBoss();
@@ -1151,7 +1182,7 @@ function blockSprite(b, size){
 const easeOut = t => 1 - Math.pow(1 - t, 3);
 function drawBlock(b, i){
   const s = easeOut(b.spawn), gap = Math.max(2, cell * .06), full = cell - gap * 2, size = full * s; if (size < 1) return;
-  const x = offX + (i % cols) * cell + cell / 2 - size / 2, y = offY + (Math.floor(i / cols) - b.fy) * cell + cell / 2 - size / 2, rad = size * .16;
+  const x = offX + (i % cols) * cell + cell / 2 - size / 2, y = offY + (Math.floor(i / cols) - b.fy + (b.boss ? 0 : scrollOff)) * cell + cell / 2 - size / 2, rad = size * .16;
   ctx.drawImage(blockSprite(b, full), x, y, size, size);
   if (b.type === 'bomb'){
     ctx.fillStyle = Math.random() < .5 ? '#ffd23f' : '#ff8a1f'; ctx.beginPath(); ctx.arc(x + size * .76, y + size * .2, size * (.06 + Math.random() * .04), 0, 6.283); ctx.fill();
@@ -1429,7 +1460,7 @@ function hud(dt){
   feverFill.style.width = (fever > 0 ? Math.min(100, fever / stat.fever() * 100) : Math.min(100, heat)) + '%';
   feverEl.style.opacity = fever > 0 ? 1 : 0;
   if (boss){ progFill.classList.add('boss'); progFill.style.width = Math.max(0, boss.hp / boss.max * 100) + '%'; progNum.textContent = fmt(Math.max(0, boss.hp)); }
-  else { progFill.classList.remove('boss'); progFill.style.width = Math.min(100, save.prog / gaugeNeed() * 100) + '%'; progNum.textContent = `${fmt(save.prog)} / ${fmt(gaugeNeed())}`; }
+  else { progFill.classList.remove('boss'); progFill.style.width = Math.min(100, save.prog / gaugeNeed() * 100) + '%'; progNum.textContent = `${save.prog.toLocaleString('ja-JP')} / ${gaugeNeed().toLocaleString('ja-JP')}m`; }
   const cm = Math.floor(combo);
   if (cm >= 5){
     if (cm !== shownChain){
@@ -1456,9 +1487,9 @@ function etaText(){
   const sec = Math.max(0, gaugeNeed() - save.prog) / progRate;
   return sec < 60 ? '（もうすぐ）' : sec < 3600 ? `（あと約${Math.ceil(sec / 60)}分）` : `（あと${Math.floor(sec / 3600)}時間以上）`;
 }
-function updateProgLabel(){ progText.textContent = boss ? 'ボス戦中' : (save.ended ? '次のボスまで（再戦）' : '次のボスまで') + etaText(); }
-el('prog').addEventListener('click', () => showToast('稼ぐほど進む',
-  'どの強化でも1Lv買うごとに+1%（画面上の「強化 ×」）。タップで直接壊すと1.5倍。フィーバー・放置ボーナス・金ブロック・幸運ブロックでも加速', 'ボスゲージ', 5000));
+function updateProgLabel(){ progText.textContent = boss ? 'ボス戦中（掘削停止）' : `${save.ended ? 'ボスの層まで（再戦）' : 'ボスの層まで'}${etaText()}　深さ${(save.st.depth || 0).toLocaleString('ja-JP')}m`; }
+el('prog').addEventListener('click', () => showToast('火力が高いほど速く掘れる',
+  '一番上の段がほぼ壊れると崩れて1m掘り進む。ドローンや兵器は上の段を優先して狙う。威力・兵器・クリティカル・崩落を上げると速い', '掘削', 5000));
 const muteBtn = el('mute');
 function syncMute(){ muteBtn.textContent = save.muted ? '🔇' : '🔊'; muteBtn.setAttribute('aria-label', save.muted ? '音を出す' : '音を消す'); }
 muteBtn.addEventListener('click', () => { save.muted = !save.muted; syncMute(); persist(); initAudio(); });
@@ -1480,7 +1511,7 @@ const NEWS = [
   () => '炎上した。ブロックが。', () => `今日のプレイ時間：${fmtT(save.st.time)}`, () => `実績 ${achCount()} / ${ACH.length}　（1個ごとに報酬+1%）`,
   () => 'フレンジー中は何をしても儲かる。', () => '「破片が多すぎて前が見えない」と苦情。', () => 'オフラインでも壊れ続ける。でも半分しか持ち帰れない。',
   () => '跳弾は壁に当たるほど痛い。', () => '誘導破片、ブロックのほうへ勝手に行く。賢い。', () => '宇宙を砕くのは物理的に可能だと判明。',
-  () => '上から降ってくるブロックは、着地の衝撃でも壊れる。', () => 'ドローン12台体制。もはや軍隊。', () => '砲台の弾は山なりに飛ぶ。物理の授業で習ったやつ。', () => 'レーザーは横一列を一瞬で焼き払う。前に立つな。', () => 'ミサイルは狙ったブロックを最後まで追いかける。', () => 'ブラックホールの中で何が起きているかは誰も知らない。', () => '「コインに使い道がない」——いや、強化しろ。',
+  () => '一番上の段を崩すと、盤面が1段せり上がる。', () => '深く掘るほど硬い地層が出てくる。', () => 'ドローン12台体制。もはや軍隊。', () => '砲台の弾は山なりに飛ぶ。物理の授業で習ったやつ。', () => 'レーザーは横一列を一瞬で焼き払う。前に立つな。', () => 'ミサイルは狙ったブロックを最後まで追いかける。', () => 'ブラックホールの中で何が起きているかは誰も知らない。', () => '「コインに使い道がない」——いや、強化しろ。',
 ];
 let newsT = 0, newsPinned = 0;
 function pushNews(h){ newsEl.innerHTML = h; newsT = 0; newsPinned = 14; }
