@@ -7,7 +7,7 @@ function run(mode, maxMin = 120, dt = 1/30, fresh = true){
   G.buildGrid(); G.setState('play');
   const save = G.save, reach = [0], dust = [], lvAt = [];
   const lvsum = () => Object.values(save.lv).reduce((a, b) => a + b, 0);
-  let t = 0, tapT = 0, buyT = 0, achT = 0, lastStage = save.stage, prestigeAt = null;
+  let t = 0, tapT = 0, buyT = 0, achT = 0, lastStage = save.stage, prestigeAt = null, gridLv = -1;
   while (t < maxMin * 60 && !save.ended){
     G.step(dt); t += dt;
     if (mode === 'tap'){ tapT += dt; if (tapT >= G.stat.holdMs() / 1000){ tapT = 0;
@@ -27,10 +27,12 @@ function run(mode, maxMin = 120, dt = 1/30, fresh = true){
         if (!best || save.coins < bc) break;
         save.coins -= bc; best();
       }
+      // 盤面拡張を買ったら組み直す
+      if (G.L('grid') !== gridLv){ gridLv = G.L('grid'); G.layout(390, 560); G.buildGrid(); }
     }
     if (save.stage !== lastStage){ lastStage = save.stage; reach.push(+(t/60).toFixed(1)); lvAt.push(lvsum()); if (save.stage >= G.PRESTIGE_STAGE) dust.push(G.dustGain()); if (save.stage === G.PRESTIGE_STAGE) prestigeAt = G.dustGain(); }
   }
-  return {mode, reach, lvAt, lvMax: G.UPG.reduce((a, u) => a + Math.min(u.max, 30), 0), dust, best: save.best, destroyed: save.st.destroyed, endMin: save.ended ? +(t/60).toFixed(1) : null, dustAtUnlock: prestigeAt, dustAtEnd: G.dustGain(),
+  return {mode, reach, lvAt, grid: G.L('grid'), cells: G.blocks.length, lvMax: G.UPG.reduce((a, u) => a + Math.min(u.max, 30), 0), dust, best: save.best, destroyed: save.st.destroyed, endMin: save.ended ? +(t/60).toFixed(1) : null, dustAtUnlock: prestigeAt, dustAtEnd: G.dustGain(),
     sp: Object.keys(save.sp).length + '/' + G.SPECIALS.length, ach: Object.keys(save.ach).length + '/' + G.ACH.length, lucky: save.st.lucky, coins: G.fmt(save.coins)};
 }
 // 第3引数に周回数を渡すと、エンディング後に砕いて永続強化を買い、次の周を続けて測る
