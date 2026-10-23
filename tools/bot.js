@@ -10,14 +10,28 @@ function run(mode, maxMin = 120, dt = 1/30, fresh = true){
   let t = 0, tapT = 0, buyT = 0, achT = 0, lastStage = save.stage, prestigeAt = null, gridLv = -1;
   while (t < maxMin * 60 && !save.ended){
     G.step(dt); t += dt;
-    if (mode === 'tap'){ tapT += dt; if (tapT >= G.stat.holdMs() / 1000){ tapT = 0;
+    if (mode === 'tap' || mode === 'ctap'){ tapT += dt; if (tapT >= (mode === 'ctap' ? .33 : G.stat.holdMs() / 1000)){ tapT = 0;
       const lk = G.lucky, bl = G.blocks; let i = -1;
       if (lk) G.tap(lk.x, lk.y);
       else { if (G.boss) i = G.boss.cells[0]; else { const al = []; for (let k = 0; k < bl.length; k++) if (bl[k].alive) al.push(k); if (al.length) i = al[(Math.random()*al.length)|0]; }
         if (i >= 0) G.tap(G.cx(i), G.cy(i)); } } }
     achT += dt; if (achT >= 1){ achT = 0; G.checkAch(); }
     buyT += dt;
-    if (buyT >= 2){ buyT = 0;
+    const casual = mode === 'ctap' || mode === 'cidle';
+    if (casual && buyT >= 10){ buyT = 0;
+      // 人間らしい買い方：買えるものからランダムに6件。半分はまとめ買い（×MAX）、残りは1Lv
+      for (let k = 0; k < 6; k++){
+        const opts = [];
+        for (const u of G.UPG) if (G.L(u.id) < u.max && G.upCost(u) <= save.coins) opts.push(() => { let n = Math.random() < .5 ? 1e9 : 1; while (n-- > 0 && G.L(u.id) < u.max && G.upCost(u) <= save.coins){ save.coins -= G.upCost(u); save.lv[u.id] = G.L(u.id) + 1; } });
+        for (const s of G.SPECIALS) if (!G.SP(s.id) && s.req() && G.spCost(s) <= save.coins) opts.push(() => { save.coins -= G.spCost(s); save.sp[s.id] = 1; });
+        for (const m of G.MODS) if (G.ML(m.id) < m.max && G.modCost(m) <= save.coins) opts.push(() => { save.coins -= G.modCost(m); const w = G.ML(m.id); save.mods[m.id] = w + 1; if (!w && save.equip.length < save.slots) save.equip.push(m.id); });
+        if (save.slots < 4 && G.slotCost() <= save.coins) opts.push(() => { save.coins -= G.slotCost(); save.slots++; });
+        if (!opts.length) break;
+        opts[(Math.random() * opts.length) | 0]();
+      }
+      if (G.L('grid') !== gridLv){ gridLv = G.L('grid'); G.layout(390, 560); G.buildGrid(); }
+    }
+    if (!casual && buyT >= 2){ buyT = 0;
       for (let guard = 0; guard < 5000; guard++){
         let best = null, bc = Infinity;
         for (const u of G.UPG){ if (G.L(u.id) < u.max){ const c = G.upCost(u); if (c < bc){ bc = c; best = () => save.lv[u.id] = G.L(u.id) + 1; } } }

@@ -203,7 +203,7 @@ button{font:inherit;color:inherit}
   <div class="chain" id="chain"><span id="chainNum" class="display">0</span><span id="chainLabel" class="display">コンボ</span><span id="chainTier" class="display"></span><span id="chainMult"></span></div>
   <div id="fever"><span class="display">フィーバー！</span><small>報酬2倍・威力2倍・連射2倍</small></div>
   <div id="buffs"></div>
-  <div class="toast" id="toast"><b>実績解除</b><span id="toastText"></span></div>
+  <div class="toast" id="toast"><b id="toastHead">実績解除</b><span id="toastText"></span></div>
   <div class="overlay" id="overlay" hidden></div>
   <section class="sheet" id="sheet" hidden aria-label="強化">
     <div class="sheet-head">
@@ -216,7 +216,7 @@ button{font:inherit;color:inherit}
 <footer class="bar">
   <div class="gauge" title="フィーバーゲージ"><div id="feverFill"></div></div>
   <div class="row">
-    <div class="prog"><div class="prog-label"><span id="progText">次のボスまで</span><span id="progNum"></span></div><div class="prog-bar"><div id="progFill"></div></div></div>
+    <div class="prog" id="prog" role="button" tabindex="0" aria-label="ボスゲージ。押すと速く進めるコツを表示"><div class="prog-label"><span id="progText">次のボスまで</span><span id="progNum"></span></div><div class="prog-bar"><div id="progFill"></div></div></div>
     <button class="shop-btn display" id="shopBtn">強化<span class="dot" id="shopDot" hidden></span></button>
   </div>
 </footer>
@@ -1226,15 +1226,24 @@ function hud(dt){
   if (bh !== shownBuffs){ buffsEl.innerHTML = bh; shownBuffs = bh; }
 }
 function updateStageLabel(){ const s = STAGES[save.stage]; el('stageText').textContent = '素材：' + s.name; el('stageSwatch').style.background = s.color; dustTag.hidden = !save.dust && !save.runs; dustTag.textContent = `✦ 星屑 ${save.dust}`; }
-function updateProgLabel(){ progText.textContent = boss ? 'ボス戦中' : save.ended ? '次のボスまで（再戦）' : '次のボスまで'; }
+let progRate = 0, progSample = 0, progStage = -1;
+function etaText(){
+  if (boss || progRate <= 0) return '';
+  const sec = Math.max(0, gaugeNeed() - save.prog) / progRate;
+  return sec < 60 ? '（もうすぐ）' : sec < 3600 ? `（あと約${Math.ceil(sec / 60)}分）` : `（あと${Math.floor(sec / 3600)}時間以上）`;
+}
+function updateProgLabel(){ progText.textContent = boss ? 'ボス戦中' : (save.ended ? '次のボスまで（再戦）' : '次のボスまで') + etaText(); }
+el('prog').addEventListener('click', () => showToast('稼ぐほど進む',
+  'タップで直接壊すと2倍。コンボ・フィーバー・金ブロック・幸運ブロックで加速。強化の「相場」「コンボ係数」（共通タブ）がいちばん効く', 'ボスゲージ', 5000));
 const muteBtn = el('mute');
 function syncMute(){ muteBtn.textContent = save.muted ? '🔇' : '🔊'; muteBtn.setAttribute('aria-label', save.muted ? '音を出す' : '音を消す'); }
 muteBtn.addEventListener('click', () => { save.muted = !save.muted; syncMute(); persist(); initAudio(); });
 
 let toastT = null;
-function showToast(name, desc){
+function showToast(name, desc, head = '実績解除', ms = 2800){
+  el('toastHead').textContent = head;
   el('toastText').innerHTML = `${name}<span style="display:block;font-weight:500;font-size:11px;opacity:.8">${desc}</span>`;
-  const t = el('toast'); t.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), 2800);
+  const t = el('toast'); t.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), ms);
 }
 
 /* ---- ニュース ---- */
@@ -1492,7 +1501,12 @@ function frame(now){
   if (freeze > 0) freeze -= raw; else { step(dt); updateFx(dt); }
   tickT += raw;
   if (tickT >= 1){
-    const rate = earnedTick / tickT; earnedTick = 0; tickT = 0;
+    const rate = earnedTick / tickT;
+    // ゲージの進み方（あと約◯分の見積もり用）。素材が変わったらやり直す
+    if (progStage === save.stage && !boss && save.prog >= progSample){ const r = (save.prog - progSample) / tickT; progRate = progRate ? progRate * .85 + r * .15 : r; }
+    else if (progStage !== save.stage) progRate = 0;
+    progStage = save.stage; progSample = save.prog;
+    earnedTick = 0; tickT = 0; updateProgLabel();
     dispRate = dispRate ? dispRate * .7 + rate * .3 : rate;
     if (state === 'play' && lastTap > 8) save.idleRate = save.idleRate ? save.idleRate * .9 + rate * .1 : rate;
   }
