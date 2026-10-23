@@ -5,7 +5,7 @@ const G = require(process.env.CORE || './core.js');
 function run(mode, maxMin = 120, dt = 1/30, fresh = true){
   if (fresh){ G.setSave(JSON.parse(JSON.stringify(G.DEFAULT))); G.save.started = true; G.layout(390, 560); }
   G.buildGrid(); G.setState('play');
-  const save = G.save, reach = [0];
+  const save = G.save, reach = [0], dust = [];
   let t = 0, tapT = 0, buyT = 0, achT = 0, lastStage = save.stage, prestigeAt = null;
   while (t < maxMin * 60 && !save.ended){
     G.step(dt); t += dt;
@@ -27,9 +27,9 @@ function run(mode, maxMin = 120, dt = 1/30, fresh = true){
         save.coins -= bc; best();
       }
     }
-    if (save.stage !== lastStage){ lastStage = save.stage; reach.push(+(t/60).toFixed(1)); if (save.stage === G.PRESTIGE_STAGE) prestigeAt = G.dustGain(); }
+    if (save.stage !== lastStage){ lastStage = save.stage; reach.push(+(t/60).toFixed(1)); if (save.stage >= G.PRESTIGE_STAGE) dust.push(G.dustGain()); if (save.stage === G.PRESTIGE_STAGE) prestigeAt = G.dustGain(); }
   }
-  return {mode, reach, endMin: save.ended ? +(t/60).toFixed(1) : null, dustAtUnlock: prestigeAt, dustAtEnd: G.dustGain(),
+  return {mode, reach, dust, endMin: save.ended ? +(t/60).toFixed(1) : null, dustAtUnlock: prestigeAt, dustAtEnd: G.dustGain(),
     sp: Object.keys(save.sp).length + '/' + G.SPECIALS.length, ach: Object.keys(save.ach).length + '/' + G.ACH.length, lucky: save.st.lucky, coins: G.fmt(save.coins)};
 }
 // 第3引数に周回数を渡すと、エンディング後に砕いて永続強化を買い、次の周を続けて測る

@@ -252,7 +252,7 @@ const STAGES = [
 const PRESTIGE_STAGE = 8;   // この素材に到達したら「砕く」が解放される
 const F_VAL = 1e5;
 const sv = s => Math.pow(F_VAL, s);
-const TUNE = {fhp:4000, fhpLate:2000, fdmg:2000, gaugeBase:300, gaugeGrow:1.75, bossHp:1500, bossGrow:1.35, bossReward:300, comboDecay:.6};
+const TUNE = {fhp:4000, fhpLate:3000, fdmg:2000, gaugeBase:300, gaugeGrow:1.75, gaugeCapK:7, gaugeLate:1.3, tapProg:3, dustBase:18, dustDiv:8, bossHp:1500, bossGrow:1.35, bossReward:300, comboDecay:.6};
 const DEFAULT = {
   coins:0, stage:0, lv:{}, mods:{}, equip:[], slots:2, best:0, ended:false, muted:false, t:0, idleRate:0, prog:0, started:false, kills:0, boss:null,
   sp:{}, ach:{}, dust:0, perm:{}, runs:0, buyMode:1, endSeen:false,
@@ -325,11 +325,12 @@ const SPECIALS = [
 ];
 // 星屑で買う永続強化（砕いても残る）
 const PERM = [
-  {id:'pmult',  name:'星屑の輝き',     note:'全部の報酬 +25%',                       cost:5,  g:1.6, max:20, v:l => `+${l*25}%`},
+  {id:'pmult',  name:'星屑の輝き',     note:'全部の報酬 +50%',                       cost:4,  g:1.6, max:20, v:l => `+${l*50}%`},
   {id:'pdrone', name:'初期ドローン',   note:'最初からドローンが多い',                cost:8,  g:1.8, max:5,  v:l => `+${l}台`},
-  {id:'pstage', name:'先の素材から',   note:'砕いたあと、先の素材から始まる',        cost:20, g:2.0, max:6,  v:l => l ? `${STAGES[l].name}から` : '木箱から'},
+  {id:'pstage', name:'先の素材から',   note:'砕いたあと、先の素材から始まる',        cost:10, g:1.8, max:7,  v:l => l ? `${STAGES[l].name}から` : '木箱から'},
   {id:'plucky', name:'幸運の軌道',     note:'幸運ブロックの出現間隔 −15%',           cost:12, g:1.7, max:5,  v:l => `−${Math.round((1-Math.pow(.85,l))*100)}%`},
-  {id:'pauto',  name:'自動タップ',     note:'毎秒勝手にタップする（放置でもフィーバーが起きる）', cost:40, g:2.0, max:3, v:l => `毎秒${l}回`},
+  {id:'pgauge', name:'因果の短縮',     note:'ボス出現までに壊す数 −15%',             cost:6,  g:1.9, max:5,  v:l => `−${Math.round((1-Math.pow(.85,l))*100)}%`},
+  {id:'pauto',  name:'自動タップ',     note:'毎秒勝手にタップする（熱量は半分。幸運ブロックは叩かない）', cost:40, g:2.2, max:3, v:l => `毎秒${l}回`},
   {id:'poff',   name:'長期休暇',       note:'オフライン収入の上限時間 +4時間',      cost:10, g:1.7, max:4,  v:l => `${8+4*l}時間`},
   {id:'pslot',  name:'広い装備枠',     note:'最初から装備枠が多い',                  cost:30, g:2.5, max:2,  v:l => `${2+l}枠から`},
   {id:'pkeep',  name:'モジュール記憶', note:'砕いてもモジュールのLvが残る',          cost:80, g:1,   max:1,  v:l => l ? '有効' : '無効'},
@@ -348,7 +349,7 @@ const permCost = p => Math.ceil(p.cost * Math.pow(p.g, P(p.id)));
 const buffs = {frenzy:0, barrage:0, awaken:0, storm:0};
 const BUFF_INFO = {frenzy:['フレンジー 報酬×7', '#ffd84d'], barrage:['弾幕 連射×8', '#4cc9ff'], awaken:['覚醒 クリティカル100%', '#ffe14d'], storm:['破片嵐', '#ff4c88']};
 const achCount = () => Object.keys(save.ach).length;
-const rewardMult = () => (1 + .01 * achCount()) * (1 + .25 * P('pmult')) * (1 + .02 * save.dust) * (buffs.frenzy > 0 ? 7 : 1) * (fever > 0 ? 3 : 1);
+const rewardMult = () => (1 + .01 * achCount()) * (1 + .5 * P('pmult')) * (1 + .02 * save.st.bestDust) * (buffs.frenzy > 0 ? 7 : 1) * (fever > 0 ? 3 : 1);
 const comboMult = () => 1 + Math.sqrt(combo) * stat.chain();
 const luckyInterval = () => 110 * (SP('lk1') ? .75 : 1) * (SP('lk2') ? .75 : 1) * Math.pow(.85, P('plucky'));
 
@@ -375,9 +376,10 @@ const stat = {
 };
 // 暗黒物質以降はHPの伸びをダメージと揃える（差が積み重なって終盤だけ詰まるのを防ぐ）
 const blockHp = s => 300 * Math.pow(TUNE.fhp, Math.min(s, PRESTIGE_STAGE)) * Math.pow(TUNE.fhpLate, Math.max(0, s - PRESTIGE_STAGE));
-const gaugeNeed = () => Math.round(TUNE.gaugeBase * Math.pow(TUNE.gaugeGrow, save.kills));
+// 8体目以降は伸びを緩める（湧き速度の上限で終盤が頭打ちになるのを防ぐ）
+const gaugeNeed = () => Math.round(TUNE.gaugeBase * Math.pow(TUNE.gaugeGrow, Math.min(save.kills, TUNE.gaugeCapK)) * Math.pow(TUNE.gaugeLate, Math.max(0, save.kills - TUNE.gaugeCapK)) * Math.pow(.85, P('pgauge')));
 const bossHp = () => blockHp(save.stage) * TUNE.bossHp * Math.pow(TUNE.bossGrow, save.kills);
-const dustGain = () => save.stage < PRESTIGE_STAGE ? 0 : Math.floor(10 * Math.pow(2, (Math.log10(Math.max(1, save.st.earnedRun)) - 37) / 5));
+const dustGain = () => save.stage < PRESTIGE_STAGE ? 0 : Math.floor(TUNE.dustBase * Math.pow(2, (Math.log10(Math.max(1, save.st.earnedRun)) - 37) / TUNE.dustDiv));
 
 let W = 390, H = 560, cols = 7, rows = 9, cell = 55.7, offX = 0, offY = 0, topBand = 0;
 let blocks = [], shards = [], booms = [], zaps = [], bullets = [], drones = [], boss = null, lucky = null;
@@ -468,13 +470,13 @@ function hitLucky(){
 function tap(x, y, auto){
   if (state !== 'play') return false;
   if (!auto){ lastTap = 0; save.st.taps++; }
-  if (lucky && Math.hypot(lucky.x - x, lucky.y - y) < lucky.r * 1.6){ hitLucky(); fx.tap(x, y); return true; }
+  if (!auto && lucky && Math.hypot(lucky.x - x, lucky.y - y) < lucky.r * 1.6){ hitLucky(); fx.tap(x, y); return true; }
   const fv = stat.fever();
   if (fever > 0){ if (SP('fv1')) fever = Math.min(fv * 2, fever + stat.heat() / 100 * fv * .5); }
-  else { heat += stat.heat(); if (heat >= 100){ heat = 0; fever = fv; save.st.fevers++; fx.fever(); } }
+  else { heat += stat.heat() * (auto ? .5 : 1); if (heat >= 100){ heat = 0; fever = fv; save.st.fevers++; fx.fever(); } }
   const i = cellAt(x, y);
   if (i >= 0 && blocks[i].boss && boss){ hitBoss(stat.dmg() * 25 * stat.tapPow(), 'tap'); spawnShards(x, y, stat.shards() * stat.tapburst(), i, 0); }
-  else if (i >= 0 && blocks[i].alive) breakBlock(i, stat.tapburst(), 'tap');
+  else if (i >= 0 && blocks[i].alive) breakBlock(i, stat.tapburst(), auto ? 'auto' : 'tap');
   else spawnShards(x, y, stat.shards() * stat.tapburst(), i, 0);
   const tb = stat.tapboom();
   if (tb) booms.push({x, y, i:Math.max(0, i), R:cell * (1 + .3 * tb + (SP('sw1') ? 1 : 0)), dmg:stat.dmg() * tb * 2 * stat.tapPow(), t:.04, big:false, quiet:true});
@@ -526,7 +528,7 @@ function breakBlock(i, burst, src){
   blocks[i] = deadBlock(stat.spawn() * (.7 + Math.random() * .6));
   combo += 1; save.st.destroyed++;
   const gain = earn(b.value * comboMult() * rewardMult());
-  if (!boss){ save.prog++; if (save.prog >= gaugeNeed()) spawnBoss(null); }
+  if (!boss){ save.prog += (src === 'tap' ? TUNE.tapProg : 1) * (fever > 0 ? 2 : 1); if (save.prog >= gaugeNeed()) spawnBoss(null); }
   const x = cx(i), y = cy(i);
   spawnShards(x, y, stat.shards() * burst, i, 0);
   if (b.type === 'bomb') booms.push({x, y, i, R:cell * 1.7 * (SP('bm1') ? 1.3 : 1), dmg:stat.dmg() * 5 * (SP('bm1') ? 2 : 1), t:.08, big:true});
@@ -594,8 +596,7 @@ function step(dt){
     if (autoT >= 1 / P('pauto')){
       autoT = 0;
       const al = []; for (let j = 0; j < blocks.length; j++) if (blocks[j].alive) al.push(j);
-      if (lucky) tap(lucky.x, lucky.y, true);
-      else if (boss && Math.random() < .5) tap(bossX(), bossY(), true);
+      if (boss && Math.random() < .5) tap(bossX(), bossY(), true);
       else if (al.length){ const j = al[(Math.random() * al.length) | 0]; tap(cx(j), cy(j), true); }
     }
   }
@@ -1275,7 +1276,7 @@ function sheetHtml(){
     const d = dustGain(), ok = save.stage >= PRESTIGE_STAGE;
     h += `<div class="prestige-box">
       <div class="dust-num display">✦ ${save.dust}</div><p>持っている星屑</p>
-      <p>今砕くと <b style="color:var(--dust)">+${d}</b> 星屑（星屑1個ごとに報酬+2%）<br>${ok ? `${STAGES[Math.min(P('pstage'), STAGES.length - 1)].name}からやり直しになる。` : `<b>${STAGES[PRESTIGE_STAGE].name}</b>に到達すると砕ける（今：${STAGES[save.stage].name}）`}</p>
+      <p>今砕くと <b style="color:var(--dust)">+${d}</b> 星屑（これまでに集めた星屑1個ごとに報酬+2%。使っても減らない）<br>${ok ? `${STAGES[Math.min(P('pstage'), STAGES.length - 1)].name}からやり直しになる。` : `<b>${STAGES[PRESTIGE_STAGE].name}</b>に到達すると砕ける（今：${STAGES[save.stage].name}）`}</p>
       <button class="go ${ok && d > 0 ? '' : 'ghost'}" data-act="prestige" ${ok && d > 0 ? '' : 'disabled'}>宇宙を砕く</button>
     </div><div class="section-title">星屑で買う永続強化</div><ul class="list">`;
     for (const p of PERM){
