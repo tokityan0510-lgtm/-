@@ -18,7 +18,7 @@ function run(mode, maxMin = 120, dt = 1/30, fresh = true){
     achT += dt; if (achT >= 1){ achT = 0; G.checkAch(); }
     buyT += dt;
     if (buyT >= 2){ buyT = 0;
-      for (let guard = 0; guard < 80; guard++){
+      for (let guard = 0; guard < 5000; guard++){
         let best = null, bc = Infinity;
         for (const u of G.UPG){ if (G.L(u.id) < u.max){ const c = G.upCost(u); if (c < bc){ bc = c; best = () => save.lv[u.id] = G.L(u.id) + 1; } } }
         for (const s of G.SPECIALS){ if (!G.SP(s.id) && s.req()){ const c = G.spCost(s); if (c < bc){ bc = c; best = () => save.sp[s.id] = 1; } } }

@@ -252,9 +252,7 @@ const STAGES = [
 const PRESTIGE_STAGE = 8;   // この素材に到達したら「砕く」が解放される
 // ブロックの価値の素材倍率（TUNE.valStage）
 const sv = s => Math.pow(TUNE.valStage, s);
-// 値段の素材倍率。ブロックの価値（valStage）の伸びに、倍率の積み上がりぶん（×1.45）を上乗せした値
-const priceSv = s => Math.pow(TUNE.priceStage, s);
-const TUNE = {fhp:4000, fhpLate:3000, fdmg:2000, gaugeBase:42000, gaugeGrow:3.0, gaugeCapK:6, gaugeLate:1.8, tapProg:2, dustBase:18, dustDiv:8, dustBonus:.001, pmultBonus:.1, idleBonus:5, idleRamp:30, feverReward:2, costX:3, priceStage:145000, chainG:2.7, valStage:1e5, droneDmg:5, droneInt:1.5, bossHp:1500, bossGrow:1.35, bossReward:300, comboDecay:.6};
+const TUNE = {fhp:4000, fhpLate:4000, fdmg:4000, gaugeBase:20000, gaugeA:6, gaugePow:1.5, tapProg:2, dustBase:18, dustDiv:8, dustBonus:.001, pmultBonus:.1, idleBonus:5, idleRamp:30, feverReward:2, costX:3, valStage:1e4, modSpan:5, droneDmg:5, droneInt:1.5, bossHp:1500, bossGrow:1.35, bossReward:300, comboDecay:.6};
 const DEFAULT = {
   coins:0, stage:0, lv:{}, mods:{}, equip:[], slots:2, best:0, ended:false, muted:false, t:0, idleRate:0, prog:0, started:false, kills:0, boss:null,
   sp:{}, ach:{}, dust:0, perm:{}, runs:0, buyMode:1, endSeen:false,
@@ -267,60 +265,64 @@ const M = id => save.equip.includes(id) ? ML(id) : 0;
 const SP = id => !!save.sp[id];
 const P = id => save.perm[id] || 0;
 
+// 値段はボスを倒しても上がらない（クッキークリッカー型）。上がるのは買ったときだけ。
+//   inf:true … 上限なし。値段は g 倍ずつ。効果は足し算で伸びる（ボス撃破のたびに数十Lvまとめて買える）
+//   それ以外 … 上限あり。span 段ぶんの価値の伸びをかけて上限に届くよう、1Lvごとに大きく上がる（素材が進むごとに解放される感覚）
 const UPG = [
   // 放置
-  {cat:'idle', id:'drones',   name:'ドローンの台数', note:'勝手に撃ち続けるドローン',           cost:800,   g:3.10,  max:11,  v:l => `${1+l+P('pdrone')}台`},
-  {cat:'idle', id:'droneint', name:'連射速度',       note:'ドローンが撃つ間隔',                 cost:600,   g:2.40,  max:14,  v:l => `${(TUNE.droneInt*Math.pow(.85,l)*(SP('rl1')?.8:1)).toFixed(2)}秒`},
-  {cat:'idle', id:'dronedmg', name:'弾の威力',       note:'ドローンの弾が与えるダメージ',       cost:900,   g:2.30,  max:999, v:l => `×${fmtX(TUNE.droneDmg*Math.pow(1.4,l))}`},
-  {cat:'idle', id:'spawn',    name:'落下衝撃',       note:'落ちてきたブロックが、着地した下のブロックにダメージ', cost:1200, g:2.50, max:15, v:l => l ? `威力×${fmtX(.6*l*(SP('sp1')?2:1))}` : 'なし'},
-  {cat:'idle', id:'drburst',  name:'弾の炸裂',       note:'弾が当たったとき追加で飛ぶ破片',     cost:2500,  g:2.70,  max:10,  v:l => `+${l*2*(SP('bu1')?2:1)}個`},
+  {cat:'idle', id:'drones',   name:'ドローンの台数', note:'勝手に撃ち続けるドローン',           cost:800,   span:10, max:11,  v:l => `${1+l+P('pdrone')}台`},
+  {cat:'idle', id:'droneint', name:'連射速度',       note:'ドローンが撃つ間隔',                 cost:600,   span:9,  max:14,  v:l => `${(TUNE.droneInt*Math.pow(.85,l)*(SP('rl1')?.8:1)).toFixed(2)}秒`},
+  {cat:'idle', id:'dronedmg', name:'弾の威力',       note:'ドローンの弾が与えるダメージ（上限なし）', cost:900, inf:true, g:1.2, max:1e9, v:l => `×${fmtX(TUNE.droneDmg*(1+.25*l))}`},
+  {cat:'idle', id:'spawn',    name:'落下衝撃',       note:'落ちてきたブロックが、着地した下のブロックにダメージ', cost:1200, span:8, max:15, v:l => l ? `威力×${fmtX(.6*l*(SP('sp1')?2:1))}` : 'なし'},
+  {cat:'idle', id:'drburst',  name:'弾の炸裂',       note:'弾が当たったとき追加で飛ぶ破片',     cost:2500,  span:8,  max:10,  v:l => `+${l*2*(SP('bu1')?2:1)}個`},
   // 操作
-  {cat:'tap',  id:'tapburst', name:'タップの破片',   note:'タップで壊したときの破片の倍率',     cost:500,   g:2.40,  max:20,  v:l => `×${2+l}`},
-  {cat:'tap',  id:'heat',     name:'熱量',           note:'1タップで溜まるフィーバーゲージ',     cost:1500,  g:2.50,  max:12,  v:l => `+${((8+2*l)*(SP('ht1')?1.5:1)).toFixed(0)}`},
-  {cat:'tap',  id:'fever',    name:'フィーバー',     note:'ゲージ満タンで報酬2倍・威力2倍になる時間', cost:4000, g:2.70, max:10, v:l => `${5+l}秒`},
-  {cat:'tap',  id:'tapboom',  name:'衝撃波',         note:'タップした周りのブロックにもダメージ', cost:3000, g:2.80,  max:8,   v:l => l ? `半径${(1+.3*l+(SP('sw1')?1:0)).toFixed(1)}・威力×${l*2}` : 'なし'},
+  {cat:'tap',  id:'tapburst', name:'タップの破片',   note:'タップで壊したときの破片の倍率',     cost:500,   span:9,  max:20,  v:l => `×${2+l}`},
+  {cat:'tap',  id:'heat',     name:'熱量',           note:'1タップで溜まるフィーバーゲージ',     cost:1500,  span:7,  max:12,  v:l => `+${((8+2*l)*(SP('ht1')?1.5:1)).toFixed(0)}`},
+  {cat:'tap',  id:'fever',    name:'フィーバー',     note:'ゲージ満タンで報酬2倍・威力2倍になる時間', cost:4000, span:8, max:10, v:l => `${5+l}秒`},
+  {cat:'tap',  id:'tapboom',  name:'衝撃波',         note:'タップした周りのブロックにもダメージ', cost:3000, span:8,  max:8,   v:l => l ? `半径${(1+.3*l+(SP('sw1')?1:0)).toFixed(1)}・威力×${l*2}` : 'なし'},
   // 共通
-  {cat:'core', id:'shards',   name:'破片の数',       note:'ブロックが壊れたときに飛び散る破片', cost:1000,  g:2.50,  max:25,  v:l => `${3+l}個`},
-  {cat:'core', id:'power',    name:'破片の威力',     note:'破片1つが与えるダメージ',             cost:1500,  g:2.40,  max:999, v:l => `×${fmtX(Math.pow(1.35,l))}`},
-  {cat:'core', id:'keep',     name:'連鎖の持続',     note:'連鎖が1段深くなるごとに破片の威力が落ちる。その落ち方をゆるやかにする', cost:3000, g:2.60, max:10, v:l => `1段ごと×${(.65+.025*l).toFixed(3)}`},
-  {cat:'core', id:'chain',    name:'コンボ係数',     note:'コンボが高いほど報酬が増える',       cost:5000,  g:TUNE.chainG,  max:99,  v:l => `${(0.1+0.1*l).toFixed(1)}`},
-  {cat:'core', id:'crit',     name:'クリティカル',   note:'大ダメージが出る確率',               cost:4000,  g:2.70,  max:15,  v:l => `${5+3*l}%`},
-  {cat:'core', id:'bomb',     name:'爆弾ブロック',   note:'壊すと周りを吹き飛ばすブロックの出現率', cost:6000, g:2.70, max:15, v:l => `${(Math.min(.25,.02+.015*l)*100).toFixed(1)}%`},
-  {cat:'core', id:'gold',     name:'金ブロック',     note:'価値15倍のブロックの出現率',           cost:8000,  g:2.70,  max:15,  v:l => `${Math.round(Math.min(.2,.01+.01*l)*100)}%`},
+  {cat:'core', id:'market',   name:'相場',           note:'すべてのブロックの価値が上がる（上限なし）', cost:1000, inf:true, g:1.15, max:1e9, v:l => `+${(l*10).toLocaleString('ja-JP')}%`},
+  {cat:'core', id:'chain',    name:'コンボ係数',     note:'コンボが高いほど報酬が増える（上限なし）', cost:5000, inf:true, g:1.22, max:1e9, v:l => `${(0.1+0.05*l).toFixed(2)}`},
+  {cat:'core', id:'power',    name:'破片の威力',     note:'破片1つが与えるダメージ（上限なし）', cost:1500, inf:true, g:1.2, max:1e9, v:l => `×${fmtX(1+.2*l)}`},
+  {cat:'core', id:'shards',   name:'破片の数',       note:'ブロックが壊れたときに飛び散る破片', cost:1000,  span:10, max:25,  v:l => `${3+l}個`},
+  {cat:'core', id:'keep',     name:'連鎖の持続',     note:'連鎖が1段深くなるごとに破片の威力が落ちる。その落ち方をゆるやかにする', cost:3000, span:9, max:10, v:l => `1段ごと×${(.65+.025*l).toFixed(3)}`},
+  {cat:'core', id:'crit',     name:'クリティカル',   note:'大ダメージが出る確率',               cost:4000,  span:9,  max:15,  v:l => `${5+3*l}%`},
+  {cat:'core', id:'bomb',     name:'爆弾ブロック',   note:'壊すと周りを吹き飛ばすブロックの出現率', cost:6000, span:8, max:15, v:l => `${(Math.min(.25,.02+.015*l)*100).toFixed(1)}%`},
+  {cat:'core', id:'gold',     name:'金ブロック',     note:'価値15倍のブロックの出現率',           cost:8000,  span:9,  max:15,  v:l => `${Math.round(Math.min(.2,.01+.01*l)*100)}%`},
 ];
 const MODS = [
-  {id:'ricochet', name:'跳弾', note:'破片が画面の端で跳ね返り、跳ねるたびに威力が上がる', unlock:15000,  cost:12000, g:2.70, max:10, v:l => `${1+l}回・1回ごと+${25+5*(l-1)}%`},
-  {id:'split',    name:'分裂', note:'ブロックに当たった破片がときどき2つに分かれる',     unlock:30000,  cost:20000, g:2.70, max:10, v:l => `${Math.round(Math.min(.8,.2+.07*(l-1))*100)}%`},
-  {id:'homing',   name:'誘導', note:'破片が近くのブロックへ曲がって飛ぶ',               unlock:50000,  cost:30000, g:2.70, max:10, v:l => `曲がる強さ ${l}`},
-  {id:'pierce',   name:'貫通', note:'破片がブロックを突き抜ける',                       unlock:80000,  cost:45000, g:2.80, max:8,  v:l => `${l}枚`},
-  {id:'bolt',     name:'雷撃', note:'壊れたブロックから近くのブロックへ雷が走る',       unlock:150000, cost:80000, g:2.70, max:10, v:l => `${Math.round(Math.min(.6,.15+.05*(l-1))*100)}%で${2+Math.floor((l-1)/2)}本`},
-  {id:'burn',     name:'炎上', note:'当たったブロックを燃やし、壊れると隣に燃え移る',   unlock:250000, cost:120000, g:2.70, max:10, v:l => `毎秒 威力×${(0.8*(1+.3*(l-1))).toFixed(1)}`},
-  {id:'blast',    name:'誘爆', note:'壊れたブロックがときどき爆発する',                 unlock:400000, cost:180000, g:2.70, max:10, v:l => `${Math.round(Math.min(.5,.08+.04*(l-1))*100)}%`},
+  {id:'ricochet', name:'跳弾', note:'破片が画面の端で跳ね返り、跳ねるたびに威力が上がる', unlock:15000,  cost:12000, st:0, max:10, v:l => `${1+l}回・1回ごと+${25+5*(l-1)}%`},
+  {id:'split',    name:'分裂', note:'ブロックに当たった破片がときどき2つに分かれる',     unlock:30000,  cost:20000, st:1, max:10, v:l => `${Math.round(Math.min(.8,.2+.07*(l-1))*100)}%`},
+  {id:'homing',   name:'誘導', note:'破片が近くのブロックへ曲がって飛ぶ',               unlock:50000,  cost:30000, st:1, max:10, v:l => `曲がる強さ ${l}`},
+  {id:'pierce',   name:'貫通', note:'破片がブロックを突き抜ける',                       unlock:80000,  cost:45000, st:2, max:8,  v:l => `${l}枚`},
+  {id:'bolt',     name:'雷撃', note:'壊れたブロックから近くのブロックへ雷が走る',       unlock:150000, cost:80000, st:3, max:10, v:l => `${Math.round(Math.min(.6,.15+.05*(l-1))*100)}%で${2+Math.floor((l-1)/2)}本`},
+  {id:'burn',     name:'炎上', note:'当たったブロックを燃やし、壊れると隣に燃え移る',   unlock:250000, cost:120000, st:4, max:10, v:l => `毎秒 威力×${(0.8*(1+.3*(l-1))).toFixed(1)}`},
+  {id:'blast',    name:'誘爆', note:'壊れたブロックがときどき爆発する',                 unlock:400000, cost:180000, st:5, max:10, v:l => `${Math.round(Math.min(.5,.08+.04*(l-1))*100)}%`},
 ];
 // 特殊強化：強化Lvなどが条件で現れる一発もの
 const SPECIALS = [
-  {cat:'idle', id:'dr1', name:'ドローン改良 I',   note:'ドローンの弾の威力 ×2',               cost:15000, req:() => L('drones') >= 3,  rq:'ドローンの台数 Lv3'},
-  {cat:'idle', id:'dr2', name:'ドローン改良 II',  note:'ドローンの弾の威力 ×2',               cost:3e5,   req:() => L('drones') >= 6,  rq:'ドローンの台数 Lv6'},
-  {cat:'idle', id:'dr3', name:'ドローン改良 III', note:'ドローンの弾の威力 ×3',               cost:5e6,   req:() => L('drones') >= 9,  rq:'ドローンの台数 Lv9'},
-  {cat:'idle', id:'dr4', name:'ドローン軍団',     note:'ドローンの弾の威力 ×5',               cost:1e8,   req:() => L('drones') >= 11, rq:'ドローンの台数 Lv11'},
-  {cat:'idle', id:'rl1', name:'速射機構',         note:'ドローンの発射間隔 ×0.8',             cost:5e4,   req:() => L('droneint') >= 5, rq:'連射速度 Lv5'},
-  {cat:'idle', id:'rl2', name:'二連装',           note:'ドローンが2発同時に撃つ',             cost:2e6,   req:() => L('droneint') >= 10, rq:'連射速度 Lv10'},
-  {cat:'idle', id:'sp1', name:'重力加速',         note:'落下衝撃の威力 ×2',                   cost:1e5,   req:() => L('spawn') >= 5,   rq:'落下衝撃 Lv5'},
-  {cat:'idle', id:'bu1', name:'榴弾',             note:'弾の炸裂で飛ぶ破片 ×2',               cost:8e5,   req:() => L('drburst') >= 5, rq:'弾の炸裂 Lv5'},
-  {cat:'tap',  id:'tp1', name:'鉄拳',             note:'タップのボスへの威力と衝撃波 ×2',     cost:3e4,   req:() => L('tapburst') >= 5, rq:'タップの破片 Lv5'},
-  {cat:'tap',  id:'tp2', name:'連打の達人',       note:'長押しの連打が速くなる（0.17秒→0.11秒）', cost:1e6, req:() => L('tapburst') >= 10, rq:'タップの破片 Lv10'},
-  {cat:'tap',  id:'ht1', name:'発熱体',           note:'タップで溜まる熱量 ×1.5',             cost:2e5,   req:() => L('heat') >= 5,    rq:'熱量 Lv5'},
-  {cat:'tap',  id:'fv1', name:'延長戦',           note:'フィーバー中もタップで熱量が溜まり、時間が延びる', cost:3e6, req:() => L('fever') >= 5, rq:'フィーバー Lv5'},
-  {cat:'tap',  id:'sw1', name:'衝撃波拡大',       note:'衝撃波の半径 +1',                     cost:2e6,   req:() => L('tapboom') >= 4, rq:'衝撃波 Lv4'},
-  {cat:'core', id:'sh1', name:'破片強化 I',       note:'破片の威力 ×2',                       cost:5e4,   req:() => L('power') >= 5,   rq:'破片の威力 Lv5'},
-  {cat:'core', id:'sh2', name:'破片強化 II',      note:'破片の威力 ×2',                       cost:2e6,   req:() => L('power') >= 10,  rq:'破片の威力 Lv10'},
-  {cat:'core', id:'sh3', name:'破片強化 III',     note:'破片の威力 ×3',                       cost:1e8,   req:() => L('power') >= 15,  rq:'破片の威力 Lv15'},
-  {cat:'core', id:'cr1', name:'致命傷',           note:'クリティカルの倍率 ×4 → ×6',          cost:5e5,   req:() => L('crit') >= 5,    rq:'クリティカル Lv5'},
-  {cat:'core', id:'cr2', name:'超致命傷',         note:'クリティカルの倍率 → ×8',             cost:5e7,   req:() => L('crit') >= 10,   rq:'クリティカル Lv10'},
-  {cat:'core', id:'cb1', name:'コンボ維持',       note:'コンボの減衰が半分になる',           cost:3e5,   req:() => L('chain') >= 5,   rq:'コンボ係数 Lv5'},
-  {cat:'core', id:'cb2', name:'コンボ記憶',       note:'コンボの減衰がさらに半分になる',     cost:2e7,   req:() => L('chain') >= 10,  rq:'コンボ係数 Lv10'},
-  {cat:'core', id:'go1', name:'金塊',             note:'金ブロックの価値 ×2',                 cost:1e6,   req:() => L('gold') >= 5,    rq:'金ブロック Lv5'},
-  {cat:'core', id:'bm1', name:'大爆発',           note:'爆弾の半径 ×1.3・威力 ×2',            cost:1e6,   req:() => L('bomb') >= 5,    rq:'爆弾ブロック Lv5'},
+  {cat:'idle', id:'dr1', name:'ドローン改良 I',   note:'ドローンの弾の威力 ×2',               ref:['drones',3], req:() => L('drones') >= 3, rq:'ドローンの台数 Lv3'},
+  {cat:'idle', id:'dr2', name:'ドローン改良 II',  note:'ドローンの弾の威力 ×2',               ref:['drones',6],   req:() => L('drones') >= 6, rq:'ドローンの台数 Lv6'},
+  {cat:'idle', id:'dr3', name:'ドローン改良 III', note:'ドローンの弾の威力 ×3',               ref:['drones',9],   req:() => L('drones') >= 9, rq:'ドローンの台数 Lv9'},
+  {cat:'idle', id:'dr4', name:'ドローン軍団',     note:'ドローンの弾の威力 ×5',               ref:['drones',11],   req:() => L('drones') >= 11, rq:'ドローンの台数 Lv11'},
+  {cat:'idle', id:'rl1', name:'速射機構',         note:'ドローンの発射間隔 ×0.8',             ref:['droneint',5],   req:() => L('droneint') >= 5, rq:'連射速度 Lv5'},
+  {cat:'idle', id:'rl2', name:'二連装',           note:'ドローンが2発同時に撃つ',             ref:['droneint',10],   req:() => L('droneint') >= 10, rq:'連射速度 Lv10'},
+  {cat:'idle', id:'sp1', name:'重力加速',         note:'落下衝撃の威力 ×2',                   ref:['spawn',5],   req:() => L('spawn') >= 5, rq:'落下衝撃 Lv5'},
+  {cat:'idle', id:'bu1', name:'榴弾',             note:'弾の炸裂で飛ぶ破片 ×2',               ref:['drburst',5],   req:() => L('drburst') >= 5, rq:'弾の炸裂 Lv5'},
+  {cat:'tap',  id:'tp1', name:'鉄拳',             note:'タップのボスへの威力と衝撃波 ×2',     ref:['tapburst',5],   req:() => L('tapburst') >= 5, rq:'タップの破片 Lv5'},
+  {cat:'tap',  id:'tp2', name:'連打の達人',       note:'長押しの連打が速くなる（0.17秒→0.11秒）', ref:['tapburst',10], req:() => L('tapburst') >= 10, rq:'タップの破片 Lv10'},
+  {cat:'tap',  id:'ht1', name:'発熱体',           note:'タップで溜まる熱量 ×1.5',             ref:['heat',5],   req:() => L('heat') >= 5, rq:'熱量 Lv5'},
+  {cat:'tap',  id:'fv1', name:'延長戦',           note:'フィーバー中もタップで熱量が溜まり、時間が延びる', ref:['fever',5], req:() => L('fever') >= 5, rq:'フィーバー Lv5'},
+  {cat:'tap',  id:'sw1', name:'衝撃波拡大',       note:'衝撃波の半径 +1',                     ref:['tapboom',4],   req:() => L('tapboom') >= 4, rq:'衝撃波 Lv4'},
+  {cat:'core', id:'sh1', name:'破片強化 I',       note:'破片の威力 ×2',                       ref:['power',25],   req:() => L('power') >= 25, rq:'破片の威力 Lv25'},
+  {cat:'core', id:'sh2', name:'破片強化 II',      note:'破片の威力 ×2',                       ref:['power',60],   req:() => L('power') >= 60, rq:'破片の威力 Lv60'},
+  {cat:'core', id:'sh3', name:'破片強化 III',     note:'破片の威力 ×3',                       ref:['power',120],   req:() => L('power') >= 120, rq:'破片の威力 Lv120'},
+  {cat:'core', id:'cr1', name:'致命傷',           note:'クリティカルの倍率 ×4 → ×6',          ref:['crit',5],   req:() => L('crit') >= 5, rq:'クリティカル Lv5'},
+  {cat:'core', id:'cr2', name:'超致命傷',         note:'クリティカルの倍率 → ×8',             ref:['crit',10],   req:() => L('crit') >= 10, rq:'クリティカル Lv10'},
+  {cat:'core', id:'cb1', name:'コンボ維持',       note:'コンボの減衰が半分になる',           ref:['chain',20],   req:() => L('chain') >= 20, rq:'コンボ係数 Lv20'},
+  {cat:'core', id:'cb2', name:'コンボ記憶',       note:'コンボの減衰がさらに半分になる',     ref:['chain',60],   req:() => L('chain') >= 60, rq:'コンボ係数 Lv60'},
+  {cat:'core', id:'go1', name:'金塊',             note:'金ブロックの価値 ×2',                 ref:['gold',5],   req:() => L('gold') >= 5, rq:'金ブロック Lv5'},
+  {cat:'core', id:'bm1', name:'大爆発',           note:'爆弾の半径 ×1.3・威力 ×2',            ref:['bomb',5],   req:() => L('bomb') >= 5, rq:'爆弾ブロック Lv5'},
   {cat:'core', id:'lk1', name:'幸運の星 I',       note:'幸運ブロックの出現間隔 −25%',        cost:2e5,   req:() => save.st.destroyed >= 2000, rq:'累計2,000個破壊'},
   {cat:'core', id:'lk2', name:'幸運の星 II',      note:'幸運ブロックの出現間隔 さらに −25%', cost:1e7,   req:() => save.st.lucky >= 10, rq:'幸運ブロック10回'},
   {cat:'core', id:'lk3', name:'幸運の持続',       note:'幸運ブロックの効果時間 ×1.5',        cost:1e8,   req:() => save.st.lucky >= 25, rq:'幸運ブロック25回'},
@@ -339,13 +341,16 @@ const PERM = [
   {id:'pkeep',  name:'モジュール記憶', note:'砕いてもモジュールのLvが残る',          cost:80, g:1,   max:1,  v:l => l ? '有効' : '無効'},
   {id:'pcrit',  name:'星の眼',         note:'クリティカル率 +5%',                    cost:15, g:1.8, max:4,  v:l => `+${5*l}%`},
 ];
-const SLOT_COST = [0, 0, 3e5, 1e8];
-const upCost  = (u, l = L(u.id)) => Math.ceil(u.cost * TUNE.costX * Math.pow(u.g, l) * priceSv(save.stage));
+const SLOT_COST = [0, 0, 3e5, 1e8], SLOT_STAGE = [0, 0, 2, 6];
+const upG = u => u.inf ? u.g : Math.pow(TUNE.valStage, u.span / u.max);
+const upCost  = (u, l = L(u.id)) => Math.ceil(u.cost * TUNE.costX * Math.pow(upG(u), l));
 const upCostN = (u, n) => { let s = 0; for (let k = 0; k < n; k++) s += upCost(u, L(u.id) + k); return s; };
 const upMaxN  = u => { let n = 0, s = 0; while (L(u.id) + n < u.max){ const c = upCost(u, L(u.id) + n); if (s + c > save.coins) break; s += c; n++; } return n; };
-const modCost = m => Math.ceil((ML(m.id) ? m.cost * Math.pow(m.g, ML(m.id) - 1) : m.unlock) * TUNE.costX * priceSv(save.stage));
-const slotCost = () => SLOT_COST[save.slots] * TUNE.costX * priceSv(save.stage);
-const spCost = s => Math.ceil(s.cost * TUNE.costX * priceSv(save.stage));
+// モジュールは st 段目あたりで解放できる値段。Lvは modSpan 段かけて上限へ
+const modCost = m => Math.ceil((ML(m.id) ? m.cost * Math.pow(TUNE.valStage, TUNE.modSpan * (ML(m.id) - 1) / m.max) : m.unlock) * TUNE.costX * sv(m.st));
+const slotCost = () => SLOT_COST[save.slots] * TUNE.costX * sv(SLOT_STAGE[save.slots]);
+// Lv条件の特殊強化は、条件になったLvの値段の4倍。記録条件のものは今の素材の価値に合わせる
+const spCost = s => Math.ceil(s.ref ? 4 * upCost(UPG.find(u => u.id === s.ref[0]), s.ref[1]) : s.cost * TUNE.costX * sv(save.stage) / 10);
 const permCost = p => Math.ceil(p.cost * Math.pow(p.g, P(p.id)));
 
 // 幸運ブロックの効果（バフ）
@@ -357,15 +362,16 @@ const permMult = () => (1 + .01 * achCount()) * (1 + TUNE.pmultBonus * P('pmult'
 // 放置ボーナス：最後に手でタップしてから idleRamp 秒かけて、報酬が最大 idleBonus 倍まで上がる
 const idleMult = () => 1 + (TUNE.idleBonus - 1) * Math.min(1, lastTap / TUNE.idleRamp);
 const rewardMult = () => permMult() * idleMult() * (buffs.frenzy > 0 ? 7 : 1) * (fever > 0 ? TUNE.feverReward : 1);
-const comboMult = () => 1 + Math.sqrt(combo) * stat.chain();
+// 相場はその周だけの倍率なので、ボスゲージにも効く
+const comboMult = () => (1 + Math.sqrt(combo) * stat.chain()) * stat.market();
 const luckyInterval = () => 110 * (SP('lk1') ? .75 : 1) * (SP('lk2') ? .75 : 1) * Math.pow(.85, P('plucky'));
 
 const stat = {
   shards:   () => 3 + L('shards'),
-  dmg:      () => 100 * Math.pow(TUNE.fdmg, save.stage) * Math.pow(1.35, L('power')) * (SP('sh1') ? 2 : 1) * (SP('sh2') ? 2 : 1) * (SP('sh3') ? 3 : 1),
+  dmg:      () => 100 * Math.pow(TUNE.fdmg, save.stage) * (1 + .2 * L('power')) * (SP('sh1') ? 2 : 1) * (SP('sh2') ? 2 : 1) * (SP('sh3') ? 3 : 1),
   drones:   () => Math.min(12, 1 + L('drones') + P('pdrone')),
   droneInt: () => TUNE.droneInt * Math.pow(.85, L('droneint')) * (SP('rl1') ? .8 : 1) * (buffs.barrage > 0 ? .125 : 1),
-  droneDmg: () => TUNE.droneDmg * Math.pow(1.4, L('dronedmg')) * (SP('dr1') ? 2 : 1) * (SP('dr2') ? 2 : 1) * (SP('dr3') ? 3 : 1) * (SP('dr4') ? 5 : 1),
+  droneDmg: () => TUNE.droneDmg * (1 + .25 * L('dronedmg')) * (SP('dr1') ? 2 : 1) * (SP('dr2') ? 2 : 1) * (SP('dr3') ? 3 : 1) * (SP('dr4') ? 5 : 1),
   fall:     () => .6 * L('spawn') * (SP('sp1') ? 2 : 1),
   drburst:  () => L('drburst') * 2 * (SP('bu1') ? 2 : 1),
   tapburst: () => 2 + L('tapburst'),
@@ -373,7 +379,8 @@ const stat = {
   heat:     () => (8 + 2 * L('heat')) * (SP('ht1') ? 1.5 : 1),
   fever:    () => 5 + L('fever'),
   tapboom:  () => L('tapboom'),
-  chain:    () => 0.1 + 0.1 * L('chain'),
+  chain:    () => 0.1 + 0.05 * L('chain'),
+  market:   () => 1 + .1 * L('market'),
   crit:     () => buffs.awaken > 0 ? 1 : 0.05 + 0.03 * L('crit') + .05 * P('pcrit'),
   critX:    () => SP('cr2') ? 8 : SP('cr1') ? 6 : 4,
   bomb:     () => Math.min(.25, .02 + .015 * L('bomb')),
@@ -384,10 +391,11 @@ const stat = {
 };
 // 暗黒物質以降はHPの伸びをダメージと揃える（差が積み重なって終盤だけ詰まるのを防ぐ）
 const blockHp = s => 300 * Math.pow(TUNE.fhp, Math.min(s, PRESTIGE_STAGE)) * Math.pow(TUNE.fhpLate, Math.max(0, s - PRESTIGE_STAGE));
-// 序盤は gaugeGrow で急に、gaugeCapK 段目以降は gaugeLate でゆるやかに伸ばす
 // 何体目か：先の素材から始めても軽くならないよう、素材の段階と撃破数の大きいほう
 const bossK = () => Math.max(save.stage, save.kills);
-const gaugeNeed = () => Math.round(TUNE.gaugeBase * Math.pow(TUNE.gaugeGrow, Math.min(bossK(), TUNE.gaugeCapK)) * Math.pow(TUNE.gaugeLate, Math.max(0, bossK() - TUNE.gaugeCapK)) * Math.pow(.92, P('pgauge')));
+// 稼ぎの倍率は「相場」×「コンボ係数」で、どちらもボス撃破のたびに買えるLvに比例して伸びる（段階の2乗ほど）。
+// ゲージはそれに合わせて (1 + gaugeA×段階)² で伸ばし、さらに (1 + 段階)^gaugePow で後半ほど少し長くする
+const gaugeNeed = () => Math.round(TUNE.gaugeBase * Math.pow(1 + TUNE.gaugeA * bossK(), 2) * Math.pow(1 + bossK(), TUNE.gaugePow) * Math.pow(.92, P('pgauge')));
 const bossHp = () => blockHp(save.stage) * TUNE.bossHp * Math.pow(TUNE.bossGrow, bossK());
 const dustGain = () => { if (save.stage < PRESTIGE_STAGE) return 0; const lv = Math.log10(TUNE.valStage) / 5; return Math.floor(TUNE.dustBase * Math.pow(2, (Math.log10(Math.max(1, save.st.earnedRun)) - 37 * lv) / (TUNE.dustDiv * lv))); };
 
@@ -752,7 +760,7 @@ achSet('t', 'タップ', [100, 1000, 5000, 2e4, 1e5], ['指慣らし', '連打',
 achSet('l', '幸運ブロック', [1, 5, 10, 25, 50, 100], ['ラッキー', '幸運体質', '運命の人', '星を掴む', '運を支配', '幸運そのもの'], () => save.st.lucky, n => n + '回');
 achSet('f', 'フィーバー', [1, 10, 50, 100, 250], ['熱い', '沸騰', '燃え尽きない', '永久機関', '太陽'], () => save.st.fevers, n => n + '回');
 achSet('p', '砕いた回数', [1, 2, 5, 10], ['宇宙、粉砕', '二度目の宇宙', '創造と破壊', '神話'], () => save.runs, n => n + '回');
-achSet('u', '強化レベル合計', [10, 50, 100, 200, 300], ['初心者', '育成中', '鍛え上げ', '完全体', '極限'], () => UPG.reduce((s, u) => s + L(u.id), 0), n => n);
+achSet('u', '強化レベル合計', [10, 100, 300, 1000, 3000], ['初心者', '育成中', '鍛え上げ', '完全体', '極限'], () => UPG.reduce((s, u) => s + L(u.id), 0), n => n);
 achSet('h', 'プレイ時間', [600, 3600, 3 * 3600, 10 * 3600, 24 * 3600], ['10分', '1時間', '3時間', '10時間', '丸一日'], () => save.st.time, fmtT);
 ACH.push({id:'mall', name:'全モジュール', desc:'7種のモジュールを全部解放', ok:() => MODS.every(m => ML(m.id) > 0)});
 ACH.push({id:'slot4', name:'フル装備', desc:'装備枠を4つにする', ok:() => save.slots >= 4});
