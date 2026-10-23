@@ -252,7 +252,7 @@ const STAGES = [
 const PRESTIGE_STAGE = 8;   // この素材に到達したら「砕く」が解放される
 // ブロックの価値の素材倍率（TUNE.valStage）
 const sv = s => Math.pow(TUNE.valStage, s);
-const TUNE = {fhp:4000, fhpLate:4000, fdmg:4000, digBase:40, digPow:2.5, digLeft:.25, digGap:.03, hpPow:3.4, hpMul:1, lvBonus:.01, tapProg:1.5, dustBase:18, dustDiv:8, dustBonus:.001, pmultBonus:.1, idleBonus:7, idleRamp:30, feverReward:2, costX:3, valStage:1e4, modSpan:7, droneDmg:5, droneInt:1.5, bossHp:1500, bossGrow:1.35, bossReward:300, comboDecay:.6};
+const TUNE = {fhp:4000, fhpLate:4000, fdmg:4000, digBase:60, digPow:2.5, digLeft:.25, digGap:.03, hpPow:3.4, hpMul:1, lvBonus:.01, tapProg:1.5, dustBase:18, dustDiv:8, dustBonus:.001, pmultBonus:.1, idleBonus:7, idleRamp:30, feverReward:2, costX:3, valStage:1e4, modSpan:7, droneDmg:5, droneInt:1.5, bossHp:1500, bossGrow:1.35, bossReward:300, comboDecay:.6};
 const DEFAULT = {
   coins:0, stage:0, lv:{}, mods:{}, equip:[], slots:2, best:0, ended:false, muted:false, t:0, idleRate:0, prog:0, started:false, kills:0, boss:null,
   sp:{}, ach:{}, dust:0, perm:{}, runs:0, buyMode:1, endSeen:false,
@@ -1482,14 +1482,16 @@ function hud(dt){
   for (const k in buffs) if (buffs[k] > 0 && BUFF_INFO[k] && k !== 'storm') bh += `<div class="buff" style="--c:${BUFF_INFO[k][1]}">${BUFF_INFO[k][0]}　${Math.ceil(buffs[k])}秒</div>`;
   if (bh !== shownBuffs){ buffsEl.innerHTML = bh; shownBuffs = bh; }
 }
-function updateStageLabel(){ const s = STAGES[save.stage]; el('stageText').textContent = '素材：' + s.name; el('stageSwatch').style.background = s.color; dustTag.hidden = !save.dust && !save.runs; dustTag.textContent = `✦ 星屑 ${save.dust}`; }
+function updateStageLabel(){ const s = STAGES[save.stage]; shownDepth = -1; updateDepth(); el('stageSwatch').style.background = s.color; dustTag.hidden = !save.dust && !save.runs; dustTag.textContent = `✦ 星屑 ${save.dust}`; }
 let progRate = 0, progSample = 0, progStage = -1;
 function etaText(){
   if (boss || progRate <= 0) return '';
   const sec = Math.max(0, gaugeNeed() - save.prog) / progRate;
   return sec < 60 ? '（もうすぐ）' : sec < 3600 ? `（あと約${Math.ceil(sec / 60)}分）` : `（あと${Math.floor(sec / 3600)}時間以上）`;
 }
-function updateProgLabel(){ progText.textContent = boss ? 'ボス戦中（掘削停止）' : `${save.ended ? 'ボスの層まで（再戦）' : 'ボスの層まで'}${etaText()}　深さ${(save.st.depth || 0).toLocaleString('ja-JP')}m`; }
+function updateProgLabel(){ progText.textContent = boss ? 'ボス戦中（掘削停止）' : `${save.ended ? 'ボスの層まで（再戦）' : 'ボスの層まで'}${etaText()}`; updateDepth(); }
+let shownDepth = -1;
+function updateDepth(){ const d = save.st.depth || 0; if (d !== shownDepth){ shownDepth = d; el('stageText').textContent = `${STAGES[save.stage].name}　${d.toLocaleString('ja-JP')}m`; } }
 el('prog').addEventListener('click', () => showToast('火力が高いほど速く掘れる',
   '一番上の段がほぼ壊れると崩れて1m掘り進む。ドローンや兵器は上の段を優先して狙う。威力・兵器・クリティカル・崩落を上げると速い', '掘削', 5000));
 const muteBtn = el('mute');
