@@ -252,7 +252,7 @@ const STAGES = [
 const PRESTIGE_STAGE = 8;   // この素材に到達したら「砕く」が解放される
 // ブロックの価値の素材倍率（TUNE.valStage）
 const sv = s => Math.pow(TUNE.valStage, s);
-const TUNE = {fhp:4000, fhpLate:4000, fdmg:4000, digBase:25, digPow:1.2, digLeft:.25, lvBonus:.01, tapProg:1.5, dustBase:18, dustDiv:8, dustBonus:.001, pmultBonus:.1, idleBonus:7, idleRamp:30, feverReward:2, costX:3, valStage:1e4, modSpan:7, droneDmg:5, droneInt:1.5, bossHp:1500, bossGrow:1.35, bossReward:300, comboDecay:.6};
+const TUNE = {fhp:4000, fhpLate:4000, fdmg:4000, digBase:40, digPow:2.5, digLeft:.25, digGap:.03, hpPow:3.4, hpMul:1, lvBonus:.01, tapProg:1.5, dustBase:18, dustDiv:8, dustBonus:.001, pmultBonus:.1, idleBonus:7, idleRamp:30, feverReward:2, costX:3, valStage:1e4, modSpan:7, droneDmg:5, droneInt:1.5, bossHp:1500, bossGrow:1.35, bossReward:300, comboDecay:.6};
 const DEFAULT = {
   coins:0, stage:0, lv:{}, mods:{}, equip:[], slots:2, best:0, ended:false, muted:false, t:0, idleRate:0, prog:0, started:false, kills:0, boss:null,
   sp:{}, ach:{}, dust:0, perm:{}, runs:0, buyMode:1, endSeen:false,
@@ -315,10 +315,10 @@ const MODS = [
 ];
 // 特殊強化：強化Lvなどが条件で現れる一発もの
 const SPECIALS = [
-  {cat:'idle', id:'dr1', name:'ドローン改良 I',   note:'ドローンの弾の威力 ×2',               ref:['drones',3], req:() => L('drones') >= 3, rq:'ドローンの台数 Lv3'},
-  {cat:'idle', id:'dr2', name:'ドローン改良 II',  note:'ドローンの弾の威力 ×2',               ref:['drones',6],   req:() => L('drones') >= 6, rq:'ドローンの台数 Lv6'},
-  {cat:'idle', id:'dr3', name:'ドローン改良 III', note:'ドローンの弾の威力 ×3',               ref:['drones',9],   req:() => L('drones') >= 9, rq:'ドローンの台数 Lv9'},
-  {cat:'idle', id:'dr4', name:'ドローン軍団',     note:'ドローンの弾の威力 ×5',               ref:['drones',11],   req:() => L('drones') >= 11, rq:'ドローンの台数 Lv11'},
+  {cat:'idle', id:'dr1', name:'ドローン改良 I',   note:'ドローンの弾の威力 ×1.5',             ref:['drones',3], req:() => L('drones') >= 3, rq:'ドローンの台数 Lv3'},
+  {cat:'idle', id:'dr2', name:'ドローン改良 II',  note:'ドローンの弾の威力 ×1.5',             ref:['drones',6],   req:() => L('drones') >= 6, rq:'ドローンの台数 Lv6'},
+  {cat:'idle', id:'dr3', name:'ドローン改良 III', note:'ドローンの弾の威力 ×2',               ref:['drones',9],   req:() => L('drones') >= 9, rq:'ドローンの台数 Lv9'},
+  {cat:'idle', id:'dr4', name:'ドローン軍団',     note:'ドローンの弾の威力 ×2',               ref:['drones',11],   req:() => L('drones') >= 11, rq:'ドローンの台数 Lv11'},
   {cat:'idle', id:'rl1', name:'速射機構',         note:'ドローンの発射間隔 ×0.8',             ref:['droneint',5],   req:() => L('droneint') >= 5, rq:'連射速度 Lv5'},
   {cat:'idle', id:'rl2', name:'二連装',           note:'ドローンが2発同時に撃つ',             ref:['droneint',10],   req:() => L('droneint') >= 10, rq:'連射速度 Lv10'},
   {cat:'idle', id:'sp1', name:'大崩落',           note:'崩落の威力 ×2',                       ref:['spawn',5],   req:() => L('spawn') >= 5, rq:'崩落 Lv5'},
@@ -392,7 +392,7 @@ const stat = {
   dmg:      () => 100 * Math.pow(TUNE.fdmg, save.stage) * (1 + .2 * L('power')) * (SP('sh1') ? 2 : 1) * (SP('sh2') ? 2 : 1) * (SP('sh3') ? 3 : 1),
   drones:   () => Math.min(12, 1 + L('drones') + P('pdrone')),
   droneInt: () => TUNE.droneInt * Math.pow(.85, L('droneint')) * (SP('rl1') ? .8 : 1) * (buffs.barrage > 0 ? .125 : 1),
-  droneDmg: () => TUNE.droneDmg * (1 + .25 * L('dronedmg')) * (SP('dr1') ? 2 : 1) * (SP('dr2') ? 2 : 1) * (SP('dr3') ? 3 : 1) * (SP('dr4') ? 5 : 1),
+  droneDmg: () => TUNE.droneDmg * (1 + .25 * L('dronedmg')) * (SP('dr1') ? 1.5 : 1) * (SP('dr2') ? 1.5 : 1) * (SP('dr3') ? 2 : 1) * (SP('dr4') ? 2 : 1),
   fall:     () => 1.5 * L('spawn') * (SP('sp1') ? 2 : 1),
   drburst:  () => L('drburst') * 2 * (SP('bu1') ? 2 : 1),
   tapburst: () => 2 + L('tapburst'),
@@ -411,7 +411,8 @@ const stat = {
   holdMs:   () => SP('tp2') ? 170 : 250,
 };
 // 暗黒物質以降はHPの伸びをダメージと揃える（差が積み重なって終盤だけ詰まるのを防ぐ）
-const blockHp = s => 300 * Math.pow(TUNE.fhp, Math.min(s, PRESTIGE_STAGE)) * Math.pow(TUNE.fhpLate, Math.max(0, s - PRESTIGE_STAGE));
+// HPは威力と同じ伸び（×4000/段）に加えて、強化で積み上がる火力に見合うよう (1+段階)^hpPow 倍を上乗せする（掘る速さ＝威力÷HP）
+const blockHp = s => 300 * TUNE.hpMul * Math.pow(TUNE.fhp, s) * Math.pow(1 + s, TUNE.hpPow);
 // 何体目か：先の素材から始めても軽くならないよう、素材の段階と撃破数の大きいほう
 const bossK = () => Math.max(save.stage, save.kills);
 // 稼ぎの倍率は「相場」×「コンボ係数」で、どちらもボス撃破のたびに買えるLvに比例して伸びる（段階の2乗ほど）。
@@ -468,13 +469,14 @@ function digRow(){
   fx.dig();
   if (save.prog >= gaugeNeed()) spawnBoss(null);
 }
-function digCheck(){
-  if (boss) return;
+// 崩れるのは digGap 秒に1回まで（火力が強いほど盤面が流れるように速く掘り進む）
+let digT = 0;
+function digCheck(dt){
+  digT -= dt;
+  if (boss || digT > 0) return;
   let alive = 0; for (const b of blocks) if (b.alive) alive++;
-  for (let guard = 0; guard < 4 && !boss; guard++){
-    // 一番上の段がほぼ空、または盤面がほとんど空なら崩す
-    if (rowLeft(0) <= cols * TUNE.digLeft || alive < blocks.length * .2){ digRow(); alive += cols; } else break;
-  }
+  // 一番上の段がほぼ空、または盤面がほぼ空なら崩す
+  if (rowLeft(0) <= cols * TUNE.digLeft || alive < blocks.length * .05){ digRow(); digT = TUNE.digGap; }
 }
 function settle(){
   for (let c = 0; c < cols; c++){
@@ -759,7 +761,7 @@ function stepArms(dt){
 function step(dt){
   if (state !== 'play') return;
   lastTap += dt; save.st.time += dt;
-  digCheck();
+  digCheck(dt);
   if (scrollOff > 0) scrollOff = Math.max(0, scrollOff - dt * (6 + scrollOff * 8));
   const fallP = stat.fall();
   for (let i = 0; i < blocks.length; i++){
