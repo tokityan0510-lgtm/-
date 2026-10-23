@@ -252,7 +252,7 @@ const STAGES = [
 const PRESTIGE_STAGE = 8;   // この素材に到達したら「砕く」が解放される
 // ブロックの価値の素材倍率（TUNE.valStage）
 const sv = s => Math.pow(TUNE.valStage, s);
-const TUNE = {fhp:4000, fhpLate:4000, fdmg:4000, reqBase:200, reqPow:2.5, dmgG:1.2, hpPow:3.4, hpMul:1, lvBonus:.01, tapProg:1.5, dustBase:18, dustDiv:8, dustBonus:.001, pmultBonus:.1, idleBonus:7, idleRamp:30, feverReward:2, costX:3, valStage:1e4, modSpan:7, droneDmg:5, droneInt:1.5, bossHp:1500, bossGrow:1.35, bossReward:300, comboDecay:.6};
+const TUNE = {fhp:4000, fhpLate:4000, fdmg:4000, reqBase:2000, reqPow:5.4, dmgG:1.5, hpPow:3.4, hpMul:1, lvBonus:.01, tapProg:1.5, dustBase:18, dustDiv:8, dustBonus:.001, pmultBonus:.1, idleBonus:7, idleRamp:30, idleDmgK:.5, feverReward:2, costX:3, valStage:1e4, modSpan:7, droneDmg:5, droneInt:1.5, bossHp:1500, bossGrow:1.35, bossReward:300, comboDecay:.6};
 const DEFAULT = {
   coins:0, stage:0, lv:{}, mods:{}, equip:[], slots:2, best:0, ended:false, muted:false, t:0, idleRate:0, prog:0, started:false, kills:0, boss:null,
   sp:{}, ach:{}, dust:0, perm:{}, runs:0, buyMode:1, endSeen:false,
@@ -378,6 +378,7 @@ const achCount = () => Object.keys(save.ach).length;
 const permMult = () => (1 + .01 * achCount()) * (1 + TUNE.pmultBonus * P('pmult')) * (1 + TUNE.dustBonus * save.st.bestDust);
 // 放置ボーナス：最後に手でタップしてから idleRamp 秒かけて、報酬が最大 idleBonus 倍まで上がる
 const idleMult = () => 1 + (TUNE.idleBonus - 1) * Math.min(1, lastTap / TUNE.idleRamp);
+const idleDmg = () => 1 + (idleMult() - 1) * TUNE.idleDmgK;
 const rewardMult = () => permMult() * idleMult() * (buffs.frenzy > 0 ? 7 : 1) * (fever > 0 ? TUNE.feverReward : 1);
 // 相場はその周だけの倍率なので、ボスゲージにも効く
 // 強化ボーナス：どの強化でも1Lv買うごとに稼ぎ（とボスゲージの進み）が +lvBonus。特定の強化を買わなくても詰まらないように
@@ -512,6 +513,8 @@ function hit(dmg, src, x, y, d = 0, burst = 0){
   let crit = false;
   if (src !== 'burn' && src !== 'reso' && Math.random() < stat.crit()){ dmg *= stat.critX(); crit = true; }
   if (fever > 0) dmg *= 2;
+  // 放置ボーナスはダメージにも半分の強さで効く（放置でもひびが進むように）
+  dmg *= idleDmg();
   // 進み（ひび）は与えたダメージ。直接タップは tapProg 倍
   save.prog += dmg * (src === 'tap' ? TUNE.tapProg : 1);
   combo += src === 'burn' || src === 'reso' ? .2 : 1; save.st.destroyed++;
