@@ -406,7 +406,7 @@ const dustGain = () => { if (save.stage < PRESTIGE_STAGE) return 0; const lv = M
 let W = 390, H = 560, cols = 7, rows = 9, cell = 55.7, ucell = 55.7, offX = 0, offY = 0, topBand = 0;
 let blocks = [], shards = [], booms = [], zaps = [], bullets = [], drones = [], boss = null, lucky = null;
 let combo = 0, fever = 0, heat = 0, state = 'title', lastTap = 0, earnedTick = 0, luckyT = 60, autoT = 0;
-const MAXS = 1500;
+let MAXS = 900;   // 破片の上限（自動画質で変わる）
 const fx = {hit(){}, brk(){}, boom(){}, bolt(){}, fever(){}, milestone(){}, tap(){}, split(){}, bossHit(){}, bossSpawn(){}, bossDie(){}, shoot(){}, land(){}, lucky(){}, luckyHit(){}, ach(){}};
 const TIERS = [[25, 'いいぞ', '#ffe14d'], [50, 'ナイス！', '#ffe14d'], [100, 'スゴい！', '#ff9a3c'], [250, 'ヤバい！', '#ff4c88'], [500, '狂気', '#c38bff'], [1000, '神', '#4cc9ff'], [2500, '宇宙', '#ffffff'], [5000, '無量大数', '#ffffff']];
 let milestoneSeen = 0;
@@ -692,7 +692,7 @@ function step(dt){
     const o = shards[s]; let dead = false;
     if (hom){
       o.tt -= dt;
-      if (o.tt <= 0){ o.tt = .12; o.tg = nearest(o.x, o.y, cell * 3.5); }
+      if (o.tt <= 0){ o.tt = .25; o.tg = nearest(o.x, o.y, cell * 3.5); }
       if (o.tg >= 0 && blocks[o.tg].alive){
         const want = Math.atan2(cy(o.tg) - o.y, cx(o.tg) - o.x), cur = Math.atan2(o.vy, o.vx);
         let d = want - cur; while (d > Math.PI) d -= 6.283; while (d < -Math.PI) d += 6.283;
@@ -854,7 +854,7 @@ const sfxAch = () => { tone(1047, .12, 'triangle', .12, 0, 1); tone(1568, .25, '
 /* ---- エフェクト ---- */
 let parts = [], floats = [], rings = [], bolts = [], flashes = [];
 let freeze = 0, shake = 0, zoom = 0, flash = 0, clock = 0, slow = 0, flashColor = '255,255,255';
-const MAXP = 1100;
+let MAXP = 500;   // 火花・破片くずの上限（自動画質で変わる）
 function sparks(x, y, n, color, speed = 8){
   for (let k = 0; k < n && parts.length < MAXP; k++){
     const a = Math.random() * 6.283, v = cell * rnd(speed * .4, speed);
@@ -966,12 +966,29 @@ function expandGrid(){
   shake += 14; zoom = .08; flash = .6; sfxFever();
   bigText(`盤面拡張！ 横${cols}列`, .45, '#4cc9ff', 1.6, 8);
 }
-function resize(){
-  const r = stageEl.getBoundingClientRect(); if (!r.width || !r.height) return;
-  dpr = Math.min(2, window.devicePixelRatio || 1);
+const QUALITY = [{dpr:2, s:900, p:500}, {dpr:1.5, s:600, p:320}, {dpr:1, s:350, p:180}];
+let quality = 0, slowT = 0, fastT = 0, frameMs = 16;
+function sizeCanvas(){
+  const r = stageEl.getBoundingClientRect(); if (!r.width || !r.height) return null;
+  dpr = Math.min(QUALITY[quality].dpr, window.devicePixelRatio || 1);
   cv.width = Math.round(r.width * dpr); cv.height = Math.round(r.height * dpr);
   cv.style.width = r.width + 'px'; cv.style.height = r.height + 'px';
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  spriteCache.clear();
+  return r;
+}
+function setQuality(q){ quality = q; MAXS = QUALITY[q].s; MAXP = QUALITY[q].p; sizeCanvas(); slowT = fastT = 0; }
+// 1フレームの間隔の移動平均を見て、重い状態（約40fps未満）が2秒続いたら画質を1段下げ、軽い状態（約55fps以上）が15秒続いたら1段戻す
+function adaptQuality(gap){
+  const sec = gap / 1000;
+  if (gap > 1000) return;   // タブ切り替えなどの空白は無視
+  frameMs = frameMs * .92 + gap * .08;
+  if (frameMs > 25){ slowT += sec; fastT = 0; if (slowT > 2 && quality < QUALITY.length - 1){ setQuality(quality + 1); frameMs = 16; } }
+  else if (frameMs < 18){ fastT += sec; slowT = 0; if (fastT > 15 && quality > 0){ setQuality(quality - 1); frameMs = 16; } }
+  else { slowT = 0; fastT = 0; }
+}
+function resize(){
+  const r = sizeCanvas(); if (!r) return;
   const keepBoss = boss ? {hp:boss.hp, max:boss.max} : save.boss;
   layout(r.width, r.height); boss = null; save.boss = keepBoss; lucky = null; buildGrid();
 }
@@ -986,23 +1003,39 @@ function makeCracks(){
 }
 
 /* ---- 描画 ---- */
-function rr(x, y, w, h, r){
-  ctx.beginPath(); ctx.moveTo(x + r, y);
-  ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r);
-  ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath();
+function rr(x, y, w, h, r, g = ctx){
+  r = Math.max(0, r);
+  g.beginPath(); g.moveTo(x + r, y);
+  g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r);
+  g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath();
+}
+// ブロックの見た目（色・影・ハイライト・模様）は種類と大きさごとに一度だけ描いておき、毎フレームは貼るだけにする
+const spriteCache = new Map();
+function blockSprite(b, size){
+  const px = Math.max(4, Math.round(size * dpr)), key = blockColor(b) + b.type + px;
+  let c = spriteCache.get(key);
+  if (!c){
+    if (spriteCache.size > 64) spriteCache.clear();
+    c = document.createElement('canvas'); c.width = c.height = px;
+    const g = c.getContext('2d'), z = px;
+    g.fillStyle = blockColor(b); rr(0, 0, z, z, z * .16, g); g.fill();
+    g.fillStyle = 'rgba(0,0,0,.22)'; rr(z * .06, z * .72, z * .88, z * .22, z * .08, g); g.fill();
+    g.fillStyle = 'rgba(255,255,255,.28)'; rr(z * .09, z * .08, z * .82, z * .18, z * .08, g); g.fill();
+    if (b.type === 'hard'){ g.strokeStyle = 'rgba(0,0,0,.35)'; g.lineWidth = z * .06; rr(z * .17, z * .34, z * .66, z * .34, z * .05, g); g.stroke(); }
+    else if (b.type === 'bomb'){
+      g.fillStyle = '#2a0f16'; g.beginPath(); g.arc(z / 2, z * .56, z * .22, 0, 6.283); g.fill();
+      g.strokeStyle = '#2a0f16'; g.lineWidth = z * .06; g.beginPath(); g.moveTo(z * .62, z * .38); g.lineTo(z * .74, z * .22); g.stroke();
+    }
+    spriteCache.set(key, c);
+  }
+  return c;
 }
 const easeOut = t => 1 - Math.pow(1 - t, 3);
 function drawBlock(b, i){
-  const s = easeOut(b.spawn), gap = Math.max(2, cell * .06), size = (cell - gap * 2) * s; if (size < 1) return;
+  const s = easeOut(b.spawn), gap = Math.max(2, cell * .06), full = cell - gap * 2, size = full * s; if (size < 1) return;
   const x = offX + (i % cols) * cell + cell / 2 - size / 2, y = offY + (Math.floor(i / cols) - b.fy) * cell + cell / 2 - size / 2, rad = size * .16;
-  ctx.fillStyle = blockColor(b); rr(x, y, size, size, rad); ctx.fill();
-  ctx.fillStyle = 'rgba(0,0,0,.22)'; rr(x + size * .06, y + size * .72, size * .88, size * .22, size * .08); ctx.fill();
-  ctx.fillStyle = 'rgba(255,255,255,.28)'; rr(x + size * .09, y + size * .08, size * .82, size * .18, size * .08); ctx.fill();
-  if (b.type === 'hard'){
-    ctx.strokeStyle = 'rgba(0,0,0,.35)'; ctx.lineWidth = size * .06; rr(x + size * .17, y + size * .34, size * .66, size * .34, size * .05); ctx.stroke();
-  } else if (b.type === 'bomb'){
-    ctx.fillStyle = '#2a0f16'; ctx.beginPath(); ctx.arc(x + size / 2, y + size * .56, size * .22, 0, 6.283); ctx.fill();
-    ctx.strokeStyle = '#2a0f16'; ctx.lineWidth = size * .06; ctx.beginPath(); ctx.moveTo(x + size * .62, y + size * .38); ctx.lineTo(x + size * .74, y + size * .22); ctx.stroke();
+  ctx.drawImage(blockSprite(b, full), x, y, size, size);
+  if (b.type === 'bomb'){
     ctx.fillStyle = Math.random() < .5 ? '#ffd23f' : '#ff8a1f'; ctx.beginPath(); ctx.arc(x + size * .76, y + size * .2, size * (.06 + Math.random() * .04), 0, 6.283); ctx.fill();
   } else if (b.type === 'gold'){
     ctx.save(); rr(x, y, size, size, rad); ctx.clip();
@@ -1025,9 +1058,8 @@ function drawBoss(){
   const st = STAGES[save.stage], s = easeOut(boss.spawn), size = (cell * boss.bs - cell * .14) * s;
   const x = bossX() - size / 2, y = bossY() - size / 2, rad = size * .14;
   ctx.save();
-  ctx.shadowColor = '#ff4c88'; ctx.shadowBlur = cell * (.4 + .2 * Math.sin(clock * 6));
+  ctx.globalAlpha = .25 + .1 * Math.sin(clock * 6); ctx.strokeStyle = '#ff4c88'; ctx.lineWidth = cell * .4; rr(x, y, size, size, rad); ctx.stroke(); ctx.globalAlpha = 1;
   ctx.fillStyle = st.dark; rr(x, y, size, size, rad); ctx.fill();
-  ctx.shadowBlur = 0;
   ctx.fillStyle = 'rgba(255,255,255,.2)'; rr(x + size * .08, y + size * .07, size * .84, size * .16, size * .06); ctx.fill();
   ctx.fillStyle = st.color; ctx.globalAlpha = .35; rr(x + size * .25, y + size * .3, size * .5, size * .5, size * .1); ctx.fill(); ctx.globalAlpha = 1;
   ctx.strokeStyle = '#ff4c88'; ctx.lineWidth = Math.max(2, size * .025); rr(x, y, size, size, rad); ctx.stroke();
@@ -1051,11 +1083,11 @@ function drawBoss(){
 function drawLucky(){
   const lk = lucky, r = lk.r * (1 + .08 * Math.sin(lk.ph * 5)), a = Math.min(1, lk.life / 2);
   ctx.save(); ctx.translate(lk.x, lk.y); ctx.rotate(lk.ph * .8); ctx.globalAlpha = a;
-  ctx.shadowColor = '#ffe14d'; ctx.shadowBlur = cell * .6;
+  ctx.globalAlpha = a * .3; ctx.fillStyle = '#ffe14d'; ctx.beginPath(); ctx.arc(0, 0, r * 1.5, 0, 6.283); ctx.fill(); ctx.globalAlpha = a;
   ctx.fillStyle = '#ffd84d'; ctx.beginPath();
   for (let k = 0; k < 10; k++){ const rad = k % 2 ? r * .45 : r, an = k / 10 * 6.283 - 1.57; ctx.lineTo(Math.cos(an) * rad, Math.sin(an) * rad); }
   ctx.closePath(); ctx.fill();
-  ctx.shadowBlur = 0; ctx.fillStyle = '#fff8d0'; ctx.beginPath(); ctx.arc(0, 0, r * .28, 0, 6.283); ctx.fill();
+  ctx.fillStyle = '#fff8d0'; ctx.beginPath(); ctx.arc(0, 0, r * .28, 0, 6.283); ctx.fill();
   ctx.restore();
   if (parts.length < MAXP && Math.random() < .6) parts.push({k:'spark', x:lk.x + rnd(-.3, .3) * cell, y:lk.y + rnd(-.3, .3) * cell, vx:rnd(-1, 1) * cell, vy:rnd(-2, -.5) * cell, life:.5, max:.5, c:'#ffe14d'});
 }
@@ -1067,10 +1099,28 @@ function drawDrones(){
     ctx.save(); ctx.translate(d.x, y);
     ctx.fillStyle = '#2a3340'; ctx.beginPath(); ctx.moveTo(-s * .8, -s * .25); ctx.lineTo(s * .8, -s * .25); ctx.lineTo(s * .55, s * .35); ctx.lineTo(-s * .55, s * .35); ctx.closePath(); ctx.fill();
     ctx.fillStyle = '#5a6778'; ctx.fillRect(-s * 1.1, -s * .32, s * .4, s * .1); ctx.fillRect(s * .7, -s * .32, s * .4, s * .1);
-    ctx.fillStyle = st.glow; ctx.shadowColor = st.glow; ctx.shadowBlur = ucell * .25;
-    ctx.beginPath(); ctx.arc(0, s * .05, s * .18 + d.fl * s * .25, 0, 6.283); ctx.fill();
+    const gr = s * .18 + d.fl * s * .25;
+    ctx.fillStyle = st.glow; ctx.globalAlpha = .3; ctx.beginPath(); ctx.arc(0, s * .05, gr * 2, 0, 6.283); ctx.fill();
+    ctx.globalAlpha = 1; ctx.beginPath(); ctx.arc(0, s * .05, gr, 0, 6.283); ctx.fill();
     ctx.restore();
   }
+}
+// 同じ種類・色・明るさ（2段階）の粒をまとめて1つのパスで描く
+const partGroups = new Map();
+function batchParts(kind, add, fill){
+  partGroups.clear();
+  for (const p of parts){
+    if (p.k !== kind) continue;
+    const a = Math.min(1, p.life / p.max * (kind === 'deb' ? 1.5 : 1)), key = p.c + (a > .5 ? '|1' : '|0.45');
+    let arr = partGroups.get(key); if (!arr) partGroups.set(key, arr = []); arr.push(p);
+  }
+  for (const [key, arr] of partGroups){
+    const k = key.indexOf('|'), c = key.slice(0, k), a = +key.slice(k + 1);
+    ctx.globalAlpha = a; ctx.beginPath();
+    for (const p of arr) add(p, a);
+    if (fill){ ctx.fillStyle = c; ctx.fill(); } else { ctx.strokeStyle = c; ctx.stroke(); }
+  }
+  ctx.globalAlpha = 1;
 }
 function render(){
   const st = STAGES[save.stage];
@@ -1094,11 +1144,10 @@ function render(){
   ctx.restore();
   if (boss) drawBoss();
 
-  for (const p of parts){
-    if (p.k !== 'deb') continue;
-    ctx.globalAlpha = Math.max(0, Math.min(1, p.life / p.max * 1.5)); ctx.fillStyle = p.c;
-    ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.r); ctx.fillRect(-p.s / 2, -p.s / 2, p.s, p.s); ctx.restore();
-  }
+  batchParts('deb', (p, a) => {
+    const c = Math.cos(p.r) * p.s / 2, n = Math.sin(p.r) * p.s / 2;
+    ctx.moveTo(p.x - c + n, p.y - n - c); ctx.lineTo(p.x + c + n, p.y + n - c); ctx.lineTo(p.x + c - n, p.y + n + c); ctx.lineTo(p.x - c - n, p.y - n + c); ctx.closePath();
+  }, true);
   ctx.globalAlpha = 1;
   if (lucky) drawLucky();
 
@@ -1136,12 +1185,9 @@ function render(){
     }
     ctx.globalAlpha = 1;
   }
-  for (const p of parts){
-    if (p.k === 'deb') continue;
-    const a = Math.max(0, p.life / p.max); ctx.globalAlpha = a;
-    if (p.k === 'flame'){ ctx.fillStyle = p.c; ctx.beginPath(); ctx.arc(p.x, p.y, p.s * (.5 + a * .5), 0, 6.283); ctx.fill(); }
-    else { ctx.strokeStyle = p.c; ctx.lineWidth = Math.max(1, cell * .035); ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(p.x - p.vx * .03, p.y - p.vy * .03); ctx.stroke(); }
-  }
+  batchParts('flame', p => { const r = p.s * (.5 + Math.max(0, p.life / p.max) * .5); ctx.moveTo(p.x + r, p.y); ctx.arc(p.x, p.y, r, 0, 6.283); }, true);
+  ctx.lineWidth = Math.max(1, cell * .035);
+  batchParts('spark', p => { ctx.moveTo(p.x, p.y); ctx.lineTo(p.x - p.vx * .03, p.y - p.vy * .03); }, false);
   for (const g of rings){
     const t = 1 - g.life / g.max; ctx.globalAlpha = g.life / g.max; ctx.strokeStyle = g.c; ctx.lineWidth = cell * g.w * (1 - t) + 1;
     ctx.beginPath(); ctx.arc(g.x, g.y, g.to * easeOut(t), 0, 6.283); ctx.stroke();
@@ -1500,7 +1546,8 @@ document.addEventListener('visibilitychange', () => {
 let last = performance.now(), saveT = 0, refT = 0, achT = 0;
 function frame(now){
   // 最初のフレームは描画時刻が記録より前になることがあるので、経過時間は0未満にしない
-  const raw = Math.max(0, Math.min(.05, (now - last) / 1000)); last = now; clock += raw;
+  const gap = now - last, raw = Math.max(0, Math.min(.05, gap / 1000)); last = now; clock += raw;
+  if (state === 'play') adaptQuality(gap);
   const dt = slow > 0 ? raw * .3 : raw;
   if (freeze > 0) freeze -= raw; else { step(dt); updateFx(dt); }
   tickT += raw;
