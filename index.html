@@ -254,7 +254,7 @@ const F_VAL = 1e5;
 const sv = s => Math.pow(F_VAL, s);
 // 値段は価値の伸びに加えて、コンボや金ブロックなど倍率の積み上がりぶん（costStage）も上乗せする
 const priceSv = s => sv(s) * Math.pow(TUNE.costStage, s);
-const TUNE = {fhp:4000, fhpLate:3000, fdmg:2000, gaugeBase:300, gaugeGrow:1.85, gaugeCapK:11, gaugeLate:1.85, tapProg:3, dustBase:18, dustDiv:8, dustBonus:.005, pmultBonus:.25, costX:3, costStage:2.5, droneDmg:5, droneInt:1.5, bossHp:1500, bossGrow:1.35, bossReward:300, comboDecay:.6};
+const TUNE = {fhp:4000, fhpLate:3000, fdmg:2000, gaugeBase:100000, gaugeGrow:3.0, gaugeCapK:6, gaugeLate:1.8, tapProg:3, dustBase:18, dustDiv:8, dustBonus:.005, pmultBonus:.25, costX:3, costStage:1.45, droneDmg:5, droneInt:1.5, bossHp:1500, bossGrow:1.35, bossReward:300, comboDecay:.6};
 const DEFAULT = {
   coins:0, stage:0, lv:{}, mods:{}, equip:[], slots:2, best:0, ended:false, muted:false, t:0, idleRate:0, prog:0, started:false, kills:0, boss:null,
   sp:{}, ach:{}, dust:0, perm:{}, runs:0, buyMode:1, endSeen:false,
@@ -380,7 +380,7 @@ const stat = {
 };
 // 暗黒物質以降はHPの伸びをダメージと揃える（差が積み重なって終盤だけ詰まるのを防ぐ）
 const blockHp = s => 300 * Math.pow(TUNE.fhp, Math.min(s, PRESTIGE_STAGE)) * Math.pow(TUNE.fhpLate, Math.max(0, s - PRESTIGE_STAGE));
-// gaugeCapK 体目以降は gaugeLate で伸ばす（今は同じ値。終盤だけ緩めたいときに使う）
+// 序盤は gaugeGrow で急に、gaugeCapK 段目以降は gaugeLate でゆるやかに伸ばす
 // 何体目か：先の素材から始めても軽くならないよう、素材の段階と撃破数の大きいほう
 const bossK = () => Math.max(save.stage, save.kills);
 const gaugeNeed = () => Math.round(TUNE.gaugeBase * Math.pow(TUNE.gaugeGrow, Math.min(bossK(), TUNE.gaugeCapK)) * Math.pow(TUNE.gaugeLate, Math.max(0, bossK() - TUNE.gaugeCapK)) * Math.pow(.85, P('pgauge')));
