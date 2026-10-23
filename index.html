@@ -252,7 +252,7 @@ const STAGES = [
 const PRESTIGE_STAGE = 8;   // この素材に到達したら「砕く」が解放される
 const F_VAL = 1e5;
 const sv = s => Math.pow(F_VAL, s);
-const TUNE = {fhp:4000, fhpLate:3000, fdmg:2000, gaugeBase:300, gaugeGrow:1.85, gaugeCapK:11, gaugeLate:1.85, tapProg:3, dustBase:18, dustDiv:8, dustBonus:.005, pmultBonus:.25, bossHp:1500, bossGrow:1.35, bossReward:300, comboDecay:.6};
+const TUNE = {fhp:4000, fhpLate:3000, fdmg:2000, gaugeBase:300, gaugeGrow:1.85, gaugeCapK:11, gaugeLate:1.85, tapProg:3, dustBase:18, dustDiv:8, dustBonus:.005, pmultBonus:.25, costX:1, droneDmg:2, droneInt:3, bossHp:1500, bossGrow:1.35, bossReward:300, comboDecay:.6};
 const DEFAULT = {
   coins:0, stage:0, lv:{}, mods:{}, equip:[], slots:2, best:0, ended:false, muted:false, t:0, idleRate:0, prog:0, started:false, kills:0, boss:null,
   sp:{}, ach:{}, dust:0, perm:{}, runs:0, buyMode:1, endSeen:false,
@@ -268,9 +268,9 @@ const P = id => save.perm[id] || 0;
 const UPG = [
   // 放置
   {cat:'idle', id:'drones',   name:'ドローンの台数', note:'勝手に撃ち続けるドローン',           cost:800,   g:3.10,  max:11,  v:l => `${1+l+P('pdrone')}台`},
-  {cat:'idle', id:'droneint', name:'連射速度',       note:'ドローンが撃つ間隔',                 cost:600,   g:2.40,  max:14,  v:l => `${(3*Math.pow(.85,l)*(SP('rl1')?.8:1)).toFixed(2)}秒`},
-  {cat:'idle', id:'dronedmg', name:'弾の威力',       note:'ドローンの弾が与えるダメージ',       cost:900,   g:2.30,  max:999, v:l => `×${fmtX(2*Math.pow(1.4,l))}`},
-  {cat:'idle', id:'spawn',    name:'湧き速度',       note:'壊れたブロックが戻ってくる速さ',     cost:1200,  g:2.50,  max:15,  v:l => `${(8*Math.pow(.85,l)*(SP('sp1')?.7:1)).toFixed(1)}秒`},
+  {cat:'idle', id:'droneint', name:'連射速度',       note:'ドローンが撃つ間隔',                 cost:600,   g:2.40,  max:14,  v:l => `${(TUNE.droneInt*Math.pow(.85,l)*(SP('rl1')?.8:1)).toFixed(2)}秒`},
+  {cat:'idle', id:'dronedmg', name:'弾の威力',       note:'ドローンの弾が与えるダメージ',       cost:900,   g:2.30,  max:999, v:l => `×${fmtX(TUNE.droneDmg*Math.pow(1.4,l))}`},
+  {cat:'idle', id:'spawn',    name:'落下衝撃',       note:'落ちてきたブロックが、着地した下のブロックにダメージ', cost:1200, g:2.50, max:15, v:l => l ? `威力×${fmtX(.6*l*(SP('sp1')?2:1))}` : 'なし'},
   {cat:'idle', id:'drburst',  name:'弾の炸裂',       note:'弾が当たったとき追加で飛ぶ破片',     cost:2500,  g:2.70,  max:10,  v:l => `+${l*2*(SP('bu1')?2:1)}個`},
   // 操作
   {cat:'tap',  id:'tapburst', name:'タップの破片',   note:'タップで壊したときの破片の倍率',     cost:500,   g:2.40,  max:20,  v:l => `×${2+l}`},
@@ -280,6 +280,7 @@ const UPG = [
   // 共通
   {cat:'core', id:'shards',   name:'破片の数',       note:'ブロックが壊れたときに飛び散る破片', cost:1000,  g:2.50,  max:25,  v:l => `${3+l}個`},
   {cat:'core', id:'power',    name:'破片の威力',     note:'破片1つが与えるダメージ',             cost:1500,  g:2.40,  max:999, v:l => `×${fmtX(Math.pow(1.35,l))}`},
+  {cat:'core', id:'keep',     name:'連鎖の持続',     note:'連鎖が1段深くなるごとに破片の威力が落ちる。その落ち方をゆるやかにする', cost:3000, g:2.60, max:10, v:l => `1段ごと×${(.65+.025*l).toFixed(3)}`},
   {cat:'core', id:'chain',    name:'コンボ係数',     note:'コンボが高いほど報酬が増える',       cost:5000,  g:2.70,  max:99,  v:l => `${(0.1+0.1*l).toFixed(1)}`},
   {cat:'core', id:'crit',     name:'クリティカル',   note:'大ダメージが出る確率',               cost:4000,  g:2.70,  max:15,  v:l => `${5+3*l}%`},
   {cat:'core', id:'bomb',     name:'爆弾ブロック',   note:'壊すと周りを吹き飛ばすブロックの出現率', cost:6000, g:2.70, max:15, v:l => `${(Math.min(.25,.02+.015*l)*100).toFixed(1)}%`},
@@ -302,7 +303,7 @@ const SPECIALS = [
   {cat:'idle', id:'dr4', name:'ドローン軍団',     note:'ドローンの弾の威力 ×5',               cost:1e8,   req:() => L('drones') >= 11, rq:'ドローンの台数 Lv11'},
   {cat:'idle', id:'rl1', name:'速射機構',         note:'ドローンの発射間隔 ×0.8',             cost:5e4,   req:() => L('droneint') >= 5, rq:'連射速度 Lv5'},
   {cat:'idle', id:'rl2', name:'二連装',           note:'ドローンが2発同時に撃つ',             cost:2e6,   req:() => L('droneint') >= 10, rq:'連射速度 Lv10'},
-  {cat:'idle', id:'sp1', name:'再生促進',         note:'ブロックの湧き速度 ×0.7',             cost:1e5,   req:() => L('spawn') >= 5,   rq:'湧き速度 Lv5'},
+  {cat:'idle', id:'sp1', name:'重力加速',         note:'落下衝撃の威力 ×2',                   cost:1e5,   req:() => L('spawn') >= 5,   rq:'落下衝撃 Lv5'},
   {cat:'idle', id:'bu1', name:'榴弾',             note:'弾の炸裂で飛ぶ破片 ×2',               cost:8e5,   req:() => L('drburst') >= 5, rq:'弾の炸裂 Lv5'},
   {cat:'tap',  id:'tp1', name:'鉄拳',             note:'タップのボスへの威力と衝撃波 ×2',     cost:3e4,   req:() => L('tapburst') >= 5, rq:'タップの破片 Lv5'},
   {cat:'tap',  id:'tp2', name:'連打の達人',       note:'長押しの連打が速くなる（0.17秒→0.11秒）', cost:1e6, req:() => L('tapburst') >= 10, rq:'タップの破片 Lv10'},
@@ -337,12 +338,12 @@ const PERM = [
   {id:'pcrit',  name:'星の眼',         note:'クリティカル率 +5%',                    cost:15, g:1.8, max:4,  v:l => `+${5*l}%`},
 ];
 const SLOT_COST = [0, 0, 3e5, 1e8];
-const upCost  = (u, l = L(u.id)) => Math.ceil(u.cost * Math.pow(u.g, l) * sv(save.stage));
+const upCost  = (u, l = L(u.id)) => Math.ceil(u.cost * TUNE.costX * Math.pow(u.g, l) * sv(save.stage));
 const upCostN = (u, n) => { let s = 0; for (let k = 0; k < n; k++) s += upCost(u, L(u.id) + k); return s; };
 const upMaxN  = u => { let n = 0, s = 0; while (L(u.id) + n < u.max){ const c = upCost(u, L(u.id) + n); if (s + c > save.coins) break; s += c; n++; } return n; };
-const modCost = m => Math.ceil((ML(m.id) ? m.cost * Math.pow(m.g, ML(m.id) - 1) : m.unlock) * sv(save.stage));
-const slotCost = () => SLOT_COST[save.slots] * sv(save.stage);
-const spCost = s => Math.ceil(s.cost * sv(save.stage));
+const modCost = m => Math.ceil((ML(m.id) ? m.cost * Math.pow(m.g, ML(m.id) - 1) : m.unlock) * TUNE.costX * sv(save.stage));
+const slotCost = () => SLOT_COST[save.slots] * TUNE.costX * sv(save.stage);
+const spCost = s => Math.ceil(s.cost * TUNE.costX * sv(save.stage));
 const permCost = p => Math.ceil(p.cost * Math.pow(p.g, P(p.id)));
 
 // 幸運ブロックの効果（バフ）
@@ -357,9 +358,9 @@ const stat = {
   shards:   () => 3 + L('shards'),
   dmg:      () => 100 * Math.pow(TUNE.fdmg, save.stage) * Math.pow(1.35, L('power')) * (SP('sh1') ? 2 : 1) * (SP('sh2') ? 2 : 1) * (SP('sh3') ? 3 : 1),
   drones:   () => Math.min(12, 1 + L('drones') + P('pdrone')),
-  droneInt: () => 3 * Math.pow(.85, L('droneint')) * (SP('rl1') ? .8 : 1) * (buffs.barrage > 0 ? .125 : 1),
-  droneDmg: () => 2 * Math.pow(1.4, L('dronedmg')) * (SP('dr1') ? 2 : 1) * (SP('dr2') ? 2 : 1) * (SP('dr3') ? 3 : 1) * (SP('dr4') ? 5 : 1),
-  spawn:    () => 8 * Math.pow(.85, L('spawn')) * (SP('sp1') ? .7 : 1),
+  droneInt: () => TUNE.droneInt * Math.pow(.85, L('droneint')) * (SP('rl1') ? .8 : 1) * (buffs.barrage > 0 ? .125 : 1),
+  droneDmg: () => TUNE.droneDmg * Math.pow(1.4, L('dronedmg')) * (SP('dr1') ? 2 : 1) * (SP('dr2') ? 2 : 1) * (SP('dr3') ? 3 : 1) * (SP('dr4') ? 5 : 1),
+  fall:     () => .6 * L('spawn') * (SP('sp1') ? 2 : 1),
   drburst:  () => L('drburst') * 2 * (SP('bu1') ? 2 : 1),
   tapburst: () => 2 + L('tapburst'),
   tapPow:   () => SP('tp1') ? 2 : 1,
@@ -371,6 +372,7 @@ const stat = {
   critX:    () => SP('cr2') ? 8 : SP('cr1') ? 6 : 4,
   bomb:     () => Math.min(.25, .02 + .015 * L('bomb')),
   gold:     () => Math.min(.2, .01 + .01 * L('gold')),
+  keep:     () => .65 + .025 * L('keep'),
   decay:    () => TUNE.comboDecay * (SP('cb1') ? .5 : 1) * (SP('cb2') ? .5 : 1),
   holdMs:   () => SP('tp2') ? 110 : 170,
 };
@@ -387,7 +389,7 @@ let W = 390, H = 560, cols = 7, rows = 9, cell = 55.7, offX = 0, offY = 0, topBa
 let blocks = [], shards = [], booms = [], zaps = [], bullets = [], drones = [], boss = null, lucky = null;
 let combo = 0, fever = 0, heat = 0, state = 'title', lastTap = 99, earnedTick = 0, luckyT = 60, autoT = 0;
 const MAXS = 1500;
-const fx = {hit(){}, brk(){}, boom(){}, bolt(){}, fever(){}, milestone(){}, tap(){}, split(){}, bossHit(){}, bossSpawn(){}, bossDie(){}, shoot(){}, spawn(){}, lucky(){}, luckyHit(){}, ach(){}};
+const fx = {hit(){}, brk(){}, boom(){}, bolt(){}, fever(){}, milestone(){}, tap(){}, split(){}, bossHit(){}, bossSpawn(){}, bossDie(){}, shoot(){}, land(){}, lucky(){}, luckyHit(){}, ach(){}};
 const TIERS = [[25, 'いいぞ', '#ffe14d'], [50, 'ナイス！', '#ffe14d'], [100, 'スゴい！', '#ff9a3c'], [250, 'ヤバい！', '#ff4c88'], [500, '狂気', '#c38bff'], [1000, '神', '#4cc9ff'], [2500, '宇宙', '#ffffff'], [5000, '無量大数', '#ffffff']];
 let milestoneSeen = 0;
 
@@ -405,10 +407,36 @@ function newBlock(){
   if (r < bp) type = 'bomb'; else if (r < bp + gp) type = 'gold'; else if (r < bp + gp + .1) type = 'hard';
   const hp = blockHp(save.stage) * (.8 + Math.random() * .6) * (type === 'hard' ? 4 : 1) * (type === 'gold' ? 1.5 : 1);
   const value = 100 * sv(save.stage) * (type === 'gold' ? 15 * (SP('go1') ? 2 : 1) : type === 'hard' ? 3 : 1);
-  return {alive:true, hp, max:hp, type, value, burn:0, burnDps:0, spawn:0, flash:0, cracks:null, re:0};
+  return {alive:true, hp, max:hp, type, value, burn:0, burnDps:0, spawn:0, flash:0, cracks:null, fy:0, vy:0};
 }
-function deadBlock(delay){ return {alive:false, re:delay, spawn:0, flash:0, burn:0}; }
+// 破片が当たるか：落下中のブロックはすり抜ける（連鎖が無限に続かないためのブレーキ）
+const solid = i => blocks[i].boss || (blocks[i].alive && blocks[i].fy < .3);
+function deadBlock(){ return {alive:false, spawn:0, flash:0, burn:0}; }
+// 落ち物式の補充：壊れたマスには上のブロックが落ち、空いた上端には新しいブロックが降ってくる。
+// ボスのマスは床として扱い、その上下で別々に詰める。fy は「何マス上に描くか」（落下中の見た目のずれ）。
+function settle(){
+  for (let c = 0; c < cols; c++){
+    let bottom = rows - 1;
+    while (bottom >= 0){
+      while (bottom >= 0 && blocks[bottom * cols + c].boss) bottom--;
+      if (bottom < 0) break;
+      let top = bottom;
+      while (top - 1 >= 0 && !blocks[(top - 1) * cols + c].boss) top--;
+      let w = bottom;
+      for (let r = bottom; r >= top; r--){
+        const b = blocks[r * cols + c];
+        if (!b.alive) continue;
+        if (w !== r){ blocks[w * cols + c] = b; b.fy += w - r; }
+        w--;
+      }
+      const empty = w - top + 1;
+      for (let r = w; r >= top; r--){ const nb = newBlock(); nb.spawn = 1; nb.fy = empty + rnd(0, .3); blocks[r * cols + c] = nb; }
+      bottom = top - 1;
+    }
+  }
+}
 function buildGrid(){ blocks = []; for (let i = 0; i < cols * rows; i++) blocks.push(newBlock()); if (save.boss) spawnBoss(save.boss); }
+const rnd = (a, b) => a + Math.random() * (b - a);
 function cellAt(x, y){
   const c = Math.floor((x - offX) / cell), r = Math.floor((y - offY) / cell);
   if (c < 0 || r < 0 || c >= cols || r >= rows) return -1;
@@ -485,13 +513,14 @@ function tap(x, y, auto){
   fx.tap(x, y);
   return true;
 }
-function spawnShards(x, y, n, from, gen){
+// d：連鎖の深さ。深いほど威力が stat.keep() 倍ずつ落ちる
+function spawnShards(x, y, n, from, gen, d = 0){
   const sp = cell * (7 + Math.random() * 3), off = Math.random() * 6.283;
   const ric = M('ricochet'), b = ric ? 1 + ric : 0, p = M('pierce');
   for (let k = 0; k < n; k++){
     if (shards.length >= MAXS) break;
     const a = off + k / n * 6.283 + (Math.random() - .5) * .4, v = sp * (.85 + Math.random() * .3);
-    shards.push({x, y, vx:Math.cos(a) * v, vy:Math.sin(a) * v, life:gen ? .55 : .8 + Math.random() * .5, b, p, nb:0, cell:from, gen, tg:-1, tt:0});
+    shards.push({x, y, vx:Math.cos(a) * v, vy:Math.sin(a) * v, life:gen ? .55 : .8 + Math.random() * .5, b, p, nb:0, cell:from, gen, tg:-1, tt:0, d});
   }
 }
 function nearest(x, y, maxD, skip){
@@ -505,7 +534,7 @@ function nearest(x, y, maxD, skip){
       for (let c = c0 - k; c <= c0 + k; c += (edge || k === 0) ? 1 : 2 * k){
         if (c < 0 || c >= cols) continue;
         const j = r * cols + c;
-        if (!blocks[j].alive || (skip && skip.has(j))) continue;
+        if (!solid(j) || blocks[j].boss || (skip && skip.has(j))) continue;
         const dx = cx(j) - x, dy = cy(j) - y, d = dx * dx + dy * dy;
         if (d < bd){ bd = d; best = j; if (foundRing < 0) foundRing = k; }
       }
@@ -513,7 +542,7 @@ function nearest(x, y, maxD, skip){
   }
   return best;
 }
-function hit(i, dmg, src){
+function hit(i, dmg, src, d = 0){
   const b = blocks[i];
   if (b.boss){ hitBoss(dmg, src); return; }
   if (!b.alive) return;
@@ -523,26 +552,28 @@ function hit(i, dmg, src){
   b.hp -= dmg; b.flash = 1;
   fx.hit(i, dmg, crit, src);
   if (src === 'shard' && M('burn')){ b.burn = 2; b.burnDps = Math.max(b.burnDps, stat.dmg() * .8 * (1 + .3 * (M('burn') - 1))); }
-  if (b.hp <= 0) breakBlock(i, 1, src);
+  if (src === 'shard' && M('burn')) b.bd = d;
+  if (b.hp <= 0) breakBlock(i, 1, src, d);
 }
-function breakBlock(i, burst, src){
+function breakBlock(i, burst, src, d = 0){
   const b = blocks[i]; if (!b.alive) return;
-  blocks[i] = deadBlock(stat.spawn() * (.7 + Math.random() * .6));
+  blocks[i] = deadBlock();
   combo += 1; save.st.destroyed++;
   const gain = earn(b.value * comboMult() * rewardMult());
   if (!boss){ save.prog += (src === 'tap' ? TUNE.tapProg : 1) * (fever > 0 ? 2 : 1); if (save.prog >= gaugeNeed()) spawnBoss(null); }
   const x = cx(i), y = cy(i);
-  spawnShards(x, y, stat.shards() * burst, i, 0);
-  if (b.type === 'bomb') booms.push({x, y, i, R:cell * 1.7 * (SP('bm1') ? 1.3 : 1), dmg:stat.dmg() * 5 * (SP('bm1') ? 2 : 1), t:.08, big:true});
+  const nd = d + 1, kp = Math.pow(stat.keep(), nd);
+  spawnShards(x, y, stat.shards() * burst, i, 0, nd);
+  if (b.type === 'bomb') booms.push({x, y, i, R:cell * 1.7 * (SP('bm1') ? 1.3 : 1), dmg:stat.dmg() * 5 * (SP('bm1') ? 2 : 1) * kp, t:.08, big:true, d:nd});
   const bl = M('blast');
-  if (bl && b.type !== 'bomb' && Math.random() < Math.min(.5, .08 + .04 * (bl - 1))) booms.push({x, y, i, R:cell * 1.25, dmg:stat.dmg() * 2, t:.08, big:false});
+  if (bl && b.type !== 'bomb' && Math.random() < Math.min(.5, .08 + .04 * (bl - 1))) booms.push({x, y, i, R:cell * 1.25, dmg:stat.dmg() * 2 * kp, t:.08, big:false, d:nd});
   const bo = M('bolt');
-  if (bo && Math.random() < Math.min(.6, .15 + .05 * (bo - 1))) zaps.push({i, x, y, n:2 + Math.floor((bo - 1) / 2), t:.05});
+  if (bo && Math.random() < Math.min(.6, .15 + .05 * (bo - 1))) zaps.push({i, x, y, n:2 + Math.floor((bo - 1) / 2), t:.05, d:nd});
   if (b.burn > 0 && M('burn')){
     const c = i % cols, r = Math.floor(i / cols);
     [[1,0],[-1,0],[0,1],[0,-1]].forEach(([dc, dr]) => {
       const nc = c + dc, nr = r + dr; if (nc < 0 || nr < 0 || nc >= cols || nr >= rows) return;
-      const nb = blocks[nr * cols + nc]; if (nb.alive){ nb.burn = 2; nb.burnDps = Math.max(nb.burnDps, b.burnDps); }
+      const nb = blocks[nr * cols + nc]; if (nb.alive){ nb.burn = 2; nb.burnDps = Math.max(nb.burnDps, b.burnDps * stat.keep()); nb.bd = nd; }
     });
   }
   fx.brk(i, b, gain, src);
@@ -574,15 +605,23 @@ function fireDrone(d){
 function step(dt){
   if (state !== 'play') return;
   lastTap += dt; save.st.time += dt;
+  settle();
+  const fallP = stat.fall();
   for (let i = 0; i < blocks.length; i++){
     const b = blocks[i];
     if (b.flash > 0) b.flash -= dt * 8;
-    if (b.alive){
-      if (b.spawn < 1) b.spawn = Math.min(1, b.spawn + dt * 5);
-      if (b.burn > 0){ b.burn -= dt; b.hp -= b.burnDps * dt * (fever > 0 ? 2 : 1); if (b.hp <= 0) breakBlock(i, 1, 'burn'); }
-    } else if (!b.boss){
-      b.re -= dt; if (b.re <= 0){ blocks[i] = newBlock(); fx.spawn(i); }
+    if (!b.alive) continue;
+    if (b.spawn < 1) b.spawn = Math.min(1, b.spawn + dt * 5);
+    if (b.fy > 0){
+      b.vy += 45 * dt; b.fy -= b.vy * dt;
+      if (b.fy <= 0){
+        const v = b.vy; b.fy = 0; b.vy = 0;
+        const below = i + cols;
+        fx.land(i, v);
+        if (fallP && v > 4 && below < blocks.length && (blocks[below].alive || blocks[below].boss)) hit(below, stat.dmg() * fallP, 'fall');
+      }
     }
+    if (b.alive && b.burn > 0){ b.burn -= dt; b.hp -= b.burnDps * dt * (fever > 0 ? 2 : 1); if (b.hp <= 0) breakBlock(i, 1, 'burn', b.bd || 0); }
   }
   if (boss){ if (boss.spawn < 1) boss.spawn = Math.min(1, boss.spawn + dt * 2); if (boss.flash > 0) boss.flash -= dt * 8; }
   // 幸運ブロック
@@ -647,14 +686,14 @@ function step(dt){
       const i = cellAt(o.x, o.y);
       if (i !== o.cell){
         o.cell = i;
-        if (i >= 0 && (blocks[i].alive || blocks[i].boss)){
-          hit(i, dmg * (1 + o.nb * ricBonus), 'shard');
+        if (i >= 0 && solid(i)){
+          hit(i, dmg * (1 + o.nb * ricBonus) * Math.pow(stat.keep(), o.d), 'shard', o.d);
           if (splitP && o.gen === 0 && Math.random() < splitP){
             const base = Math.atan2(o.vy, o.vx), v = Math.hypot(o.vx, o.vy);
             for (const da of [-.7, .7]){
               if (shards.length >= MAXS) break;
               const a = base + da + (Math.random() - .5) * .5;
-              shards.push({x:o.x, y:o.y, vx:Math.cos(a) * v, vy:Math.sin(a) * v, life:.55, b:o.b, p:0, nb:o.nb, cell:i, gen:1, tg:-1, tt:0});
+              shards.push({x:o.x, y:o.y, vx:Math.cos(a) * v, vy:Math.sin(a) * v, life:.55, b:o.b, p:0, nb:o.nb, cell:i, gen:1, tg:-1, tt:0, d:o.d});
             }
             fx.split(o.x, o.y);
           }
@@ -672,7 +711,7 @@ function step(dt){
     for (let r = er - span; r <= er + span; r++) for (let c = ec - span; c <= ec + span; c++){
       if (r < 0 || c < 0 || r >= rows || c >= cols) continue;
       const j = r * cols + c;
-      if ((blocks[j].alive || blocks[j].boss) && Math.hypot(cx(j) - e.x, cy(j) - e.y) <= e.R) hit(j, e.dmg, 'boom');
+      if (solid(j) && Math.hypot(cx(j) - e.x, cy(j) - e.y) <= e.R) hit(j, e.dmg, 'boom', e.d || 0);
     }
     fx.boom(e);
   }
@@ -683,7 +722,7 @@ function step(dt){
     for (let m = 0; m < z.n; m++){
       const j = nearest(px, py, cell * 4, skip); if (j < 0) break;
       skip.add(j); px = cx(j); py = cy(j); pts.push([px, py]);
-      hit(j, stat.dmg() * 3, 'bolt');
+      hit(j, stat.dmg() * 3 * Math.pow(stat.keep(), z.d), 'bolt', z.d);
     }
     if (pts.length > 1) fx.bolt(pts);
   }
@@ -791,7 +830,6 @@ const sfxAch = () => { tone(1047, .12, 'triangle', .12, 0, 1); tone(1568, .25, '
 let parts = [], floats = [], rings = [], bolts = [], flashes = [];
 let freeze = 0, shake = 0, zoom = 0, flash = 0, clock = 0, slow = 0, flashColor = '255,255,255';
 const MAXP = 1100;
-const rnd = (a, b) => a + Math.random() * (b - a);
 function sparks(x, y, n, color, speed = 8){
   for (let k = 0; k < n && parts.length < MAXP; k++){
     const a = Math.random() * 6.283, v = cell * rnd(speed * .4, speed);
@@ -826,9 +864,9 @@ const bigText = (t, y, c, life = 1.4, sz = 7) => addFloat({x:W / 2, y:H * y, t, 
 fx.tap = (x, y) => { rings.push({x, y, to:cell * 1.1, life:.28, max:.28, c:'#ffffff', w:.18}); shake += 2.5; sparks(x, y, 6, '#ffffff', 6); };
 fx.hit = (i, d, crit) => {
   if (crit){
-    if (floats.length < 50) addFloat({x:cx(i) + rnd(-.2, .2) * cell, y:cy(i) - cell * .1, t:fmt(d) + '!', life:.6, max:.6, c:'#ffe14d', size:cell * .36, vy:-cell * 1.8, pop:1});
+    if (floats.length < 24 && Math.random() < .4) addFloat({x:cx(i) + rnd(-.2, .2) * cell, y:cy(i) - cell * .1, t:fmt(d) + '!', life:.6, max:.6, c:'#ffe14d', size:cell * .36, vy:-cell * 1.8, pop:1});
     sparks(cx(i), cy(i), 4, '#ffe14d', 7); shake += .7;
-  } else if (floats.length < 14 && Math.random() < .25){
+  } else if (floats.length < 8 && Math.random() < .15){
     addFloat({x:cx(i) + rnd(-.25, .25) * cell, y:cy(i), t:fmt(d), life:.45, max:.45, c:'#ffffff', size:cell * .2, vy:-cell * 1.5});
   }
 };
@@ -840,7 +878,7 @@ fx.brk = (i, b, gain) => {
     addFloat({x, y, t:'+' + fmt(gain), life:1, max:1, c:'#ffd84d', size:cell * .46, vy:-cell * 1.1, pop:1});
     rings.push({x, y, to:cell * 1.4, life:.35, max:.35, c:'#ffd84d', w:.16}); sparks(x, y, 14, '#ffe14d', 10); shake += 4; sfxGold();
   } else {
-    if (floats.length < 22) addFloat({x, y:y - cell * .2, t:'+' + fmt(gain), life:.7, max:.7, c:buffs.frenzy > 0 ? '#ffe14d' : '#ffc53a', size:cell * (buffs.frenzy > 0 ? .3 : .24), vy:-cell * 1.2});
+    if (floats.length < 14 && Math.random() < .5) addFloat({x, y:y - cell * .2, t:'+' + fmt(gain), life:.7, max:.7, c:buffs.frenzy > 0 ? '#ffe14d' : '#ffc53a', size:cell * (buffs.frenzy > 0 ? .3 : .24), vy:-cell * 1.2});
     sfxPop(combo);
   }
   shake = Math.min(shake + .4, 16);
@@ -861,7 +899,7 @@ fx.milestone = (n, name) => {
   sfxChime();
 };
 fx.shoot = (d, tx, ty) => { d.fl = 1; sfxShot(); };
-fx.spawn = i => {};
+fx.land = (i, v) => { if (v > 9 && parts.length < MAXP - 100 && Math.random() < .3) sparks(cx(i), cy(i) + cell * .45, 2, stageGlow(), 3); };
 fx.bossSpawn = b => {
   shake += 16; zoom = .05; flash = .5; sfxBoss();
   bigText('ボス出現！', .3, '#ff4c88', 1.6, 7);
@@ -925,7 +963,7 @@ function rr(x, y, w, h, r){
 const easeOut = t => 1 - Math.pow(1 - t, 3);
 function drawBlock(b, i){
   const s = easeOut(b.spawn), gap = Math.max(2, cell * .06), size = (cell - gap * 2) * s; if (size < 1) return;
-  const x = offX + (i % cols) * cell + cell / 2 - size / 2, y = offY + Math.floor(i / cols) * cell + cell / 2 - size / 2, rad = size * .16;
+  const x = offX + (i % cols) * cell + cell / 2 - size / 2, y = offY + (Math.floor(i / cols) - b.fy) * cell + cell / 2 - size / 2, rad = size * .16;
   ctx.fillStyle = blockColor(b); rr(x, y, size, size, rad); ctx.fill();
   ctx.fillStyle = 'rgba(0,0,0,.22)'; rr(x + size * .06, y + size * .72, size * .88, size * .22, size * .08); ctx.fill();
   ctx.fillStyle = 'rgba(255,255,255,.28)'; rr(x + size * .09, y + size * .08, size * .82, size * .18, size * .08); ctx.fill();
@@ -1020,7 +1058,9 @@ function render(){
     if (shake > .3) ctx.translate(rnd(-.5, .5) * shake, rnd(-.5, .5) * shake);
   }
   drawDrones();
+  ctx.save(); ctx.beginPath(); ctx.rect(-W, offY, W * 3, H * 2); ctx.clip();
   for (let i = 0; i < blocks.length; i++) if (blocks[i].alive) drawBlock(blocks[i], i);
+  ctx.restore();
   if (boss) drawBoss();
 
   for (const p of parts){
@@ -1180,7 +1220,7 @@ const NEWS = [
   () => '炎上した。ブロックが。', () => `今日のプレイ時間：${fmtT(save.st.time)}`, () => `実績 ${achCount()} / ${ACH.length}　（1個ごとに報酬+1%）`,
   () => 'フレンジー中は何をしても儲かる。', () => '「破片が多すぎて前が見えない」と苦情。', () => 'オフラインでも壊れ続ける。でも半分しか持ち帰れない。',
   () => '跳弾は壁に当たるほど痛い。', () => '誘導破片、ブロックのほうへ勝手に行く。賢い。', () => '宇宙を砕くのは物理的に可能だと判明。',
-  () => '湧き速度を上げると「無限」に近づく。', () => 'ドローン12台体制。もはや軍隊。', () => '「コインに使い道がない」——いや、強化しろ。',
+  () => '上から降ってくるブロックは、着地の衝撃でも壊れる。', () => 'ドローン12台体制。もはや軍隊。', () => '「コインに使い道がない」——いや、強化しろ。',
 ];
 let newsT = 0, newsPinned = 0;
 function pushNews(h){ newsEl.innerHTML = h; newsT = 0; newsPinned = 14; }

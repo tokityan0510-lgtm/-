@@ -29,7 +29,7 @@ function run(mode, maxMin = 120, dt = 1/30, fresh = true){
     }
     if (save.stage !== lastStage){ lastStage = save.stage; reach.push(+(t/60).toFixed(1)); if (save.stage >= G.PRESTIGE_STAGE) dust.push(G.dustGain()); if (save.stage === G.PRESTIGE_STAGE) prestigeAt = G.dustGain(); }
   }
-  return {mode, reach, dust, endMin: save.ended ? +(t/60).toFixed(1) : null, dustAtUnlock: prestigeAt, dustAtEnd: G.dustGain(),
+  return {mode, reach, dust, best: save.best, destroyed: save.st.destroyed, endMin: save.ended ? +(t/60).toFixed(1) : null, dustAtUnlock: prestigeAt, dustAtEnd: G.dustGain(),
     sp: Object.keys(save.sp).length + '/' + G.SPECIALS.length, ach: Object.keys(save.ach).length + '/' + G.ACH.length, lucky: save.st.lucky, coins: G.fmt(save.coins)};
 }
 // 第3引数に周回数を渡すと、エンディング後に砕いて永続強化を買い、次の周を続けて測る
