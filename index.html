@@ -201,7 +201,7 @@ button{font:inherit;color:inherit}
 <main id="stage">
   <canvas id="cv" aria-label="ブロックのフィールド。タップで壊す"></canvas>
   <div class="chain" id="chain"><span id="chainNum" class="display">0</span><span id="chainLabel" class="display">コンボ</span><span id="chainTier" class="display"></span><span id="chainMult"></span></div>
-  <div id="fever"><span class="display">フィーバー！</span><small>報酬3倍・威力2倍・連射2倍</small></div>
+  <div id="fever"><span class="display">フィーバー！</span><small>報酬2倍・威力2倍・連射2倍</small></div>
   <div id="buffs"></div>
   <div class="toast" id="toast"><b>実績解除</b><span id="toastText"></span></div>
   <div class="overlay" id="overlay" hidden></div>
@@ -254,7 +254,7 @@ const F_VAL = 1e5;
 const sv = s => Math.pow(F_VAL, s);
 // 値段は価値の伸びに加えて、コンボや金ブロックなど倍率の積み上がりぶん（costStage）も上乗せする
 const priceSv = s => sv(s) * Math.pow(TUNE.costStage, s);
-const TUNE = {fhp:4000, fhpLate:3000, fdmg:2000, gaugeBase:100000, gaugeGrow:3.0, gaugeCapK:6, gaugeLate:1.8, tapProg:3, dustBase:18, dustDiv:8, dustBonus:.005, pmultBonus:.25, costX:3, costStage:1.45, droneDmg:5, droneInt:1.5, bossHp:1500, bossGrow:1.35, bossReward:300, comboDecay:.6};
+const TUNE = {fhp:4000, fhpLate:3000, fdmg:2000, gaugeBase:75000, gaugeGrow:3.0, gaugeCapK:6, gaugeLate:1.8, tapProg:2, dustBase:18, dustDiv:8, dustBonus:.001, pmultBonus:.1, idleBonus:3, idleRamp:30, feverReward:2, costX:3, costStage:1.45, droneDmg:5, droneInt:1.5, bossHp:1500, bossGrow:1.35, bossReward:300, comboDecay:.6};
 const DEFAULT = {
   coins:0, stage:0, lv:{}, mods:{}, equip:[], slots:2, best:0, ended:false, muted:false, t:0, idleRate:0, prog:0, started:false, kills:0, boss:null,
   sp:{}, ach:{}, dust:0, perm:{}, runs:0, buyMode:1, endSeen:false,
@@ -277,7 +277,7 @@ const UPG = [
   // 操作
   {cat:'tap',  id:'tapburst', name:'タップの破片',   note:'タップで壊したときの破片の倍率',     cost:500,   g:2.40,  max:20,  v:l => `×${2+l}`},
   {cat:'tap',  id:'heat',     name:'熱量',           note:'1タップで溜まるフィーバーゲージ',     cost:1500,  g:2.50,  max:12,  v:l => `+${((8+2*l)*(SP('ht1')?1.5:1)).toFixed(0)}`},
-  {cat:'tap',  id:'fever',    name:'フィーバー',     note:'ゲージ満タンで報酬3倍・威力2倍になる時間', cost:4000, g:2.70, max:10, v:l => `${5+l}秒`},
+  {cat:'tap',  id:'fever',    name:'フィーバー',     note:'ゲージ満タンで報酬2倍・威力2倍になる時間', cost:4000, g:2.70, max:10, v:l => `${5+l}秒`},
   {cat:'tap',  id:'tapboom',  name:'衝撃波',         note:'タップした周りのブロックにもダメージ', cost:3000, g:2.80,  max:8,   v:l => l ? `半径${(1+.3*l+(SP('sw1')?1:0)).toFixed(1)}・威力×${l*2}` : 'なし'},
   // 共通
   {cat:'core', id:'shards',   name:'破片の数',       note:'ブロックが壊れたときに飛び散る破片', cost:1000,  g:2.50,  max:25,  v:l => `${3+l}個`},
@@ -328,11 +328,11 @@ const SPECIALS = [
 ];
 // 星屑で買う永続強化（砕いても残る）
 const PERM = [
-  {id:'pmult',  name:'星屑の輝き',     note:'全部の報酬 +25%',                       cost:4,  g:1.6, max:20, v:l => `+${l*25}%`},
+  {id:'pmult',  name:'星屑の輝き',     note:'全部の報酬 +10%',                       cost:4,  g:1.6, max:20, v:l => `+${l*10}%`},
   {id:'pdrone', name:'初期ドローン',   note:'最初からドローンが多い',                cost:8,  g:1.8, max:5,  v:l => `+${l}台`},
   {id:'pstage', name:'先の素材から',   note:'砕いたあと、先の素材から始まる',        cost:10, g:1.8, max:7,  v:l => l ? `${STAGES[l].name}から` : '木箱から'},
   {id:'plucky', name:'幸運の軌道',     note:'幸運ブロックの出現間隔 −15%',           cost:12, g:1.7, max:5,  v:l => `−${Math.round((1-Math.pow(.85,l))*100)}%`},
-  {id:'pgauge', name:'因果の短縮',     note:'ボス出現に必要な稼ぎ −15%',             cost:6,  g:1.9, max:5,  v:l => `−${Math.round((1-Math.pow(.85,l))*100)}%`},
+  {id:'pgauge', name:'因果の短縮',     note:'ボス出現に必要な稼ぎ −8%',              cost:6,  g:1.9, max:5,  v:l => `−${Math.round((1-Math.pow(.92,l))*100)}%`},
   {id:'pauto',  name:'自動タップ',     note:'毎秒勝手にタップする（熱量は半分。幸運ブロックは叩かない）', cost:40, g:2.2, max:3, v:l => `毎秒${l}回`},
   {id:'poff',   name:'長期休暇',       note:'オフライン収入の上限時間 +4時間',      cost:10, g:1.7, max:4,  v:l => `${8+4*l}時間`},
   {id:'pslot',  name:'広い装備枠',     note:'最初から装備枠が多い',                  cost:30, g:2.5, max:2,  v:l => `${2+l}枠から`},
@@ -354,7 +354,9 @@ const BUFF_INFO = {frenzy:['フレンジー 報酬×7', '#ffd84d'], barrage:['�
 const achCount = () => Object.keys(save.ach).length;
 // ずっと残る倍率（実績・星屑）。ボスゲージの進みからは除く（周回で極端に速くならないように）
 const permMult = () => (1 + .01 * achCount()) * (1 + TUNE.pmultBonus * P('pmult')) * (1 + TUNE.dustBonus * save.st.bestDust);
-const rewardMult = () => permMult() * (buffs.frenzy > 0 ? 7 : 1) * (fever > 0 ? 3 : 1);
+// 放置ボーナス：最後に手でタップしてから idleRamp 秒かけて、報酬が最大 idleBonus 倍まで上がる
+const idleMult = () => 1 + (TUNE.idleBonus - 1) * Math.min(1, lastTap / TUNE.idleRamp);
+const rewardMult = () => permMult() * idleMult() * (buffs.frenzy > 0 ? 7 : 1) * (fever > 0 ? TUNE.feverReward : 1);
 const comboMult = () => 1 + Math.sqrt(combo) * stat.chain();
 const luckyInterval = () => 110 * (SP('lk1') ? .75 : 1) * (SP('lk2') ? .75 : 1) * Math.pow(.85, P('plucky'));
 
@@ -385,13 +387,13 @@ const blockHp = s => 300 * Math.pow(TUNE.fhp, Math.min(s, PRESTIGE_STAGE)) * Mat
 // 序盤は gaugeGrow で急に、gaugeCapK 段目以降は gaugeLate でゆるやかに伸ばす
 // 何体目か：先の素材から始めても軽くならないよう、素材の段階と撃破数の大きいほう
 const bossK = () => Math.max(save.stage, save.kills);
-const gaugeNeed = () => Math.round(TUNE.gaugeBase * Math.pow(TUNE.gaugeGrow, Math.min(bossK(), TUNE.gaugeCapK)) * Math.pow(TUNE.gaugeLate, Math.max(0, bossK() - TUNE.gaugeCapK)) * Math.pow(.85, P('pgauge')));
+const gaugeNeed = () => Math.round(TUNE.gaugeBase * Math.pow(TUNE.gaugeGrow, Math.min(bossK(), TUNE.gaugeCapK)) * Math.pow(TUNE.gaugeLate, Math.max(0, bossK() - TUNE.gaugeCapK)) * Math.pow(.92, P('pgauge')));
 const bossHp = () => blockHp(save.stage) * TUNE.bossHp * Math.pow(TUNE.bossGrow, bossK());
 const dustGain = () => save.stage < PRESTIGE_STAGE ? 0 : Math.floor(TUNE.dustBase * Math.pow(2, (Math.log10(Math.max(1, save.st.earnedRun)) - 37) / TUNE.dustDiv));
 
 let W = 390, H = 560, cols = 7, rows = 9, cell = 55.7, offX = 0, offY = 0, topBand = 0;
 let blocks = [], shards = [], booms = [], zaps = [], bullets = [], drones = [], boss = null, lucky = null;
-let combo = 0, fever = 0, heat = 0, state = 'title', lastTap = 99, earnedTick = 0, luckyT = 60, autoT = 0;
+let combo = 0, fever = 0, heat = 0, state = 'title', lastTap = 0, earnedTick = 0, luckyT = 60, autoT = 0;
 const MAXS = 1500;
 const fx = {hit(){}, brk(){}, boom(){}, bolt(){}, fever(){}, milestone(){}, tap(){}, split(){}, bossHit(){}, bossSpawn(){}, bossDie(){}, shoot(){}, land(){}, lucky(){}, luckyHit(){}, ach(){}};
 const TIERS = [[25, 'いいぞ', '#ffe14d'], [50, 'ナイス！', '#ffe14d'], [100, 'スゴい！', '#ff9a3c'], [250, 'ヤバい！', '#ff4c88'], [500, '狂気', '#c38bff'], [1000, '神', '#4cc9ff'], [2500, '宇宙', '#ffffff'], [5000, '無量大数', '#ffffff']];
@@ -1177,8 +1179,8 @@ let shownCoins = '', shownProd = '', shownChain = -1, chainScale = 1, chainAlpha
 const CHAIN_COLORS = [[0, '#ffffff'], [50, '#ffe14d'], [100, '#ff9a3c'], [250, '#ff4c88'], [500, '#c38bff'], [1000, '#4cc9ff'], [2500, '#ffffff']];
 function hud(dt){
   const c = fmt(save.coins); if (c !== shownCoins){ coinsEl.textContent = c; shownCoins = c; }
-  const rm = rewardMult() / (fever > 0 ? 3 : 1) / (buffs.frenzy > 0 ? 7 : 1);
-  const ps = (dispRate > 0 ? `毎秒 <b>+${fmt(dispRate)}</b>${lastTap > 8 ? '（放置中）' : ''}` : '') + (rm > 1.001 ? `<span class="mul">報酬 ×${fmtX(rm)}</span>` : '');
+  const im = idleMult(), rm = permMult();
+  const ps = (dispRate > 0 ? `毎秒 <b>+${fmt(dispRate)}</b>` : '') + (im > 1.05 ? `<span class="mul" style="color:var(--good)">放置 ×${im.toFixed(1)}</span>` : '') + (rm > 1.001 ? `<span class="mul">報酬 ×${fmtX(rm)}</span>` : '');
   if (ps !== shownProd){ prodEl.innerHTML = ps; shownProd = ps; }
   feverFill.style.width = (fever > 0 ? Math.min(100, fever / stat.fever() * 100) : Math.min(100, heat)) + '%';
   feverEl.style.opacity = fever > 0 ? 1 : 0;
@@ -1323,7 +1325,7 @@ function sheetHtml(){
     const d = dustGain(), ok = save.stage >= PRESTIGE_STAGE;
     h += `<div class="prestige-box">
       <div class="dust-num display">✦ ${save.dust}</div><p>持っている星屑</p>
-      <p>今砕くと <b style="color:var(--dust)">+${d}</b> 星屑（これまでに集めた星屑1個ごとに報酬+0.5%。使っても減らない）<br>${ok ? `${STAGES[Math.min(P('pstage'), STAGES.length - 1)].name}からやり直しになる。` : `<b>${STAGES[PRESTIGE_STAGE].name}</b>に到達すると砕ける（今：${STAGES[save.stage].name}）`}</p>
+      <p>今砕くと <b style="color:var(--dust)">+${d}</b> 星屑（これまでに集めた星屑1個ごとに報酬+0.1%。使っても減らない）<br>${ok ? `${STAGES[Math.min(P('pstage'), STAGES.length - 1)].name}からやり直しになる。` : `<b>${STAGES[PRESTIGE_STAGE].name}</b>に到達すると砕ける（今：${STAGES[save.stage].name}）`}</p>
       <button class="go ${ok && d > 0 ? '' : 'ghost'}" data-act="prestige" ${ok && d > 0 ? '' : 'disabled'}>宇宙を砕く</button>
     </div><div class="section-title">星屑で買う永続強化</div><ul class="list">`;
     for (const p of PERM){
