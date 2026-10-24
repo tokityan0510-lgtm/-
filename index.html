@@ -193,6 +193,11 @@ body:not(.loud) #fever span{animation:none}
 .relic .rr{color:var(--rc);font-weight:700;filter:brightness(.8)}
 .relic.unk{border-style:dashed;opacity:.5;background:var(--surface)}
 .relic .d{color:var(--muted)}
+.combos{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:6px;margin-top:6px}
+.combo{border:1.5px dashed var(--line);border-radius:10px;padding:8px;font-size:12px;line-height:1.4;display:flex;flex-direction:column;gap:2px;opacity:.6}
+.combo.on{border:2px solid var(--accent);opacity:1;background:color-mix(in srgb,var(--accent) 10%,var(--surface))}
+.combo .rr{font-weight:700}
+.combo .d{color:var(--muted)}
 .prestige-box{margin:10px 0;padding:14px;border-radius:14px;border:2px solid var(--dust);text-align:center}
 .prestige-box .dust-num{font-size:clamp(30px,9vw,48px)}
 .prestige-box p{margin:6px 0;font-size:13px;line-height:1.6}
@@ -278,7 +283,7 @@ for (let k = 1; k <= 38; k++){
 const PRESTIGE_STAGE = 8;   // この素材に到達したら「砕く」が解放される
 // ブロックの価値の素材倍率（TUNE.valStage）
 const sv = s => Math.pow(TUNE.valStage, s);
-const TUNE = {fhp:4000, fhpLate:4000, fdmg:4000, reqBase:1500, reqPow:6.4, dmgG:1.5, hpPow:3.4, hpMul:1, lvBonus:.01, tapProg:1.5, dustBase:18, dustDiv:8, dustBonus:.001, pmultBonus:.1, idleBonus:7, idleRamp:30, idleDmgK:.55, feverReward:2, costX:3, valStage:1e4, modSpan:7, droneDmg:5, droneInt:1.5, armMul:15, armIdle:0, reso:.01, bossHp:1500, bossGrow:1.35, bossReward:300, comboDecay:.6};
+const TUNE = {fhp:4000, fhpLate:4000, fdmg:4000, reqBase:3200, reqPow:6.4, dmgG:1.5, hpPow:3.4, hpMul:1, lvBonus:.01, tapProg:1.5, dustBase:18, dustDiv:8, dustBonus:.001, pmultBonus:.1, idleBonus:7, idleRamp:30, idleDmgK:.5, feverReward:2, costX:3, valStage:1e4, modSpan:7, droneDmg:5, droneInt:1.5, armMul:15, armIdle:0, reso:.01, bossHp:1500, bossGrow:1.35, bossReward:300, comboDecay:.6};
 const DEFAULT = {
   coins:0, stage:0, lv:{}, mods:{}, best:0, ended:false, muted:false, t:0, idleRate:0, prog:0, started:false, kills:0, boss:null,
   sp:{}, ach:{}, dust:0, perm:{}, off:{}, runs:0, buyMode:1, endSeen:false, relics:{},
@@ -337,8 +342,25 @@ const MODS = [
   {id:'pierce',   name:'貫通', note:'かけらがブロックを突き抜けて、もう一度戻ってくる',                       unlock:80000,  cost:45000, st:2, max:8,  v:l => `${l}枚`},
   {id:'bolt',     name:'雷撃', note:'当たったところから雷が走り、ブロックに何度も落ちる',       unlock:150000, cost:80000, st:3, max:10, v:l => `${Math.round(Math.min(.6,.15+.05*(l-1))*100)}%で${2+Math.floor((l-1)/2)}本`},
   {id:'burn',     name:'炎上', note:'かけらが当たるとブロックが燃え、少しずつダメージ',   unlock:250000, cost:120000, st:4, max:10, v:l => `毎秒 威力×${(0.8*(1+.3*(l-1))).toFixed(1)}`},
+  {id:'frost',    name:'凍結', note:'かけらが当たると、ときどきブロックが凍る。凍っている間は受けるダメージが増える', unlock:1e5, cost:5e4, st:2, max:10, v:l => `凍ると +${15+5*(l-1)}%`},
+  {id:'orbit',    name:'衛星', note:'ブロックの周りを衛星が回り、近づくたびに撃ち込む',       unlock:2e5, cost:1e5, st:3, max:10, v:l => `${1+Math.floor(l/3)}機・威力×${(1+.25*(l-1)).toFixed(2)}`},
+  {id:'poison',   name:'猛毒', note:'かけらが当たるたびに毒が溜まり、溜まった量に応じて削り続ける', unlock:3e5, cost:1.5e5, st:4, max:10, v:l => `最大${30+10*l}層`},
+  {id:'charge',   name:'会心', note:'何回か当てるごとに、次の一撃が会心の一撃になる',         unlock:5e5, cost:2.2e5, st:5, max:10, v:l => `${200-10*(l-1)}回ごとに ×${30+5*l}`},
+  {id:'meteor',   name:'流星', note:'一定時間ごとに流星が降ってきて、ブロックに激突する',     unlock:8e5, cost:3e5, st:6, max:10, v:l => `${(5-.3*(l-1)).toFixed(1)}秒ごと`},
+  {id:'pulse',    name:'波動', note:'ブロックの中心から衝撃の波が広がり、かけらをまき散らす', unlock:1.2e6, cost:4.5e5, st:7, max:10, v:l => `3秒ごと・かけら${2+Math.floor(l/2)}個`},
   {id:'blast',    name:'誘爆', note:'当たったところがときどき爆発する',                 unlock:400000, cost:180000, st:5, max:10, v:l => `${Math.round(Math.min(.5,.08+.04*(l-1))*100)}%`},
 ];
+// 組み合わせ技：2つのモジュールがどちらもLv3以上でONなら自動で発動する
+const COMBOS = [
+  {id:'supercon', name:'超伝導', a:'bolt',   b:'frost',    note:'凍っている間、雷撃の出る確率 ×2'},
+  {id:'toxboom',  name:'毒爆',   a:'poison', b:'blast',    note:'誘爆が起きると毒が10層溜まる'},
+  {id:'shower',   name:'流星群', a:'meteor', b:'split',    note:'流星が着弾すると、小さな流星が2つ追加で降る'},
+  {id:'satgun',   name:'衛星砲', a:'orbit',  b:'pierce',   note:'衛星の一撃でかけらが2つ多く飛ぶ'},
+  {id:'scorch',   name:'焦熱',   a:'burn',   b:'poison',   note:'燃えている間、毒のダメージ ×2'},
+  {id:'critical', name:'臨界',   a:'charge', b:'ricochet', note:'会心の一撃でかけらが10個飛ぶ'},
+  {id:'tidal',    name:'潮汐',   a:'pulse',  b:'homing',   note:'波動の威力 ×2'},
+];
+const CB = id => { const c = COMBOS.find(x => x.id === id); return M(c.a) >= 3 && M(c.b) >= 3; };
 // 特殊強化：強化Lvなどが条件で現れる一発もの
 const SPECIALS = [
   {cat:'idle', id:'dr1', name:'ドローン改良 I',   note:'ドローンの弾の威力 ×1.5',             ref:['drones',3], req:() => L('drones') >= 3, rq:'ドローンの台数 Lv3'},
@@ -534,7 +556,7 @@ const bossHp = () => blockHp(save.stage) * TUNE.bossHp * Math.pow(TUNE.bossGrow,
 const dustGain = () => { if (save.stage < PRESTIGE_STAGE) return 0; const lv = Math.log10(TUNE.valStage) / 5; return Math.floor(TUNE.dustBase * Math.pow(2, (Math.log10(Math.max(1, save.st.earnedRun)) - 37 * lv) / (TUNE.dustDiv * lv)) * (1 + .25 * RL('tear'))); };
 
 let W = 390, H = 560, cell = 55.7, ucell = 55.7, topBand = 0, botBand = 0;
-let BX = 195, BY = 300, BS = 240, big = {flash:0, wob:0, wx:0, wy:0, spawn:1, burn:0, burnDps:0, burnAcc:0, bd:0};
+let BX = 195, BY = 300, BS = 240, big = {flash:0, wob:0, wx:0, wy:0, spawn:1, burn:0, burnDps:0, burnAcc:0, bd:0, frost:0, poison:0, poisonAcc:0};
 // blocks と boss は旧方式の名残（常に空）。表示側の互換のために残している
 let blocks = [], boss = null, shards = [], booms = [], zaps = [], bullets = [], drones = [], lucky = null;
 // 連鎖で爆発・雷が増えすぎると重くなるので、保留できる数に上限を付ける。あふれた分はダメージだけまとめて次のフレームで与える
@@ -544,7 +566,7 @@ function queueBoom(e){ if (booms.length < MAXB) booms.push(e); else overflow[e.s
 let shells = [], beams = [], missiles = [], holes = [], armT = {}, armK = 0;
 let combo = 0, fever = 0, heat = 0, state = 'title', lastTap = 0, earnedTick = 0, luckyT = 60, autoT = 0;
 let MAXS = 900;   // 破片の上限（自動画質で変わる）
-const fx = {dig(){}, arm(){}, beam(){}, hole(){}, hit(){}, brk(){}, boom(){}, bolt(){}, fever(){}, milestone(){}, tap(){}, split(){}, bossHit(){}, bossSpawn(){}, bossDie(){}, shoot(){}, land(){}, lucky(){}, luckyHit(){}, ach(){}, relic(){}};
+const fx = {dig(){}, arm(){}, beam(){}, hole(){}, hit(){}, brk(){}, boom(){}, bolt(){}, fever(){}, milestone(){}, tap(){}, split(){}, bossHit(){}, bossSpawn(){}, bossDie(){}, shoot(){}, land(){}, lucky(){}, luckyHit(){}, ach(){}, relic(){}, charge(){}, frost(){}, pulse(){}};
 const TIERS = [[25, 'いいぞ', '#ffe14d'], [50, 'ナイス！', '#ffe14d'], [100, 'スゴい！', '#ff9a3c'], [250, 'ヤバい！', '#ff4c88'], [500, '狂気', '#c38bff'], [1000, '神', '#4cc9ff'], [2500, '宇宙', '#ffffff'], [5000, '無量大数', '#ffffff']];
 let milestoneSeen = 0;
 
@@ -561,7 +583,9 @@ function layout(w, h){
   cell = BS / 6;
   drones = []; for (let k = 0; k < 12; k++) drones.push({x:W * (k + .5) / 12, y:topBand * .5, t:Math.random() * 3, ph:Math.random() * 6});
 }
-const freshBig = () => ({flash:0, wob:0, wx:0, wy:0, spawn:0, burn:0, burnDps:0, burnAcc:0, bd:0});
+const freshBig = () => ({flash:0, wob:0, wx:0, wy:0, spawn:0, burn:0, burnDps:0, burnAcc:0, bd:0, frost:0, poison:0, poisonAcc:0});
+// 新しいモジュールの状態：衛星（発射までの時間）、流星、波動、会心までの残り回数
+let sats = [], satA = 0, meteors = [], meteorT = 3, pulseT = 3, chargeN = 0;
 function buildGrid(){ big = freshBig(); big.spawn = 1; }
 const rnd = (a, b) => a + Math.random() * (b - a);
 const inBig = (x, y, pad = 0) => Math.abs(x - BX) <= BS / 2 + pad && Math.abs(y - BY) <= BS / 2 + pad;
@@ -579,7 +603,7 @@ function shatter(){
   save.st.deepest = Math.max(save.st.deepest, save.stage);
   dropRelic();
   big = freshBig();
-  shards = []; holes = [];
+  shards = []; holes = []; meteors = [];
   fx.bossDie(prevStage, gain);
 }
 
@@ -643,22 +667,28 @@ function trackDps(dt){
 const armOn = id => !(save.off && save.off[id]);
 // すべてのダメージに効く倍率（遺物「ビッグバンの種」、シナジー）
 const allDmg = () => (1 + .5 * RL('seed')) * (SP('sy4') ? 1 + Math.min(.25, combo / 4000) : 1) * (SP('sy6') ? 1 + .02 * relicKinds() : 1) * (SP('sy9') && idleMult() >= TUNE.idleBonus ? 1.25 : 1);
+const DOT = new Set(['burn', 'reso', 'poison']);
 function hit(dmg, src, x, y, d = 0, burst = 0){
   let crit = false;
-  if (src !== 'burn' && src !== 'reso' && Math.random() < stat.crit()){ dmg *= stat.critX(); crit = true; }
+  // 会心：決まった回数当てるごとに、次の一撃が大きくなる
+  const ch = M('charge');
+  if (ch && !DOT.has(src) && ++chargeN >= 200 - 10 * (ch - 1)){ chargeN = 0; dmg *= 30 + 5 * ch; crit = true; fx.charge(x, y); if (CB('critical')) spawnShards(x, y, 10, d + 1); }
+  // 凍っている間は受けるダメージが増える
+  if (big.frost > 0) dmg *= 1.1 + .05 * M('frost');
+  if (!crit && !DOT.has(src) && Math.random() < stat.crit()){ dmg *= stat.critX(); crit = true; }
   // 共鳴は「すでに倍率がかかったダメージ」を元にするので、フィーバー・放置ボーナスをかけ直さない。
   // 炎上のフィーバー分は burnAcc でかけ済み
-  if (fever > 0 && src !== 'burn' && src !== 'reso') dmg *= 2;
-  // 放置ボーナスはダメージにも約半分の強さで効く（最大×4.3）（放置でもひびが進むように）
+  if (fever > 0 && src !== 'burn' && src !== 'reso' && src !== 'poison') dmg *= 2;
+  // 放置ボーナスはダメージにも半分の強さで効く（最大×4）（放置でもひびが進むように）
   if (src !== 'reso') dmg *= idleDmg() * allDmg();
   // 進み（ひび）は与えたダメージ。直接タップは tapProg 倍
   save.prog += dmg * (src === 'tap' ? TUNE.tapProg : 1);
   { const g = DPS_GROUP[src] || src; dpsAcc[g] = (dpsAcc[g] || 0) + dmg; }
-  combo += src === 'burn' || src === 'reso' ? .2 : 1; save.st.destroyed++;
+  combo += DOT.has(src) ? .2 : 1; save.st.destroyed++;
   // コインは与えたダメージに比例（ブロック1個ぶんのHPで、その素材のブロック1個ぶんの価値）
   const nx = allDmg() * coreX() * (src === 'drone' ? droneX() : ARM_RELIC[src] ? armX(src) : 1);
   let gain = 100 * sv(save.stage) * dmg / nx / blockHp(save.stage) * comboMult() * rewardMult(), gold = false;
-  if (src !== 'burn' && src !== 'reso' && Math.random() < stat.gold()){ gain *= 15 * (SP('go1') ? 2 : 1); gold = true; }
+  if (!DOT.has(src) && Math.random() < stat.gold()){ gain *= 15 * (SP('go1') ? 2 : 1); gold = true; }
   earn(gain);
   if (src !== 'reso') resoWin += dmg;
   big.flash = 1;
@@ -667,14 +697,18 @@ function hit(dmg, src, x, y, d = 0, burst = 0){
   fx.hit(x, y, dmg, crit, gain, gold, src);
   const nd = d + 1, kp = Math.pow(stat.keep(), nd);
   if (burst) spawnShards(x, y, burst, nd);
-  if (src !== 'burn' && src !== 'reso'){
+  if (!DOT.has(src)){
     if (Math.random() < stat.bomb() * .3) queueBoom({x, y, R:cell * 1.7 * (SP('bm1') ? 1.3 : 1), dmg:stat.dmg() * 5 * (SP('bm1') ? 2 : 1) * kp, t:.08, big:true, d:nd, src:'bomb'});
     const bl = M('blast');
-    if (bl && Math.random() < Math.min(.5, .08 + .04 * (bl - 1)) * .3) queueBoom({x, y, R:cell * 1.25, dmg:stat.dmg() * 2 * kp, t:.08, big:false, d:nd, src:'blast'});
+    if (bl && Math.random() < Math.min(.5, .08 + .04 * (bl - 1)) * .3){ queueBoom({x, y, R:cell * 1.25, dmg:stat.dmg() * 2 * kp, t:.08, big:false, d:nd, src:'blast'}); if (CB('toxboom')) big.poison = Math.min(poisonMax(), big.poison + 10); }
     const bo = M('bolt');
-    if (bo && Math.random() < Math.min(.6, .15 + .05 * (bo - 1)) * .3){
+    if (bo && Math.random() < Math.min(.6, .15 + .05 * (bo - 1)) * .3 * (big.frost > 0 && CB('supercon') ? 2 : 1)){
       const n = 2 + Math.floor((bo - 1) / 2);
       if (zaps.length < MAXZ) zaps.push({x, y, n, t:.05, d:nd}); else overflow.bolt = (overflow.bolt || 0) + stat.dmg() * 3 * Math.pow(stat.keep(), nd) * n;
+    }
+    if (src === 'shard'){
+      const fr = M('frost'); if (fr && Math.random() < .01 + .003 * (fr - 1)){ if (big.frost <= 0) fx.frost(); big.frost = 2.5; }
+      if (M('poison')) big.poison = Math.min(poisonMax(), big.poison + 1);
     }
     if (src === 'shard' && M('burn')){ big.burn = 2; big.burnDps = Math.max(big.burnDps * .9, stat.dmg() * .8 * (1 + .3 * (M('burn') - 1))); big.bd = d; }
   }
@@ -683,6 +717,51 @@ function hit(dmg, src, x, y, d = 0, burst = 0){
   for (const [n, name] of TIERS) if (cm === n && cm > milestoneSeen){ milestoneSeen = cm; fx.milestone(cm, name); }
   // 砕けるのはフレームの最後（かけらなどの処理中に一覧を空にしないため）
   if (save.prog >= gaugeNeed()) shatterPending = true;
+}
+const poisonMax = () => 30 + 10 * M('poison');
+function stepMods(dt){
+  if (big.frost > 0) big.frost -= dt;
+  // 猛毒：溜まった層の数に応じて削り続ける。毎秒15%ずつ抜けていく
+  const po = M('poison');
+  if (big.poison > 0){
+    if (po){
+      big.poisonAcc += big.poison * stat.dmg() * .3 * (1 + .2 * (po - 1)) * (big.burn > 0 && CB('scorch') ? 2 : 1) * dt;
+      if (Math.random() < dt * 3){ const [x, y] = bigPoint(); hit(big.poisonAcc, 'poison', x, y); big.poisonAcc = 0; }
+    }
+    big.poison = Math.max(0, big.poison - big.poison * .15 * dt - (po ? 0 : 5 * dt));
+  }
+  // 衛星：ブロックの周りを回り、0.6秒ごとに撃ち込む
+  const ob = M('orbit'), ns = ob ? 1 + Math.floor(ob / 3) : 0;
+  satA += dt * 1.4;
+  while (sats.length < ns) sats.push({t:Math.random() * .6, fl:0});
+  sats.length = ns;
+  for (let k = 0; k < ns; k++){
+    const s = sats[k], a = satA + k * 6.283 / ns, r = BS * .66;
+    s.x = BX + Math.cos(a) * r; s.y = BY + Math.sin(a) * r; s.fl = Math.max(0, s.fl - dt * 4); s.t -= dt;
+    if (s.t <= 0){ s.t = .6; s.fl = 1; const tx = BX + Math.cos(a) * BS * .4, ty = BY + Math.sin(a) * BS * .4; s.tx = tx; s.ty = ty;
+      hit(stat.dmg() * 12 * (1 + .25 * (ob - 1)), 'orbit', tx, ty, 0, 1 + (CB('satgun') ? 2 : 0)); }
+  }
+  // 流星：一定時間ごとに上から降ってくる
+  const me = M('meteor');
+  if (me){ meteorT -= dt; if (meteorT <= 0){ meteorT = 5 - .3 * (me - 1); spawnMeteor(1); } }
+  for (let k = meteors.length - 1; k >= 0; k--){
+    const m = meteors[k]; m.t += dt;
+    const p = Math.min(1, m.t / m.dur); m.x = m.x0 + (m.tx - m.x0) * p; m.y = m.y0 + (m.ty - m.y0) * p;
+    if (p >= 1){
+      meteors.splice(k, 1);
+      queueBoom({x:m.tx, y:m.ty, R:cell * 2 * m.s, dmg:stat.dmg() * 80 * (1 + .3 * (me - 1)) * m.s, t:0, big:true, d:0, burst:Math.round(6 * m.s), src:'meteor', arm:true, missile:m.s >= 1});
+      if (m.s >= 1 && CB('shower')) spawnMeteor(.5, 2);
+    }
+  }
+  // 波動：3秒ごとに中心から波が広がる
+  const pu = M('pulse');
+  if (pu){ pulseT -= dt; if (pulseT <= 0){ pulseT = 3; fx.pulse(); hit(stat.dmg() * 30 * (3 + pu) * (CB('tidal') ? 2 : 1), 'pulse', BX, BY, 0, 2 + Math.floor(pu / 2)); } }
+}
+function spawnMeteor(s, n = 1){
+  for (let q = 0; q < n; q++){
+    const [tx, ty] = bigPoint(), x0 = tx + rnd(-1, 1) * W * .4 + W * .3, y0 = -cell;
+    meteors.push({x0, y0, x:x0, y:y0, tx, ty, t:0, dur:.55 + q * .12, s});
+  }
 }
 function fireDrone(dr){
   const [tx, ty] = bigPoint();
@@ -766,6 +845,7 @@ function step(dt){
     big.burn -= dt; big.burnAcc += big.burnDps * dt * (fever > 0 ? 2 : 1);
     if (big.burnAcc > 0 && Math.random() < dt * 4){ const [x, y] = bigPoint(); hit(big.burnAcc, 'burn', x, y, big.bd); big.burnAcc = 0; }
   }
+  stepMods(dt);
   // 共鳴：直前1秒に与えたダメージの一部を、もう一度与える
   resoT -= dt;
   if (resoT <= 0){ resoT = 1; const r = stat.reso(); if (r && resoWin > 0){ const [x, y] = bigPoint(); hit(resoWin * r, 'reso', x, y); } resoWin = 0; }
@@ -854,8 +934,8 @@ achSet('p', '砕いた回数', [1, 2, 5, 10], ['宇宙、粉砕', '二度目の�
 achSet('u', '強化レベル合計', [10, 100, 300, 1000, 3000], ['初心者', '育成中', '鍛え上げ', '完全体', '極限'], () => UPG.reduce((s, u) => s + L(u.id), 0), n => n);
 achSet('h', 'プレイ時間', [600, 3600, 3 * 3600, 10 * 3600, 24 * 3600], ['10分', '1時間', '3時間', '10時間', '丸一日'], () => save.st.time, fmtT);
 ACH.push({id:'arms4', name:'兵器工場', desc:'4種類の兵器をすべてそろえる', ok:() => ARMS.every(a => L(a.id + 'N') > 0)});
-ACH.push({id:'mall', name:'全モジュール', desc:'7種のモジュールを全部解放', ok:() => MODS.every(m => ML(m.id) > 0)});
-ACH.push({id:'slot4', name:'フル装備', desc:'7種のモジュールを全部Lv5以上にする', ok:() => MODS.every(m => ML(m.id) >= 5)});
+ACH.push({id:'mall', name:'全モジュール', desc:`${MODS.length}種のモジュールを全部解放`, ok:() => MODS.every(m => ML(m.id) > 0)});
+ACH.push({id:'slot4', name:'フル装備', desc:`${MODS.length}種のモジュールを全部Lv5以上にする`, ok:() => MODS.every(m => ML(m.id) >= 5)});
 ACH.push({id:'off1', name:'おかえり', desc:'オフライン収入を受け取る', ok:() => save.st.offline >= 1});
 ACH.push({id:'sp10', name:'特殊部隊', desc:'特殊強化を10個買う', ok:() => Object.keys(save.sp).length >= 10});
 ACH.push({id:'spall', name:'全部入り', desc:'特殊強化を全部買う', ok:() => SPECIALS.every(s => SP(s.id))});
@@ -864,6 +944,8 @@ achSet('r', '遺物の種類', [1, 5, 10, 15, RELICS.length], ['掘り出し物'
 ACH.push({id:'rleg', name:'伝説', desc:'レジェンドの遺物を手に入れる', ok:() => RELICS.some(r => r.rar === 3 && RL(r.id) > 0)});
 ACH.push({id:'rmax', name:'極めし者', desc:'遺物をどれか1つ最大Lvにする', ok:() => RELICS.some(r => RL(r.id) >= r.max)});
 achSet('z', '到達', [UNIVERSE + 1, UNIVERSE + 5, UNIVERSE + 10, UNIVERSE + 20, STAGES.length - 1], ['宇宙の先へ', '終焉を見た', '深淵', '深淵の底', '果て'], () => save.st.deepest, n => STAGES[n].name);
+ACH.push({id:'combo3', name:'組み合わせ上手', desc:'組み合わせ技を3つ同時に発動させる', ok:() => COMBOS.filter(c => CB(c.id)).length >= 3});
+ACH.push({id:'comboall', name:'全部のせ', desc:'組み合わせ技を全部同時に発動させる', ok:() => COMBOS.every(c => CB(c.id))});
 ACH.push({id:'evo1', name:'進化', desc:'兵器をどれか1つ進化させる', ok:() => Object.keys(EVO).some(id => evo(id) > 0)});
 ACH.push({id:'evo5', name:'全軍進化', desc:'ドローンと4つの兵器を全部進化させる', ok:() => Object.keys(EVO).every(id => evo(id) > 0)});
 ACH.push({id:'evo10', name:'最終形態', desc:'ドローンと4つの兵器を全部2段階進化させる', ok:() => Object.keys(EVO).every(id => evo(id) > 1)});
@@ -880,7 +962,7 @@ function prestige(){
   save.st.earnedRun = 0;
   for (const k in buffs) buffs[k] = 0;
   combo = 0; fever = 0; heat = 0; boss = null; lucky = null; luckyT = 30;
-  shells = []; beams = []; missiles = []; holes = [];
+  shells = []; beams = []; missiles = []; holes = []; meteors = []; big.poison = 0; big.frost = 0;
   return d;
 }
 
@@ -1049,6 +1131,10 @@ fx.boom = e => {
   else if (!e.quiet){ if (e.big && loud()) hitStop(.05); shake += e.big ? 8 : 3; if (e.big) zoom = Math.max(zoom, .03); sfxBoom(e.big); }
 };
 fx.bolt = pts => { if (bolts.length < (loud() ? 12 : 4)) bolts.push({pts:jag(pts), life:.22, max:.22}); for (let k = 1; k < pts.length; k++) sparks(pts[k][0], pts[k][1], 3, '#bfe9ff', 8); shake += 1.5; sfxZap(); };
+let lastChargeT = 0;
+fx.charge = (x, y) => { addRing({x, y, to:cell * 2.2, life:.4, max:.4, c:'#ffe14d', w:.3}); sparks(x, y, 16, '#ffe14d', 12); shake += 4; if (clock - lastChargeT < .6) return; lastChargeT = clock; addFloat({x, y:y - cell * .4, t:'会心！', life:.8, max:.8, c:'#ffe14d', size:ucell * .4, vy:-cell * 1.2, pop:1}); sfxGold(); };
+fx.frost = () => { sparks(BX, BY, 18, '#bfe9ff', 9); tone(1600, .25, 'sine', .06, 0, .5); };
+fx.pulse = () => { addRing({x:BX, y:BY, to:BS * 1.1, life:.6, max:.6, c:'#7cf5ff', w:.35}); shake += 2; tone(110, .35, 'sine', .14, 0, .6); };
 fx.split = (x, y) => { if (parts.length < MAXP - 50) sparks(x, y, 2, '#ffffff', 5); };
 fx.fever = () => { flash = 1; freeze = Math.max(freeze, .12); shake += 14; zoom = .06; sfxFever(); };
 fx.milestone = (n, name) => {
@@ -1199,6 +1285,9 @@ function drawBig(){
     ctx.stroke();
     if (frac > .5){ ctx.strokeStyle = `rgba(255,255,255,${(frac - .5) * .5})`; ctx.lineWidth = Math.max(1, size * .005); ctx.stroke(); }
   }
+  if (big.frost > 0){ ctx.globalAlpha = .3 * Math.min(1, big.frost * 2); ctx.fillStyle = '#bfe9ff'; rr(tx, ty, size, size, rad); ctx.fill(); ctx.globalAlpha = 1; }
+  if (big.poison > 1){ ctx.globalAlpha = Math.min(.35, big.poison / poisonMax() * .4); ctx.fillStyle = '#5fe36b'; rr(tx, ty, size, size, rad); ctx.fill(); ctx.globalAlpha = 1;
+    if (parts.length < MAXP && Math.random() < .3){ const [px, py] = bigPoint(); parts.push({k:'flame', x:px, y:py, vx:rnd(-.2, .2) * cell, vy:-cell * rnd(.4, .9), life:.6, max:.6, c:'#7dff8a', s:cell * rnd(.05, .1)}); } }
   if (big.burn > 0){ ctx.globalAlpha = .25 + .15 * Math.sin(clock * 20); ctx.fillStyle = '#ff5a14'; rr(tx, ty, size, size, rad); ctx.fill(); ctx.globalAlpha = 1; }
   if (big.flash > 0){ ctx.fillStyle = `rgba(255,255,255,${big.flash * .35})`; rr(tx, ty, size, size, rad); ctx.fill(); }
   // ひびの割合
@@ -1250,6 +1339,22 @@ function batchParts(kind, add, fill){
     if (fill){ ctx.fillStyle = c; ctx.fill(); } else { ctx.strokeStyle = c; ctx.stroke(); }
   }
   ctx.globalAlpha = 1;
+}
+function drawMods(){
+  ctx.globalCompositeOperation = 'lighter';
+  for (const s of sats){
+    if (s.x === undefined) continue;
+    ctx.globalAlpha = .35; ctx.fillStyle = '#7cf5ff'; ctx.beginPath(); ctx.arc(s.x, s.y, ucell * .2, 0, 6.283); ctx.fill();
+    ctx.globalAlpha = 1; ctx.fillStyle = '#e8feff'; ctx.beginPath(); ctx.arc(s.x, s.y, ucell * .08, 0, 6.283); ctx.fill();
+    if (s.fl > 0){ ctx.globalAlpha = s.fl; ctx.strokeStyle = '#7cf5ff'; ctx.lineWidth = Math.max(1.5, cell * .06); ctx.beginPath(); ctx.moveTo(s.x, s.y); ctx.lineTo(s.tx, s.ty); ctx.stroke(); }
+  }
+  for (const m of meteors){
+    const dx = m.tx - m.x0, dy = m.ty - m.y0, len = Math.hypot(dx, dy) || 1, tl = cell * 2.5 * m.s;
+    ctx.globalAlpha = .5; ctx.strokeStyle = '#ff9a3c'; ctx.lineWidth = cell * .35 * m.s; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(m.x - dx / len * tl, m.y - dy / len * tl); ctx.lineTo(m.x, m.y); ctx.stroke();
+    ctx.globalAlpha = 1; ctx.fillStyle = '#fff3b0'; ctx.beginPath(); ctx.arc(m.x, m.y, cell * .22 * m.s, 0, 6.283); ctx.fill();
+  }
+  ctx.globalCompositeOperation = 'source-over'; ctx.globalAlpha = 1;
 }
 function drawArms(){
   const st = STAGES[save.stage], n = L('cannonN');
@@ -1331,7 +1436,7 @@ function render(){
     ctx.moveTo(p.x - c + n, p.y - n - c); ctx.lineTo(p.x + c + n, p.y + n - c); ctx.lineTo(p.x + c - n, p.y + n + c); ctx.lineTo(p.x - c - n, p.y - n + c); ctx.closePath();
   }, true);
   ctx.globalAlpha = 1;
-  drawArms();
+  drawArms(); drawMods();
   if (lucky) drawLucky();
 
   ctx.globalCompositeOperation = 'lighter';
@@ -1515,9 +1620,9 @@ function anyAffordable(kind){
 function renderTabs(){
   tabsEl.innerHTML = TABS.map(([k, n]) => `<button class="tab" role="tab" data-tab="${k}" aria-selected="${tab === k}">${n}${tab !== k && anyAffordable(k) ? '<span class="dot"></span>' : ''}</button>`).join('');
 }
-const HINTS = {arms:'放置で勝手に戦ってくれる兵器。威力を上げると「改良」で大きく伸びる。素材を進めるほど新しい兵器が手に入る。上のボタンで兵器ごとに止められる。', idle:'ドローンは目を離していても撃ち続ける。放置の稼ぎはここで伸びる。', tap:'タップは加速役。叩くほどフィーバーゲージが溜まり、満タンで全部が速くなる。長押しで連打できる。', core:'ドローンにもタップにも効く土台の強化。', build:'モジュールは解放したら全部効く。かけらの動きが変わって、重ねるほど連鎖が派手になる。右のボタンで止められる。', ach:'実績1個ごとに全部の報酬が+1%。', relic:'ひびが満タンで砕けるたびに遺物が1つ落ちる（幸運ブロックからもたまに）。集めた遺物は全部効き、宇宙を砕いても消えない。同じ遺物が出たらLvが上がる。', dust:'宇宙を砕くと星屑が手に入り、すべてがリセットされる代わりに永続強化が買える。'};
+const HINTS = {arms:'放置で勝手に戦ってくれる兵器。威力を上げると「改良」で大きく伸びる。素材を進めるほど新しい兵器が手に入る。上のボタンで兵器ごとに止められる。', idle:'ドローンは目を離していても撃ち続ける。放置の稼ぎはここで伸びる。', tap:'タップは加速役。叩くほどフィーバーゲージが溜まり、満タンで全部が速くなる。長押しで連打できる。', core:'ドローンにもタップにも効く土台の強化。', build:'モジュールは解放したら全部効く。重ねるほど連鎖が派手になる。2つを育てると組み合わせ技が発動する。右のボタンで止められる。', ach:'実績1個ごとに全部の報酬が+1%。', relic:'ひびが満タンで砕けるたびに遺物が1つ落ちる（幸運ブロックからもたまに）。集めた遺物は全部効き、宇宙を砕いても消えない。同じ遺物が出たらLvが上がる。', dust:'宇宙を砕くと星屑が手に入り、すべてがリセットされる代わりに永続強化が買える。'};
 function buyN(u){ return save.buyMode === 'max' ? Math.max(1, upMaxN(u)) : Math.min(save.buyMode, u.max - L(u.id)); }
-const DPS_NAMES = {tap:['タップ', '#ffffff'], shard:['かけら', '#9fe6ff'], drone:['ドローン', '#4cc9ff'], cannon:['砲台', '#ffb13b'], laser:['レーザー', '#ff5a6e'], missile:['ミサイル', '#ff8a1f'], hole:['ブラックホール', '#b48cff'], reso:['共鳴', '#3ddc97'], bolt:['雷撃', '#bfe9ff'], burn:['炎上', '#ff7a1a'], bomb:['爆発するかけら', '#e0263f'], blast:['誘爆', '#ff4c88'], boom:['爆発', '#ffd84d']};
+const DPS_NAMES = {tap:['タップ', '#ffffff'], shard:['かけら', '#9fe6ff'], drone:['ドローン', '#4cc9ff'], cannon:['砲台', '#ffb13b'], laser:['レーザー', '#ff5a6e'], missile:['ミサイル', '#ff8a1f'], hole:['ブラックホール', '#b48cff'], reso:['共鳴', '#3ddc97'], bolt:['雷撃', '#bfe9ff'], burn:['炎上', '#ff7a1a'], bomb:['爆発するかけら', '#e0263f'], blast:['誘爆', '#ff4c88'], boom:['爆発', '#ffd84d'], poison:['猛毒', '#5fe36b'], orbit:['衛星', '#7cf5ff'], meteor:['流星', '#ff9a3c'], pulse:['波動', '#3fd9c0']};
 function dpsHtml(){
   const ent = Object.entries(dps).filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]), tot = ent.reduce((a, [, v]) => a + v, 0);
   if (!tot) return '<p class="hint">まだダメージの記録がない。</p>';
@@ -1561,7 +1666,13 @@ function sheetHtml(){
     if (next.length) h += `<p class="hint">次の特殊強化：${next.map(s => `${s.name}（${s.rq}）`).join('、')}</p>`;
     if (tab === 'core') h += `<button class="small" data-act="reset">データを消す</button>`;
   } else if (tab === 'build'){
-    h += '<ul class="list">';
+    const on = COMBOS.filter(c => CB(c.id)).length;
+    h += `<div class="section-title">組み合わせ技 ${on} / ${COMBOS.length}（2つのモジュールがどちらもLv3以上・ONで発動）</div><div class="combos">`;
+    for (const c of COMBOS){
+      const ma = MODS.find(m => m.id === c.a), mb = MODS.find(m => m.id === c.b), ok = CB(c.id);
+      h += `<div class="combo ${ok ? 'on' : ''}"><b>${ok ? '⚡ ' : ''}${c.name}</b><span class="rr">${ma.name}（Lv${ML(c.a)}）＋ ${mb.name}（Lv${ML(c.b)}）</span><span class="d">${c.note}</span></div>`;
+    }
+    h += '</div><div class="section-title">モジュール</div><ul class="list">';
     for (const m of MODS){
       const l = ML(m.id), on = !(save.off && save.off[m.id]), mx = l >= m.max, c = modCost(m), can = !mx && save.coins >= c;
       h += `<li><div class="item ${l ? '' : 'locked'}">
@@ -1622,7 +1733,7 @@ let sheetSig = '';
 function refreshSheet(){
   if (sheet.hidden) return;
   // 特殊強化の出現やレベル変化でリストの形が変わるなら描き直す
-  const sig = tab + ':' + SPECIALS.filter(s => s.cat === tab && !SP(s.id) && s.req()).map(s => s.id).join(',') + (tab === 'ach' ? achCount() : '') + (tab === 'relic' ? save.st.relics : '');
+  const sig = (tab === 'build' ? COMBOS.filter(c => CB(c.id)).length + '|' + MODS.map(m => ML(m.id)).join(',') : '') + tab + ':' + SPECIALS.filter(s => s.cat === tab && !SP(s.id) && s.req()).map(s => s.id).join(',') + (tab === 'ach' ? achCount() : '') + (tab === 'relic' ? save.st.relics : '');
   if (sig !== sheetSig){ sheetSig = sig; renderSheet(true); return; }
   if (tab === 'arms'){ const b = el('dpsBox'); if (b) b.innerHTML = dpsHtml(); }
   sheetBody.querySelectorAll('[data-cid]').forEach(e => {
