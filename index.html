@@ -65,15 +65,20 @@ button{font:inherit;color:inherit}
 #stage{position:relative;flex:1;min-height:0;overflow:hidden;background:#0b0f15}
 #cv{display:block;touch-action:none;cursor:crosshair}
 .chain{position:absolute;left:0;right:0;top:8px;text-align:center;pointer-events:none;opacity:0;line-height:1;color:#fff}
-#chainNum{font-size:clamp(44px,14vw,80px);display:inline-block;transform-origin:50% 60%;
+#chainNum{font-size:clamp(30px,9vw,52px);display:inline-block;transform-origin:50% 60%;
   text-shadow:0 0 18px currentColor,0 3px 0 #000,0 -2px 0 #000,3px 0 0 #000,-3px 0 0 #000}
 #chainLabel{font-size:18px;margin-left:4px;text-shadow:0 2px 0 #000,0 0 10px currentColor}
 #chainMult{display:block;margin-top:4px;font-size:15px;font-weight:700;color:#ffd84d;text-shadow:0 2px 0 #000}
 #chainTier{display:block;margin-top:2px;font-size:14px;text-shadow:0 2px 0 #000,0 0 8px currentColor}
-#fever{position:absolute;left:0;right:0;top:44%;text-align:center;pointer-events:none;opacity:0;transform:translateY(-50%)}
+#fever{position:absolute;left:0;right:0;top:16%;text-align:center;pointer-events:none;opacity:0;transform:translateY(-50%)}
 #fever span{font-size:clamp(40px,13vw,76px);color:#fff;display:inline-block;
   text-shadow:0 0 20px #ff4c88,0 0 40px #ffd84d,0 4px 0 #000;animation:pulse .5s ease-in-out infinite alternate}
 #fever small{display:block;font-size:14px;color:#fff;font-weight:700;margin-top:6px;text-shadow:0 2px 0 #000}
+body.loud #chainNum{font-size:clamp(44px,14vw,80px)}
+#fever span{font-size:clamp(30px,10vw,56px)}
+body.loud #fever span{font-size:clamp(40px,13vw,76px)}
+body.loud #fever{top:44%}
+body:not(.loud) #fever span{animation:none}
 @keyframes pulse{from{transform:scale(1) rotate(-3deg);filter:hue-rotate(0)}to{transform:scale(1.08) rotate(3deg);filter:hue-rotate(160deg)}}
 #buffs{position:absolute;left:8px;bottom:8px;display:flex;flex-direction:column;gap:4px;pointer-events:none}
 .buff{font-size:12px;font-weight:700;color:#fff;background:rgba(0,0,0,.55);border-radius:8px;padding:4px 8px;border-left:4px solid var(--c,#ffd84d);text-shadow:0 1px 0 #000}
@@ -203,6 +208,7 @@ button{font:inherit;color:inherit}
   <div class="hud-side">
     <div style="display:flex;gap:6px;align-items:center">
       <span id="stageName"><span id="stageSwatch"></span><span id="stageText"></span></span>
+      <button id="fxBtn" class="icon-btn" aria-label="演出：控えめ">🌙</button>
       <button id="mute" class="icon-btn" aria-label="音を消す">🔊</button>
     </div>
     <span id="dustTag" hidden></span>
@@ -824,20 +830,28 @@ const sfxAch = () => { tone(1047, .12, 'triangle', .12, 0, 1); tone(1568, .25, '
 /* ---- エフェクト ---- */
 let parts = [], floats = [], rings = [], bolts = [], flashes = [];
 let freeze = 0, shake = 0, zoom = 0, flash = 0, clock = 0, slow = 0, flashColor = '255,255,255';
+// 演出の強さ。控えめ（標準）は画面の揺れ・光・粒・数字を抑える。save.fx が 1 なら派手
+const loud = () => save.fx === 1;
 let MAXP = 500;   // 火花・破片くずの上限（自動画質で変わる）
 function sparks(x, y, n, color, speed = 8){
+  if (!loud()) n = Math.ceil(n * .4);
   for (let k = 0; k < n && parts.length < MAXP; k++){
     const a = Math.random() * 6.283, v = cell * rnd(speed * .4, speed);
     parts.push({k:'spark', x, y, vx:Math.cos(a) * v, vy:Math.sin(a) * v, life:rnd(.25, .5), max:.5, c:color});
   }
 }
 function debris(x, y, n, color, big){
+  if (!loud()) n = Math.ceil(n * .5);
   for (let k = 0; k < n && parts.length < MAXP; k++){
     parts.push({k:'deb', x:x + rnd(-.3, .3) * cell, y:y + rnd(-.3, .3) * cell, vx:rnd(-4, 4) * cell * (big ? 1.6 : 1), vy:rnd(-5.5, 1) * cell * (big ? 1.6 : 1),
       life:rnd(.45, .85) * (big ? 1.5 : 1), max:1.3, c:color, s:cell * rnd(.08, .18) * (big ? 2 : 1), r:Math.random() * 6, vr:rnd(-12, 12)});
   }
 }
-function addFloat(f){ if (floats.length > 60) floats.shift(); floats.push(f); }
+function addFloat(f){
+  // 控えめでは、大きな見出し以外の数字は同時に6個まで
+  if (!loud() && !f.big && floats.filter(o => !o.big).length >= 6) return;
+  if (floats.length > 60) floats.shift(); floats.push(f);
+}
 function jag(pts){
   const out = [pts[0]];
   for (let k = 1; k < pts.length; k++){
@@ -890,8 +904,8 @@ fx.split = (x, y) => { if (parts.length < MAXP - 50) sparks(x, y, 2, '#ffffff', 
 fx.fever = () => { flash = 1; freeze = Math.max(freeze, .12); shake += 14; zoom = .06; sfxFever(); };
 fx.milestone = (n, name) => {
   freeze = Math.max(freeze, .06); shake += 10; zoom = Math.max(zoom, .04); flash = Math.max(flash, .3);
-  bigText(`${n.toLocaleString('ja-JP')}コンボ！`, .4, '#ff4c88', 1.2, 6.5);
-  bigText(name, .5, '#ffe14d', 1.2, 8);
+  bigText(`${n.toLocaleString('ja-JP')}コンボ！${loud() ? '' : '　' + name}`, .4, '#ff4c88', 1.2, loud() ? 6.5 : 9);
+  if (loud()) bigText(name, .5, '#ffe14d', 1.2, 8);
   sfxChime();
 };
 fx.shoot = (d, tx, ty) => { d.fl = 1; sfxShot(); };
@@ -1137,12 +1151,14 @@ function render(){
   const st = STAGES[save.stage];
   ctx.save();
   ctx.fillStyle = st.bg; ctx.fillRect(0, 0, W, H);
-  if (fever > 0){ ctx.globalAlpha = .22 + .08 * Math.sin(clock * 12); ctx.fillStyle = `hsl(${(clock * 220) % 360},90%,45%)`; ctx.fillRect(0, 0, W, H); ctx.globalAlpha = 1; }
+  if (fever > 0){ ctx.globalAlpha = loud() ? .22 + .08 * Math.sin(clock * 12) : .08; ctx.fillStyle = `hsl(${(clock * 220) % 360},90%,45%)`; ctx.fillRect(0, 0, W, H); ctx.globalAlpha = 1; }
   if (buffs.frenzy > 0){ ctx.globalAlpha = .1 + .05 * Math.sin(clock * 8); ctx.fillStyle = '#ffd84d'; ctx.fillRect(0, 0, W, H); ctx.globalAlpha = 1; }
   if (boss){ ctx.globalAlpha = .12 + .06 * Math.sin(clock * 4); ctx.fillStyle = '#ff4c88'; ctx.fillRect(0, 0, W, H); ctx.globalAlpha = 1; }
   if (!reduceMotion){
-    const z = 1 + zoom; ctx.translate(W / 2, H / 2); ctx.scale(z, z); ctx.translate(-W / 2, -H / 2);
-    if (shake > .3) ctx.translate(rnd(-.5, .5) * shake, rnd(-.5, .5) * shake);
+    // 控えめでは揺れを小さく（最大4px）、ズームも弱く
+    const sh = loud() ? Math.min(shake, 16) : Math.min(shake * .35, 4), z = 1 + zoom * (loud() ? 1 : .4);
+    ctx.translate(W / 2, H / 2); ctx.scale(z, z); ctx.translate(-W / 2, -H / 2);
+    if (sh > .3) ctx.translate(rnd(-.5, .5) * sh, rnd(-.5, .5) * sh);
   }
   drawDrones();
   drawBig();
@@ -1176,9 +1192,10 @@ function render(){
     const buckets = fever > 0 ? 6 : 1;
     for (let bkt = 0; bkt < buckets; bkt++){
       const col = fever > 0 ? `hsl(${(clock * 300 + bkt * 60) % 360},100%,65%)` : buffs.frenzy > 0 ? '#ffe14d' : st.glow;
-      for (const pass of [0, 1]){
-        ctx.strokeStyle = col; ctx.globalAlpha = pass ? 1 : .22; ctx.lineWidth = pass ? Math.max(1.5, cell * .05) : cell * .16; ctx.beginPath();
-        for (let k = bkt; k < shards.length; k += buckets){ const o = shards[k], tl = pass ? .022 : .035; ctx.moveTo(o.x - o.vx * tl, o.y - o.vy * tl); ctx.lineTo(o.x, o.y); }
+      // 控えめでは外側のぼんやりした光を描かず、軌跡も細く短く・少し透かす
+      for (const pass of loud() ? [0, 1] : [1]){
+        ctx.strokeStyle = col; ctx.globalAlpha = pass ? (loud() ? 1 : .6) : .22; ctx.lineWidth = pass ? Math.max(loud() ? 1.5 : 1, cell * (loud() ? .05 : .03)) : cell * .16; ctx.beginPath();
+        for (let k = bkt; k < shards.length; k += buckets){ const o = shards[k], tl = pass ? (loud() ? .022 : .012) : .035; ctx.moveTo(o.x - o.vx * tl, o.y - o.vy * tl); ctx.lineTo(o.x, o.y); }
         ctx.stroke();
       }
     }
@@ -1210,7 +1227,7 @@ function render(){
   }
   ctx.globalAlpha = 1;
   ctx.restore();
-  if (flash > 0){ ctx.fillStyle = `rgba(${flashColor},${flash * .55})`; ctx.fillRect(0, 0, W, H); }
+  if (flash > 0){ ctx.fillStyle = `rgba(${flashColor},${flash * (loud() ? .55 : .2)})`; ctx.fillRect(0, 0, W, H); }
 }
 function updateFx(dt){
   const g = cell * 14;
@@ -1248,7 +1265,7 @@ function hud(dt){
   const ps = (dispRate > 0 ? `毎秒 <b>+${fmt(dispRate)}</b>` : '') + (im > 1.05 ? `<span class="mul" style="color:var(--good)">放置 ×${im.toFixed(1)}</span>` : '') + (lvTotal() ? `<span class="mul">強化 ×${fmtX(lvMult())}</span>` : '') + (rm > 1.001 ? `<span class="mul">報酬 ×${fmtX(rm)}</span>` : '');
   if (ps !== shownProd){ prodEl.innerHTML = ps; shownProd = ps; }
   feverFill.style.width = (fever > 0 ? Math.min(100, fever / stat.fever() * 100) : Math.min(100, heat)) + '%';
-  feverEl.style.opacity = fever > 0 ? 1 : 0;
+  feverEl.style.opacity = fever > 0 && (loud() || fever > stat.fever() - 1.5) ? 1 : 0;
   if (boss){ progFill.classList.add('boss'); progFill.style.width = Math.max(0, boss.hp / boss.max * 100) + '%'; progNum.textContent = fmt(Math.max(0, boss.hp)); }
   else { progFill.classList.remove('boss'); progFill.style.width = Math.min(100, save.prog / gaugeNeed() * 100) + '%'; progNum.textContent = `${fmt(save.prog)} / ${fmt(gaugeNeed())}`; }
   const cm = Math.floor(combo);
@@ -1285,6 +1302,9 @@ el('prog').addEventListener('click', () => showToast('ダメージを与える�
 const muteBtn = el('mute');
 function syncMute(){ muteBtn.textContent = save.muted ? '🔇' : '🔊'; muteBtn.setAttribute('aria-label', save.muted ? '音を出す' : '音を消す'); }
 muteBtn.addEventListener('click', () => { save.muted = !save.muted; syncMute(); persist(); initAudio(); });
+const fxBtn = el('fxBtn');
+function syncFx(){ fxBtn.textContent = loud() ? '🎆' : '🌙'; fxBtn.setAttribute('aria-label', loud() ? '演出：派手' : '演出：控えめ'); document.body.classList.toggle('loud', loud()); }
+fxBtn.addEventListener('click', () => { save.fx = loud() ? 0 : 1; syncFx(); persist(); showToast(loud() ? '演出：派手' : '演出：控えめ', loud() ? '画面の揺れ・光・数字を全部出す' : '画面の揺れ・光・数字を抑える', '設定', 1800); });
 
 let toastT = null;
 function showToast(name, desc, head = '実績解除', ms = 2800){
@@ -1583,7 +1603,7 @@ function frame(now){
 }
 load();
 new ResizeObserver(() => resize()).observe(stageEl);
-resize(); updateStageLabel(); updateProgLabel(); syncMute();
+resize(); updateStageLabel(); updateProgLabel(); syncMute(); syncFx();
 if (!save.started) showTitle();
 else { state = 'play'; if (save.t) offline((Date.now() - save.t) / 1000); }
 requestAnimationFrame(frame);
