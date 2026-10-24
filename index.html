@@ -530,9 +530,9 @@ const ARM_RELIC = {cannon:['powder', .2], laser:['prism', .2], missile:['fuse', 
 const armCount = () => ARMS.reduce((a, x) => a + L(x.id + 'N'), 0);
 // 遺物・進化・シナジーの火力の倍率。これらは「ひびの進み」だけを速くし、コインには効かせない
 // （コインはダメージに比例するので、効かせると ダメージ→コイン→強化→ダメージ の雪だるまで1周が数分で終わってしまう）
-const coreX = () => (1 + .1 * RL('hammer')) * (SP('sy3') ? 1 + .005 * Object.keys(save.ach).length : 1) * (SP('sy7') ? 1 + .005 * modTotal() : 1);
-const droneX = () => Math.max(1, stat.droneCount() / 12) * mastery('drone') * (1 + .1 * P('pwing')) * (1 + .15 * RL('prop')) * Math.pow(4, evo('drone')) * (SP('sy1') ? 1 + .03 * armCount() : 1);
-const armX = id => mastery(id) * (1 + .1 * P('pforge')) * (ARM_RELIC[id] ? 1 + ARM_RELIC[id][1] * RL(ARM_RELIC[id][0]) : 1) * Math.pow(4, evo(id)) * (SP('sy2') ? 1 + .03 * stat.drones() : 1);
+const coreXRaw = () => (1 + .1 * RL('hammer')) * (SP('sy3') ? 1 + .005 * Object.keys(save.ach).length : 1) * (SP('sy7') ? 1 + .005 * modTotal() : 1);
+const droneXRaw = () => Math.max(1, stat.droneCount() / 12) * mastery('drone') * (1 + .1 * P('pwing')) * (1 + .15 * RL('prop')) * Math.pow(4, evo('drone')) * (SP('sy1') ? 1 + .03 * armCount() : 1);
+const armXRaw = id => mastery(id) * (1 + .1 * P('pforge')) * (ARM_RELIC[id] ? 1 + ARM_RELIC[id][1] * RL(ARM_RELIC[id][0]) : 1) * Math.pow(4, evo(id)) * (SP('sy2') ? 1 + .03 * stat.drones() : 1);
 const modTotal = () => MODS.reduce((a, m) => a + ML(m.id), 0);
 SPECIALS.push(
   {cat:'idle', id:'sy1', name:'兵器連動',     note:'兵器の台数の合計1台ごとに、ドローンの威力 +3%',        cost:5e6, req:() => armCount() >= 12, rq:'兵器の台数 合計12台'},
@@ -766,7 +766,7 @@ function spawnShards(x, y, n, d = 0, gen = 0){
     shards.push({x, y, vx:Math.cos(a) * v, vy:Math.sin(a) * v, life:2, b, p, nb:0, gen, d, out:!inBig(x, y)});
   }
 }
-let resoWin = 0, resoT = 1, shatterPending = false;
+let resoWin = 0, resoT = 1, shatterPending = false, shatterCool = 0;
 const BIG_KICK = new Set(['boom', 'laser', 'cannon', 'missile', 'bomb', 'blast', 'tapboom', 'hammer', 'orbital', 'nova', 'meteor']);
 // 火力の内訳：出どころごとのダメージを集計し、1秒ごとに直近10秒ほどの移動平均（毎秒あたり）にする
 const DPS_GROUP = {tap:'tap', auto:'tap', tapboom:'tap'};
@@ -780,7 +780,7 @@ function trackDps(dt){
 // 兵器のON/OFF（save.off[id] が 1 なら撃たない）
 const armOn = id => !(save.off && save.off[id]);
 // すべてのダメージに効く倍率（遺物「ビッグバンの種」、シナジー）
-const allDmg = () => Math.pow(1.5, RL('abyss')) * (1 + .5 * RL('seed')) * (SP('sy4') ? 1 + Math.min(.25, combo / 4000) : 1) * (SP('sy6') ? 1 + .02 * relicKinds() : 1) * (SP('sy9') && idleMult() >= idleMax() ? 1.25 : 1) * (1 + .1 * P('pdmg'));
+const allDmgRaw = () => Math.pow(1.5, RL('abyss')) * (1 + .5 * RL('seed')) * (SP('sy4') ? 1 + Math.min(.25, combo / 4000) : 1) * (SP('sy6') ? 1 + .02 * relicKinds() : 1) * (SP('sy9') && idleMult() >= idleMax() ? 1.25 : 1) * (1 + .1 * P('pdmg'));
 const DOT = new Set(['burn', 'reso', 'poison']);
 function hit(dmg, src, x, y, d = 0, burst = 0){
   let crit = false;
@@ -843,6 +843,13 @@ function calcModPow(){
   }
   return TUNE.modMul * follow * (1 + .25 * L('modpow')) * mastery('mod') * (1 + .1 * P('pcrys'));
 }
+// 倍率のキャッシュ（毎フレームの最初に作り直す。買い物などで変わっても次のフレームから効く）
+let xCache = null;
+function refreshX(){ xCache = {core:coreXRaw(), drone:droneXRaw(), all:allDmgRaw(), arm:Object.fromEntries(ARMS.map(a => [a.id, armXRaw(a.id)]))}; }
+const coreX = () => (xCache || (refreshX(), xCache)).core;
+const droneX = () => (xCache || (refreshX(), xCache)).drone;
+const armX = id => (xCache || (refreshX(), xCache)).arm[id];
+const allDmg = () => (xCache || (refreshX(), xCache)).all;
 function stepMods(dt){
   modPowCache = calcModPow();
   if (big.frost > 0) big.frost -= dt;
@@ -1031,6 +1038,7 @@ function stepArms(dt){
 }
 function step(dt){
   if (state !== 'play') return;
+  refreshX();
   lastTap += dt; save.st.time += dt;
   if (big.flash > 0) big.flash = Math.max(0, big.flash - dt * 8);
   if (big.wob > 0) big.wob = Math.max(0, big.wob - dt * 4);
@@ -1113,7 +1121,8 @@ function step(dt){
   for (const k in buffs) if (buffs[k] > 0) buffs[k] = Math.max(0, buffs[k] - dt);
   combo = Math.max(0, combo - combo * stat.decay() * dt);
   if (combo < 1) milestoneSeen = 0;
-  if (shatterPending){ shatterPending = false; if (save.prog >= gaugeNeed()) shatter(); }
+  shatterCool = Math.max(0, shatterCool - dt);
+  if (shatterPending && shatterCool <= 0){ shatterPending = false; if (save.prog >= gaugeNeed()){ shatter(); shatterCool = 1; } }
   trackDps(dt);
 }
 
@@ -1289,7 +1298,7 @@ function debris(x, y, n, color, big){
 }
 function addFloat(f){
   // 大きな見出し以外の数字は同時に6個まで（派手では16個）
-  if (!f.big && floats.filter(o => !o.big).length >= (loud() ? 16 : 6)) return;
+  if (!f.big && floats.filter(o => !o.big).length >= (loud() ? 16 : quality >= 2 ? 3 : 6)) return;
   if (floats.length > 60) floatPool.push(floats.shift().img); floatSprite(f); floats.push(f);
 }
 // 数字は縁取りの文字を毎フレーム描くと重いので、出したときに一度だけ小さなキャンバスに描いて、あとは貼るだけにする
@@ -1371,8 +1380,16 @@ fx.milestone = (n, name) => {
 };
 fx.shoot = (d, tx, ty) => { d.fl = 1; sfxShot(); };
 // 砕けたとき：大爆発して次の素材のブロックが降ってくる
+let lastShatterT = -99;
 fx.bossDie = (prevStage, gain) => {
-  const x = BX, y = BY;
+  const x = BX, y = BY, quick = clock - lastShatterT < 8; lastShatterT = clock;
+  // 立て続けに砕けるとき（終盤）は、止めたりスローにしたりせず、軽い演出だけにする（止まって見えていた）
+  if (quick){
+    addRing({x, y, to:Math.max(W, H) * .8, life:.5, max:.5, c:'#ffffff', w:.3}); sparks(x, y, 20, STAGES[prevStage].glow, 12); shake += 6;
+    bigText(`${STAGES[prevStage].name}、粉砕！`, .36, '#ffe14d', 1, 8); sfxBoom(true);
+    setTimeout(() => { updateStageLabel(); updateProgLabel(); }, 300);
+    return;
+  }
   freeze = Math.max(freeze, .16); slow = .9; shake += 26; zoom = .1; flash = 1;
   debris(x, y, 60, STAGES[prevStage].color, true); debris(x, y, 30, STAGES[prevStage].dark, true);
   sparks(x, y, 60, '#ffffff', 16); sparks(x, y, 40, STAGES[prevStage].glow, 12);
@@ -1409,7 +1426,7 @@ fx.relic = (r, lv) => {
 
 /* ---- レイアウト ---- */
 let dpr = 1;
-const QUALITY = [{dpr:2, s:900, p:500, r:36, f:8}, {dpr:1.5, s:600, p:320, r:22, f:5}, {dpr:1, s:350, p:180, r:12, f:3}];
+const QUALITY = [{dpr:2, s:900, p:500, r:36, f:8}, {dpr:1.5, s:600, p:320, r:22, f:5}, {dpr:1, s:350, p:180, r:12, f:3}, {dpr:.7, s:250, p:110, r:6, f:2}];
 let quality = 0, slowT = 0, fastT = 0, frameMs = 16;
 function sizeCanvas(){
   const r = stageEl.getBoundingClientRect(); if (!r.width || !r.height) return null;
@@ -1614,7 +1631,7 @@ function drawArms(){
     } else {
       const a = Math.max(0, b.t / (b.fireAt || .25));
       const le = 1 + .5 * evo('laser'), lc = evoCol('laser', '#ff3355');
-      for (const [w, c, al] of [[cell * .9 * le, lc, .35], [cell * .45 * le, evo('laser') ? lc : '#ff8a9a', .7], [cell * .15 * le, '#ffffff', 1]]){
+      for (const [w, c, al] of (quality >= 2 ? [[cell * .4 * le, lc, .8]] : [[cell * .9 * le, lc, .35], [cell * .45 * le, evo('laser') ? lc : '#ff8a9a', .7], [cell * .15 * le, '#ffffff', 1]])){
         ctx.globalAlpha = al * a; ctx.strokeStyle = c; ctx.lineWidth = w; ctx.beginPath();
         if (row){ ctx.moveTo(0, pos); ctx.lineTo(W, pos); } else { ctx.moveTo(pos, topBand); ctx.lineTo(pos, H); } ctx.stroke();
       }
@@ -1658,7 +1675,7 @@ function drawArms(){
     if (b.kind !== 'orb') continue;
     const oe = 1 + .4 * evo('orbital'), oc = evoCol('orbital', '#ffe14d');
     if (!b.fired){ ctx.globalAlpha = .35 + .3 * Math.sin(clock * 40); ctx.strokeStyle = oc; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(b.x, 0); ctx.lineTo(b.x, H); ctx.stroke(); }
-    else { const a = Math.min(1, Math.max(0, b.t / .35)); for (const [w, c, al] of [[cell * 2 * oe, oc, .3], [cell * oe, oc, .6], [cell * .35 * oe, '#ffffff', 1]]){ ctx.globalAlpha = al * a; ctx.strokeStyle = c; ctx.lineWidth = w; ctx.beginPath(); ctx.moveTo(b.x, 0); ctx.lineTo(b.x, H); ctx.stroke(); } }
+    else { const a = Math.min(1, Math.max(0, b.t / .35)); for (const [w, c, al] of (quality >= 2 ? [[cell * .9 * oe, oc, .8]] : [[cell * 2 * oe, oc, .3], [cell * oe, oc, .6], [cell * .35 * oe, '#ffffff', 1]])){ ctx.globalAlpha = al * a; ctx.strokeStyle = c; ctx.lineWidth = w; ctx.beginPath(); ctx.moveTo(b.x, 0); ctx.lineTo(b.x, H); ctx.stroke(); } }
   }
   // ナノマシン：小さな光る点の群れ
   if (nanos.length){
@@ -1693,8 +1710,8 @@ function render(){
   const st = STAGES[save.stage];
   ctx.save();
   ctx.fillStyle = st.bg; ctx.fillRect(0, 0, W, H);
-  if (fever > 0){ ctx.globalAlpha = loud() ? .22 + .08 * Math.sin(clock * 12) : .08; ctx.fillStyle = `hsl(${(clock * 220) % 360},90%,45%)`; ctx.fillRect(0, 0, W, H); ctx.globalAlpha = 1; }
-  if (buffs.frenzy > 0){ ctx.globalAlpha = .1 + .05 * Math.sin(clock * 8); ctx.fillStyle = '#ffd84d'; ctx.fillRect(0, 0, W, H); ctx.globalAlpha = 1; }
+  if (fever > 0 && (loud() || quality < 2)){ ctx.globalAlpha = loud() ? .22 + .08 * Math.sin(clock * 12) : .08; ctx.fillStyle = `hsl(${(clock * 220) % 360},90%,45%)`; ctx.fillRect(0, 0, W, H); ctx.globalAlpha = 1; }
+  if (buffs.frenzy > 0 && (loud() || quality < 2)){ ctx.globalAlpha = .1 + .05 * Math.sin(clock * 8); ctx.fillStyle = '#ffd84d'; ctx.fillRect(0, 0, W, H); ctx.globalAlpha = 1; }
   if (boss){ ctx.globalAlpha = .12 + .06 * Math.sin(clock * 4); ctx.fillStyle = '#ff4c88'; ctx.fillRect(0, 0, W, H); ctx.globalAlpha = 1; }
   if (!reduceMotion){
     // 控えめでは揺れを小さく（最大4px）、ズームも弱く
