@@ -486,7 +486,7 @@ const armName = id => evo(id) ? EVO[id].names[evo(id) - 1] : EVO[id].base;
 const evoCol = (id, def) => evo(id) ? EVO[id].cols[evo(id) - 1] : def;
 for (const [id, e] of Object.entries(EVO)) for (let k = 0; k < 2; k++){
   SPECIALS.push({cat:id === 'drone' ? 'idle' : 'arms', id:`${id}e${k + 1}`, evo:true, name:`進化：${e.names[k]}`, note:`${k ? e.names[0] : e.base}が${e.names[k]}に進化する。威力 ×4・見た目が変わる`,
-    ref:[e.up, e.at[k]], req:() => L(e.up) >= e.at[k] && save.st.deepest >= EVO_AT[k] && (k === 0 || SP(id + 'e1')), get rq(){ return `${id === 'drone' ? e.upName : armName(id) + 'の威力'} Lv${e.at[k]}・${STAGES[EVO_AT[k]].name}に到達`; }});
+    ref:[e.up, e.at[k]], req:() => L(e.up) >= e.at[k] - 10 * P('pevo') && save.st.deepest >= EVO_AT[k] && (k === 0 || SP(id + 'e1')), get rq(){ return `${id === 'drone' ? e.upName : armName(id) + 'の威力'} Lv${e.at[k] - 10 * P('pevo')}・${STAGES[EVO_AT[k]].name}に到達`; }});
 }
 // ===== シナジー：別々の系統どうしを掛け合わせて火力を伸ばす特殊強化 =====
 const ARM_RELIC = {cannon:['powder', .2], laser:['prism', .2], missile:['fuse', .25], hole:['graviton', .25]};
@@ -515,12 +515,23 @@ const PERM = [
   {id:'pdrone', name:'初期ドローン',   note:'最初からドローンが多い',                cost:8,  g:1.8, max:5,  v:l => `+${l}台`},
   {id:'pstage', name:'先の素材から',   note:'砕いたあと、先の素材から始まる',        cost:10, g:1.8, max:7,  v:l => l ? `${STAGES[l].name}から` : '木箱から'},
   {id:'plucky', name:'幸運の軌道',     note:'幸運ブロックの出現間隔 −15%',           cost:12, g:1.7, max:5,  v:l => `−${Math.round((1-Math.pow(.85,l))*100)}%`},
-  {id:'pgauge', name:'因果の短縮',     note:'ボス出現に必要な稼ぎ −8%',              cost:6,  g:1.9, max:5,  v:l => `−${Math.round((1-Math.pow(.92,l))*100)}%`},
+  {id:'pgauge', name:'因果の短縮',     note:'砕くのに必要なダメージ −8%',              cost:6,  g:1.9, max:5,  v:l => `−${Math.round((1-Math.pow(.92,l))*100)}%`},
   {id:'pauto',  name:'自動タップ',     note:'毎秒勝手にタップする（熱量は半分。幸運ブロックは叩かない）', cost:40, g:2.2, max:3, v:l => `毎秒${l}回`},
   {id:'poff',   name:'長期休暇',       note:'オフライン収入の上限時間 +4時間',      cost:10, g:1.7, max:4,  v:l => `${8+4*l}時間`},
   {id:'pmodc',  name:'モジュール工房', note:'モジュールの値段 −30%',                 cost:30, g:2.5, max:2,  v:l => `−${Math.round((1-Math.pow(.7,l))*100)}%`},
   {id:'pkeep',  name:'モジュール記憶', note:'砕いてもモジュールのLvが残る',          cost:80, g:1,   max:1,  v:l => l ? '有効' : '無効'},
   {id:'pcrit',  name:'星の眼',         note:'クリティカル率 +5%',                    cost:15, g:1.8, max:4,  v:l => `+${5*l}%`},
+  {id:'pdmg',   name:'星の力',         note:'すべてのダメージ +10%（ひびだけが速くなる）', cost:5, g:1.55, max:30, v:l => `+${10*l}%`},
+  {id:'pidle',  name:'瞑想',           note:'放置ボーナスの上限 +1',                 cost:15, g:2,   max:5,  v:l => `最大 ×${TUNE.idleBonus + l}`},
+  {id:'pfever', name:'熱狂',           note:'フィーバーの時間 +2秒',                 cost:12, g:1.8, max:5,  v:l => `+${2*l}秒`},
+  {id:'pcombo', name:'連鎖の記憶',     note:'コンボが減る速さ −10%',                 cost:10, g:1.8, max:5,  v:l => `−${Math.round((1-Math.pow(.9,l))*100)}%`},
+  {id:'pluckt', name:'幸運の加護',     note:'幸運ブロックの効果時間 +20%',           cost:12, g:1.8, max:5,  v:l => `+${20*l}%`},
+  {id:'pjack',  name:'星の導き',       note:'幸運ブロックでジャックポットが出る確率 ×2', cost:50, g:3, max:3, v:l => `×${Math.pow(2,l)}`},
+  {id:'prelic', name:'発掘家',         note:'砕けたとき、遺物がもう1つ落ちる確率 +10%', cost:25, g:2, max:5, v:l => `${10*l}%`},
+  {id:'pspc',   name:'値切り上手',     note:'特殊強化の値段 −20%',                   cost:20, g:2.2, max:3,  v:l => `−${Math.round((1-Math.pow(.8,l))*100)}%`},
+  {id:'pcash',  name:'支度金',         note:'砕いたあと、コインを持った状態で始まる', cost:8, g:1.9, max:5,  v:l => l ? `${fmt(10 * Math.pow(100, l))}コイン（素材の価値の分だけ増える）` : 'なし'},
+  {id:'parms',  name:'兵器庫',         note:'砕いたあと、砲台とレーザーを持った状態で始まる', cost:20, g:2, max:3, v:l => l ? `${2*l}台ずつ` : 'なし'},
+  {id:'pevo',   name:'進化の近道',     note:'進化に必要な威力Lv −10',                cost:60, g:2.5, max:3,  v:l => `−${10*l}`},
 ];
 const upG = u => u.inf ? u.g : Math.pow(TUNE.valStage, u.span / u.max);
 const upCost  = (u, l = L(u.id)) => Math.ceil(u.cost * TUNE.costX * TUNE.coinK * Math.pow(upG(u), l));
@@ -529,7 +540,7 @@ const upMaxN  = u => { let n = 0, s = 0; while (L(u.id) + n < u.max){ const c = 
 // モジュールは st 段目あたりで解放できる値段。Lvは modSpan 段かけて上限へ
 const modCost = m => Math.ceil((ML(m.id) ? m.cost * Math.pow(TUNE.valStage, TUNE.modSpan * (ML(m.id) - 1) / m.max) : m.unlock) * TUNE.costX * TUNE.coinK * sv(m.st) * Math.pow(.7, P('pmodc')));
 // Lv条件の特殊強化は、条件になったLvの値段の4倍。記録条件のものは今の素材の価値に合わせる
-const spCost = s => Math.ceil(s.ref ? 4 * upCost(UPG.find(u => u.id === s.ref[0]), s.ref[1]) : s.cost * TUNE.costX * TUNE.coinK * sv(save.stage) / 10);
+const spCost = s => Math.ceil(Math.pow(.8, P('pspc')) * (s.ref ? 4 * upCost(UPG.find(u => u.id === s.ref[0]), s.ref[1]) : s.cost * TUNE.costX * TUNE.coinK * sv(save.stage) / 10));
 const permCost = p => Math.ceil(p.cost * Math.pow(p.g, P(p.id)));
 
 // 幸運ブロックの効果（バフ）
@@ -540,7 +551,8 @@ const achCount = () => Object.keys(save.ach).length;
 // ずっと残る倍率（実績・星屑）。ボスゲージの進みからは除く（周回で極端に速くならないように）
 const permMult = () => (1 + .01 * achCount()) * (1 + TUNE.pmultBonus * P('pmult')) * (1 + TUNE.dustBonus * save.st.bestDust);
 // 放置ボーナス：最後に手でタップしてから idleRamp 秒かけて、報酬が最大 idleBonus 倍まで上がる
-const idleMult = () => 1 + (TUNE.idleBonus - 1) * Math.min(1, lastTap / (TUNE.idleRamp * (1 - .1 * RL('hourglass'))));
+const idleMax = () => TUNE.idleBonus + P('pidle');
+const idleMult = () => 1 + (idleMax() - 1) * Math.min(1, lastTap / (TUNE.idleRamp * (1 - .1 * RL('hourglass'))));
 const idleDmg = () => 1 + (idleMult() - 1) * TUNE.idleDmgK;
 const rewardMult = () => permMult() * idleMult() * (buffs.frenzy > 0 ? 7 : 1) * (fever > 0 ? TUNE.feverReward : 1) * (1 + .1 * RL('cat')) * Math.pow(1.25, RL('crown'));
 // 相場はその周だけの倍率なので、ボスゲージにも効く
@@ -564,7 +576,7 @@ const stat = {
   tapburst: () => 2 + L('tapburst'),
   tapPow:   () => (SP('tp1') ? 2 : 1) * (1 + .2 * RL('fist')),
   heat:     () => (8 + 2 * L('heat')) * (SP('ht1') ? 1.5 : 1),
-  fever:    () => 5 + L('fever') + .5 * RL('ember'),
+  fever:    () => 5 + L('fever') + .5 * RL('ember') + 2 * P('pfever'),
   tapboom:  () => L('tapboom'),
   chain:    () => 0.1 + 0.05 * L('chain'),
   market:   () => 1 + .1 * L('market'),
@@ -573,7 +585,7 @@ const stat = {
   bomb:     () => Math.min(.25, .02 + .015 * L('bomb')) + .02 * RL('core'),
   gold:     () => Math.min(.2, .01 + .01 * L('gold')) + .03 * RL('eye') + (buffs.gold > 0 ? .5 : 0),
   keep:     () => .65 + .025 * L('keep'),
-  decay:    () => TUNE.comboDecay * (SP('cb1') ? .5 : 1) * (SP('cb2') ? .5 : 1),
+  decay:    () => TUNE.comboDecay * (SP('cb1') ? .5 : 1) * (SP('cb2') ? .5 : 1) * Math.pow(.9, P('pcombo')),
   holdMs:   () => SP('tp2') ? 170 : 250,
 };
 // 暗黒物質以降はHPの伸びをダメージと揃える（差が積み重なって終盤だけ詰まるのを防ぐ）
@@ -636,6 +648,7 @@ function shatter(){
   if (save.stage < STAGES.length - 1) save.stage++;
   save.st.deepest = Math.max(save.st.deepest, save.stage);
   dropRelic();
+  if (Math.random() < .1 * P('prelic')) dropRelic();
   big = freshBig();
   shards = []; holes = []; meteors = []; drills = []; nanos = []; novas = [];
   fx.bossDie(prevStage, gain);
@@ -660,11 +673,11 @@ const LUCKY = [
   {id:'fever',   w:5,  name:'即フィーバー', note:'すぐにフィーバー',              run:() => { fever = Math.max(fever, stat.fever()); save.st.fevers++; fx.fever(); return 'フィーバー直行！'; }},
   {id:'crack',   w:4,  name:'大ひび',       note:'ひびが一気に15%進む',           run:() => { save.prog += gaugeNeed() * .15; if (save.prog >= gaugeNeed()) shatterPending = true; return '大ひび！　+15%'; }},
   {id:'relic',   w:4,  name:'宝箱',         note:'レア以上の遺物が1つ',           run:() => { const r = dropRelic(1); return r ? '宝箱！　遺物を発見' : '宝箱！　（遺物は全部最大）'; }},
-  {id:'jackpot', w:1,  name:'ジャックポット', note:'30秒 フレンジー・弾幕・覚醒・総攻撃・黄金を全部', run:(lk, d) => { for (const k of ['frenzy', 'barrage', 'awaken', 'assault', 'gold']) buffs[k] = Math.max(buffs[k], 30 * d); spawnShards(lk.x, lk.y, 200, 0); return 'ジャックポット！！'; }},
+  {id:'jackpot', get w(){ return Math.pow(2, P('pjack')); }, name:'ジャックポット', note:'30秒 フレンジー・弾幕・覚醒・総攻撃・黄金を全部', run:(lk, d) => { for (const k of ['frenzy', 'barrage', 'awaken', 'assault', 'gold']) buffs[k] = Math.max(buffs[k], 30 * d); spawnShards(lk.x, lk.y, 200, 0); return 'ジャックポット！！'; }},
 ];
 function hitLucky(){
   const lk = lucky; lucky = null; save.st.lucky++;
-  const dur = (SP('lk3') ? 1.5 : 1) * (1 + .1 * RL('comet'));
+  const dur = (SP('lk3') ? 1.5 : 1) * (1 + .1 * RL('comet')) * (1 + .2 * P('pluckt'));
   let x = Math.random() * LUCKY.reduce((a, e) => a + e.w, 0), e = LUCKY[0];
   for (const c of LUCKY){ x -= c.w; if (x < 0){ e = c; break; } }
   const kind = e.id, text = e.run(lk, dur);
@@ -714,7 +727,7 @@ function trackDps(dt){
 // 兵器のON/OFF（save.off[id] が 1 なら撃たない）
 const armOn = id => !(save.off && save.off[id]);
 // すべてのダメージに効く倍率（遺物「ビッグバンの種」、シナジー）
-const allDmg = () => (1 + .5 * RL('seed')) * (SP('sy4') ? 1 + Math.min(.25, combo / 4000) : 1) * (SP('sy6') ? 1 + .02 * relicKinds() : 1) * (SP('sy9') && idleMult() >= TUNE.idleBonus ? 1.25 : 1);
+const allDmg = () => (1 + .5 * RL('seed')) * (SP('sy4') ? 1 + Math.min(.25, combo / 4000) : 1) * (SP('sy6') ? 1 + .02 * relicKinds() : 1) * (SP('sy9') && idleMult() >= idleMax() ? 1.25 : 1) * (1 + .1 * P('pdmg'));
 const DOT = new Set(['burn', 'reso', 'poison']);
 function hit(dmg, src, x, y, d = 0, burst = 0){
   let crit = false;
@@ -819,7 +832,7 @@ function fireDrone(dr){
   bullets.push({x:dr.x, y:dr.y, vx:dx / len * v, vy:dy / len * v, tx, ty, life:len / v + .05});
   fx.shoot(dr, tx, ty);
 }
-const armRate = () => (1 + TUNE.armIdle * (idleMult() - 1) / (TUNE.idleBonus - 1)) * (1 + .1 * RL('gear')) * (SP('sy5') && fever > 0 ? 1.3 : 1) * (buffs.assault > 0 ? 5 : 1);
+const armRate = () => (1 + TUNE.armIdle * (idleMult() - 1) / (idleMax() - 1)) * (1 + .1 * RL('gear')) * (SP('sy5') && fever > 0 ? 1.3 : 1) * (buffs.assault > 0 ? 5 : 1);
 const armCatch = id => {
   const me = ARM_BY[id], prev = ARMS.filter(a => a.st < me.st && L(a.id + 'N') > 0);
   return prev.length ? Math.floor(TUNE.armCatch * prev.reduce((t, a) => t + L(a.id + 'P'), 0) / prev.length) : 0;
@@ -1072,6 +1085,8 @@ function prestige(){
   const keepMods = P('pkeep') ? save.mods : {};
   Object.assign(save, {coins:0, stage:Math.min(P('pstage'), STAGES.length - 1), lv:{}, mods:keepMods, ended:false, endSeen:false, prog:0, kills:0, boss:null, sp:{}, idleRate:0});
   save.st.earnedRun = 0;
+  if (P('pcash')) save.coins = 10 * Math.pow(100, P('pcash')) * sv(save.stage);
+  if (P('parms')) save.lv.cannonN = save.lv.laserN = 2 * P('parms');
   for (const k in buffs) buffs[k] = 0;
   combo = 0; fever = 0; heat = 0; boss = null; lucky = null; luckyT = 30;
   shells = []; beams = []; missiles = []; holes = []; meteors = []; big.poison = 0; big.frost = 0;
