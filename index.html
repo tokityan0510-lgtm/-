@@ -137,7 +137,7 @@ body:not(.loud) #fever span{animation:none}
 .tab{appearance:none;border:1.5px solid var(--line);background:var(--surface);border-radius:10px;padding:8px 10px;font-weight:700;font-size:13px;cursor:pointer;position:relative;white-space:nowrap;flex-shrink:0}
 .tab[aria-selected="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
 .tab .dot{position:absolute;top:4px;right:5px;width:7px;height:7px;border-radius:50%;background:var(--accent)}
-.sheet-body{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:0 14px 24px}
+.sheet-body{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:0 14px 24px;touch-action:pan-y}
 .close{flex-shrink:0}
 .hint{font-size:12px;color:var(--muted);margin:10px 0 6px;line-height:1.6}
 .modes{display:flex;gap:4px;margin:6px 0 2px}
@@ -1766,6 +1766,8 @@ function anyAffordable(kind){
 }
 function renderTabs(){
   tabsEl.innerHTML = TABS.map(([k, n]) => `<button class="tab" role="tab" data-tab="${k}" aria-selected="${tab === k}">${n}${tab !== k && anyAffordable(k) ? '<span class="dot"></span>' : ''}</button>`).join('');
+  const on = tabsEl.querySelector('[aria-selected="true"]');
+  if (on){ const l = on.getBoundingClientRect().left - tabsEl.getBoundingClientRect().left + tabsEl.scrollLeft - (tabsEl.clientWidth - on.offsetWidth) / 2; tabsEl.scrollTo({left:Math.max(0, l), behavior:reduceMotion ? 'auto' : 'smooth'}); }
 }
 const HINTS = {arms:'放置で勝手に戦ってくれる兵器。威力を上げると「改良」で大きく伸びる。素材を進めるほど新しい兵器が手に入る。上のボタンで兵器ごとに止められる。', idle:'ドローンは目を離していても撃ち続ける。放置の稼ぎはここで伸びる。', tap:'タップは加速役。叩くほどフィーバーゲージが溜まり、満タンで全部が速くなる。長押しで連打できる。', core:'ドローンにもタップにも効く土台の強化。', build:'モジュールは解放したら全部効く。重ねるほど連鎖が派手になる。2つを育てると組み合わせ技が発動する。右のボタンで止められる。', ach:'実績1個ごとに全部の報酬が+1%。', relic:'ひびが満タンで砕けるたびに遺物が1つ落ちる（幸運ブロックからもたまに）。集めた遺物は全部効き、宇宙を砕いても消えない。同じ遺物が出たらLvが上がる。', dust:'宇宙を砕くと星屑が手に入り、すべてがリセットされる代わりに永続強化が買える。'};
 function buyN(u){ return save.buyMode === 'max' ? Math.max(1, upMaxN(u)) : Math.min(save.buyMode, u.max - L(u.id)); }
@@ -1910,10 +1912,38 @@ function refreshSheet(){
 }
 function openSheet(){ sheet.hidden = false; sheetSig = ''; renderSheet(false); stopHold(); }
 function closeSheet(){ sheet.hidden = true; }
+// 強化パネルは横スワイプで隣のタブへ移る。指についてくるように少しずらし、離したら切り替える
+function goTab(dir){
+  const i = TABS.findIndex(([k]) => k === tab), j = i + dir;
+  if (j < 0 || j >= TABS.length){ if (!reduceMotion) sheetBody.animate([{transform:`translateX(${-dir * 18}px)`}, {transform:'none'}], {duration:220, easing:'ease-out'}); return; }
+  tab = TABS[j][0]; sheetSig = ''; renderSheet(false);
+  if (!reduceMotion) sheetBody.animate([{transform:`translateX(${dir * 40}px)`, opacity:.3}, {transform:'none', opacity:1}], {duration:200, easing:'ease-out'});
+}
+let swX = null, swY = 0, swT = 0, swDir = 0, swipedAt = 0;
+sheetBody.addEventListener('touchstart', e => {
+  if (e.touches.length !== 1){ swX = null; return; }
+  swX = e.touches[0].clientX; swY = e.touches[0].clientY; swT = performance.now(); swDir = 0;
+}, {passive:true});
+sheetBody.addEventListener('touchmove', e => {
+  if (swX === null) return;
+  const dx = e.touches[0].clientX - swX, dy = e.touches[0].clientY - swY;
+  // 最初に動いた向きで、縦スクロールか横スワイプかを決める
+  if (!swDir && Math.hypot(dx, dy) > 10) swDir = Math.abs(dx) > Math.abs(dy) * 1.2 ? 1 : -1;
+  if (swDir === 1 && !reduceMotion) sheetBody.style.transform = `translateX(${dx * .35}px)`;
+}, {passive:true});
+sheetBody.addEventListener('touchend', e => {
+  if (swX === null) return;
+  const dx = e.changedTouches[0].clientX - swX; swX = null;
+  sheetBody.style.transform = '';
+  if (swDir === 1 && Math.abs(dx) > 50){ swipedAt = performance.now(); goTab(dx < 0 ? 1 : -1); }
+}, {passive:true});
+sheetBody.addEventListener('touchcancel', () => { swX = null; sheetBody.style.transform = ''; }, {passive:true});
 el('shopBtn').addEventListener('click', () => { initAudio(); sheet.hidden ? openSheet() : closeSheet(); });
 el('closeSheet').addEventListener('click', closeSheet);
 sheet.addEventListener('click', e => {
   initAudio();
+  // スワイプした直後のタップは、ボタンを押したことにしない
+  if (performance.now() - swipedAt < 350) return;
   const t = e.target.closest('button'); if (!t) return; const d = t.dataset;
   const buy = (c, f) => { if (save.coins >= c){ save.coins -= c; f(); persist(); sfxBuy(); sheetSig = ''; renderSheet(true); } };
   if (d.tab){ tab = d.tab; sheetSig = ''; renderSheet(false); return; }
