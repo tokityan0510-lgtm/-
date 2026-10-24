@@ -45,15 +45,19 @@ button{font:inherit;color:inherit}
 
 /* HUD */
 .hud{padding:6px 14px 4px;display:flex;align-items:center;justify-content:space-between;gap:10px}
-.purse{min-width:0;line-height:1}
+.purse{flex:1;min-width:0;line-height:1}
 .coins{display:flex;align-items:baseline;gap:6px}
 #coins{font-size:clamp(28px,8.6vw,44px);color:var(--coin);white-space:nowrap;font-variant-numeric:tabular-nums}
+#coins.long{font-size:clamp(18px,5.4vw,28px)}
+#coins.long + small{display:none}
+.ex sup{font-family:"Zen Kaku Gothic New",system-ui,sans-serif;font-weight:900;font-size:.5em;vertical-align:.9em;margin-left:1px}
+.ex{white-space:nowrap}
 .coins small{font-size:12px;color:var(--muted);font-weight:700}
 #prod{display:block;margin-top:4px;font-size:12px;color:var(--muted);font-weight:700;white-space:nowrap}
 #prod b{color:var(--good)}
 #prod .mul{color:var(--accent);margin-left:6px}
 .hud-side{display:flex;flex-direction:column;align-items:flex-end;gap:5px;flex-shrink:0}
-#stageName{font-size:13px;padding:4px 10px;border-radius:8px;background:var(--surface);border:1.5px solid var(--line);white-space:nowrap}
+#stageName{font-size:13px;padding:4px 10px;border-radius:8px;background:var(--surface);border:1.5px solid var(--line);white-space:nowrap;max-width:36vw;overflow:hidden;text-overflow:ellipsis}
 #stageSwatch{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:6px}
 #dustTag{font-size:12px;font-weight:700;color:var(--dust);white-space:nowrap}
 #dustTag[hidden]{display:none}
@@ -265,11 +269,13 @@ body:not(.loud) #fever span{animation:none}
 (() => {
 
 const UNITS = ['', '万', '億', '兆', '京', '垓', '秭', '穣', '溝', '澗', '正', '載', '極', '恒河沙', '阿僧祇', '那由他', '不可思議', '無量大数'];
+const SUP = {0:'⁰', 1:'¹', 2:'²', 3:'³', 4:'⁴', 5:'⁵', 6:'⁶', 7:'⁷', 8:'⁸', 9:'⁹'};
 function fmt(n){
   if (!isFinite(n)) return '∞';
   if (n < 10000) return Math.floor(n).toLocaleString('ja-JP');
   const k = Math.floor(Math.log10(n) / 4);
-  if (k >= UNITS.length) return fmt(n / 1e68) + '無量大数';
+  // 無量大数の1万倍（10^72）より大きい数は「1.25×10¹⁵⁶」のように10の何乗かで表す（単位を重ねると読みにくい）
+  if (k >= UNITS.length){ const e = Math.floor(Math.log10(n)), m = n / Math.pow(10, e); return `${m.toFixed(2)}×10${String(e).split('').map(c => SUP[c]).join('')}`; }
   const v = n / Math.pow(10, 4 * k);
   return (v < 10 ? v.toFixed(2) : v < 100 ? v.toFixed(1) : v.toFixed(0)) + UNITS[k];
 }
@@ -1771,12 +1777,14 @@ function updateFx(dt){
 const el = id => document.getElementById(id);
 const coinsEl = el('coins'), prodEl = el('prod'), chainEl = el('chain'), chainNum = el('chainNum'), chainMult = el('chainMult'), chainTier = el('chainTier'), feverEl = el('fever'), feverFill = el('feverFill');
 const progFill = el('progFill'), progNum = el('progNum'), progText = el('progText'), shopDot = el('shopDot'), buffsEl = el('buffs'), dustTag = el('dustTag'), newsEl = el('news');
+const UNSUP = Object.fromEntries(Object.entries(SUP).map(([k, v]) => [v, k]));
+const fmtHtml = n => fmt(n).replace(/×10([⁰¹²³⁴⁵⁶⁷⁸⁹]+)/, (m, e) => `<span class="ex">×10<sup>${e.split('').map(c => UNSUP[c]).join('')}</sup></span>`);
 let shownCoins = '', shownProd = '', shownChain = -1, chainScale = 1, chainAlpha = 0, dispRate = 0, tickT = 0, shownBuffs = '';
 const CHAIN_COLORS = [[0, '#ffffff'], [50, '#ffe14d'], [100, '#ff9a3c'], [250, '#ff4c88'], [500, '#c38bff'], [1000, '#4cc9ff'], [2500, '#ffffff']];
 function hud(dt){
-  const c = fmt(save.coins); if (c !== shownCoins){ coinsEl.textContent = c; shownCoins = c; }
+  const c = fmt(save.coins); if (c !== shownCoins){ coinsEl.innerHTML = fmtHtml(save.coins); coinsEl.classList.toggle('long', c.length > 7); shownCoins = c; }
   const im = idleMult(), rm = permMult();
-  const ps = (dispRate > 0 ? `毎秒 <b>+${fmt(dispRate)}</b>` : '') + (im > 1.05 ? `<span class="mul" style="color:var(--good)">放置 ×${im.toFixed(1)}</span>` : '') + (lvTotal() ? `<span class="mul">強化 ×${fmtX(lvMult())}</span>` : '') + (rm > 1.001 ? `<span class="mul">報酬 ×${fmtX(rm)}</span>` : '');
+  const ps = (dispRate > 0 ? `毎秒 <b>+${fmtHtml(dispRate)}</b>` : '') + (im > 1.05 ? `<span class="mul" style="color:var(--good)">放置 ×${im.toFixed(1)}</span>` : '') + (lvTotal() ? `<span class="mul">強化 ×${fmtX(lvMult())}</span>` : '') + (rm > 1.001 ? `<span class="mul">報酬 ×${fmtX(rm)}</span>` : '');
   if (ps !== shownProd){ prodEl.innerHTML = ps; shownProd = ps; }
   feverFill.style.width = (fever > 0 ? Math.min(100, fever / stat.fever() * 100) : Math.min(100, heat)) + '%';
   feverEl.style.opacity = fever > 0 && (loud() || fever > stat.fever() - 1.5) ? 1 : 0;
@@ -1811,7 +1819,7 @@ function etaText(){
 }
 function updateProgLabel(){ progText.textContent = `${STAGES[save.stage].name}を砕くまで${etaText()}`; updateDepth(); }
 let shownDepth = -1;
-function updateDepth(){ if (shownDepth !== save.stage){ shownDepth = save.stage; el('stageText').textContent = '素材：' + STAGES[save.stage].name; } }
+function updateDepth(){ if (shownDepth !== save.stage){ shownDepth = save.stage; const nm = STAGES[save.stage].name; el('stageText').textContent = nm.length > 4 ? nm : '素材：' + nm; } }
 el('prog').addEventListener('click', () => showToast(`与えたダメージ ${fmt(save.prog)} ／ 砕くのに必要 ${fmt(gaugeNeed())}`,
   'ひび＝これまでに与えたダメージの割合。100%で砕けて次の素材へ。「あと約◯分」は今の火力のままの見積もり。火力を上げると速くなる。タップで直接叩くと1.5倍', 'ひび', 6000));
 const muteBtn = el('mute');
@@ -1927,7 +1935,7 @@ function helpHtml(){
     sec('宇宙を砕く（転生）と星屑', `<p>${STAGES[PRESTIGE_STAGE].name}に届くと「砕く」タブでやり直せる。強化・コイン・モジュールなどはリセットされるが、<b>星屑</b>が手に入る。星屑は永続強化に使え、集めた量だけ報酬も上がる（使っても減らない）。実績・遺物・星屑・永続強化は残る。</p>
       <p>今の宇宙で稼いだコインが多いほど星屑が増えるので、行けるところまで進んでから砕くのがおすすめ。</p>`),
     sec('宇宙の先', `<p>宇宙を砕いたあとも「宇宙の先へ進む」で素材が続く（多元宇宙 → … → 深淵）。一番深く届いた素材は記録され、兵器の進化の条件にもなる。</p>`),
-    sec('数字の単位', `<p>4桁ごとに単位が変わる。無量大数より先は「1.00万無量大数」のように重ねる。</p><div class="units">${unitRows}</div>`),
+    sec('数字の単位', `<p>4桁ごとに単位が変わる。無量大数の1万倍（10⁷²）より大きい数は「1.25×10¹⁵⁶」のように、10の何乗かで表す。</p><div class="units">${unitRows}</div>`),
     sec('画面と操作', `<ul><li>右上の 🌙／🎆 で演出の強さ（控えめ／派手）を切り替え。カクつくときは控えめに</li>
       <li>重いときは自動で画質が下がる</li>
       <li>強化パネルは左右にスワイプしてタブを移れる</li></ul>`),
