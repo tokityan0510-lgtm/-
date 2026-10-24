@@ -199,6 +199,10 @@ body:not(.loud) #fever span{animation:none}
 .help ul{margin:6px 0;padding-left:18px}
 .units{display:grid;grid-template-columns:repeat(3,max-content 1fr);gap:4px 8px;font-size:12px;margin-top:6px}
 .units span{white-space:nowrap}
+.io-row{display:flex;gap:8px;margin:6px 0}
+.io-row .buy{flex:1;font-size:13px;padding:10px 8px}
+.buy.ghost{background:var(--surface);color:var(--ink);box-shadow:0 5px 0 var(--line)}
+.io-box{width:100%;height:90px;font-size:11px;font-family:ui-monospace,monospace;border:1.5px solid var(--line);border-radius:8px;padding:6px;background:var(--surface);color:var(--ink);margin-top:6px}
 .units b{font-weight:400;color:var(--muted)}
 .relics{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:6px;margin-top:8px}
 .relic{border:2px solid var(--rc);border-radius:10px;padding:8px;font-size:12px;line-height:1.4;background:color-mix(in srgb,var(--rc) 10%,var(--surface));display:flex;flex-direction:column;gap:2px}
@@ -1853,7 +1857,11 @@ function helpHtml(){
   const per = coinBase() * sv(save.stage) / blockHp(save.stage), cm = comboMult() * rewardMult();
   const unitRows = UNITS.slice(1).map((u, k) => `<span>${u}</span><b>10<sup>${4 * (k + 1)}</sup></b>`).join('');
   const sec = (title, body, open = false) => `<details class="help"${open ? ' open' : ''}><summary>${title}</summary><div>${body}</div></details>`;
-  return [
+  const io = `<div class="section-title">プレイデータ</div>
+    <p class="hint">「コピー」を押すとプレイデータが文字列でコピーされる。チャットなどに貼り付けて見てもらったり、別の端末に持っていったりできる。</p>
+    <div class="io-row"><button class="buy" data-act="export">プレイデータをコピー</button><button class="buy ghost" data-act="import">貼り付けて読み込む</button></div>
+    <textarea id="ioBox" class="io-box" hidden readonly></textarea>`;
+  return io + [
     sec('基本の流れ', `<p>真ん中の巨大ブロックは何度叩いても壊れない。与えたダメージが<b>ひび</b>として溜まり、100%になると砕けて次の素材に進む。</p>
       <p>タップ・ドローン・兵器・モジュールでダメージを与えると、同時に<b>コイン</b>も入る。コインで強化を買って火力を上げ、もっと速く砕く。全部で12の素材があり、最後の「宇宙」を砕くとエンディング。</p>`, true),
     sec('ダメージとコインのちがい', `<p><b>ダメージ</b>はひびを進めるもの。<b>コイン</b>は強化を買うためのもの。単位が別なので、桁が大きく離れていても正常。</p>
@@ -2060,6 +2068,28 @@ sheet.addEventListener('click', e => {
   if (d.mod){ const m = MODS.find(x => x.id === d.mod); if (ML(m.id) < m.max) buy(modCost(m), () => { const was = ML(m.id); save.mods[m.id] = was + 1; }); return; }
   if (d.perm){ const p = PERM.find(x => x.id === d.perm); const c = permCost(p); if (P(p.id) < p.max && save.dust >= c){ save.dust -= c; save.perm[p.id] = P(p.id) + 1; persist(); sfxBuy(); updateStageLabel(); renderSheet(true); } return; }
   if (d.act === 'prestige'){ if (save.stage >= PRESTIGE_STAGE && dustGain() > 0){ closeSheet(); showPrestige(); } return; }
+  // プレイデータ：JSON を base64 にして「RENSA1:」を付けた文字列にする（貼り付けで崩れにくいように）
+  if (d.act === 'export'){
+    persist();
+    const code = 'RENSA1:' + btoa(unescape(encodeURIComponent(JSON.stringify(save))));
+    const box = el('ioBox'); box.hidden = false; box.value = code; box.focus(); box.select();
+    const done = ok => showToast(ok ? 'プレイデータをコピーした' : '下の枠の文字を全部選んでコピーしてね', `${code.length.toLocaleString('ja-JP')}文字`, 'プレイデータ', 4000);
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(code).then(() => done(true), () => done(false));
+    else { let ok = false; try { ok = document.execCommand('copy'); } catch(e){} done(ok); }
+    return;
+  }
+  if (d.act === 'import'){
+    const text = (prompt('コピーしたプレイデータ（RENSA1: から始まる文字）を貼り付けてね。今のデータは上書きされる') || '').trim();
+    if (!text) return;
+    try {
+      const raw = text.startsWith('RENSA1:') ? decodeURIComponent(escape(atob(text.slice(7)))) : text;
+      const o = JSON.parse(raw);
+      if (!o || typeof o !== 'object' || !('stage' in o) || !('lv' in o)) throw new Error('形が違う');
+      if (!confirm(`${STAGES[Math.min(o.stage, STAGES.length - 1)] ? STAGES[Math.min(o.stage, STAGES.length - 1)].name : '?'}・星屑${o.dust || 0}のデータで上書きする？`)) return;
+      localStorage.setItem(KEY, JSON.stringify(o)); location.reload();
+    } catch(e){ showToast('読み込めなかった', 'コピーした文字を最後まで貼り付けたか確かめてね', 'プレイデータ', 4000); }
+    return;
+  }
   if (d.act === 'reset'){
     if (t.classList.contains('armed')){
       save = JSON.parse(JSON.stringify(DEFAULT)); persist(); boss = null; lucky = null; tab = 'idle';

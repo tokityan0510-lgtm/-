@@ -10,6 +10,6 @@ core = core.replace("let save = JSON.parse(JSON.stringify(DEFAULT));", "let save
 fs.writeFileSync('core.js', core + `
 // 調整用：環境変数 TUNE='{"gaugeLate":1.5}' で数値を差し替えられる
 Object.assign(TUNE, JSON.parse(process.env.TUNE || '{}'));
-module.exports = { get save(){ return save; }, setSave, DEFAULT, L, ML, M, SP, P, UPG, MODS, SPECIALS, PERM, STAGES, PRESTIGE_STAGE, upCost, modCost, spCost, permCost, stat, layout, buildGrid, step, tap, fmt, get BX(){ return BX; }, get BY(){ return BY; }, get BS(){ return BS; },
+module.exports = { get save(){ return save; }, setSave, DEFAULT, RELICS, L, ML, M, SP, P, UPG, MODS, SPECIALS, PERM, STAGES, PRESTIGE_STAGE, upCost, modCost, spCost, permCost, stat, layout, buildGrid, step, tap, fmt, get BX(){ return BX; }, get BY(){ return BY; }, get BS(){ return BS; },
   checkAch, prestige, dustGain, ACH, gaugeNeed, comboMult, rewardMult, permMult, blockHp, get blocks(){ return blocks; }, get boss(){ return boss; }, get lucky(){ return lucky; }, get combo(){ return combo; }, get fever(){ return fever; }, setState(s){ state = s; }, fx };
 `);
