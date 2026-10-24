@@ -332,15 +332,15 @@ const ARMS = [
 //   それ以外 … 上限あり。span 段ぶんの価値の伸びをかけて上限に届くよう、1Lvごとに大きく上がる（素材が進むごとに解放される感覚）
 const UPG = [
   // 放置
-  {cat:'idle', id:'drones',   name:'ドローンの台数', note:'勝手に撃ち続けるドローン',           cost:800,   span:10, max:11,  v:l => `${1+l+P('pdrone')}台`},
-  {cat:'idle', id:'droneint', name:'連射速度',       note:'ドローンが撃つ間隔',                 cost:600,   span:9,  max:8,  v:l => `${(TUNE.droneInt*Math.pow(.85,l)*(SP('rl1')?.8:1)).toFixed(2)}秒`},
-  {cat:'idle', id:'dronedmg', name:'弾の威力',       note:'ドローンの弾が与えるダメージ（上限なし）', cost:900, inf:true, g:TUNE.dmgG, max:1e9, v:l => `×${fmtX(TUNE.droneDmg*(1+.25*l))}`},
+  {cat:'idle', id:'drones',   get name(){ return armName('drone') + 'の台数'; }, get note(){ return evo('drone') ? `勝手に撃ち続ける${armName('drone')}（ドローンが進化）` : '勝手に撃ち続けるドローン'; },           cost:800,   span:10, max:11,  v:l => `${1+l+P('pdrone')}台`},
+  {cat:'idle', id:'droneint', name:'連射速度',       get note(){ return armName('drone') + 'が撃つ間隔'; },                 cost:600,   span:9,  max:8,  v:l => `${(TUNE.droneInt*Math.pow(.85,l)*(SP('rl1')?.8:1)).toFixed(2)}秒`},
+  {cat:'idle', id:'dronedmg', name:'弾の威力',       get note(){ return armName('drone') + 'の弾が与えるダメージ（上限なし）'; }, cost:900, inf:true, g:TUNE.dmgG, max:1e9, v:l => `×${fmtX(TUNE.droneDmg*(1+.25*l))}`},
   {cat:'idle', id:'spawn',    name:'共鳴',           note:'1秒ごとに、直前1秒に与えたダメージの一部をもう一度与える', cost:1200, span:8, max:15, v:l => l ? `${Math.round(stat.reso(l)*100)}%` : 'なし'},
   {cat:'idle', id:'drburst',  name:'弾の炸裂',       note:'弾が当たったとき飛び散るかけら',     cost:2500,  span:8,  max:10,  v:l => `+${l*2*(SP('bu1')?2:1)}個`},
   // 兵器（台数は上限あり、威力は上限なし）。値段は手に入る目安の段の価値に合わせる
   ...ARMS.flatMap(a => [
-    {cat:'arms', id:a.id + 'N', name:a.name + 'の数', note:a.note, cost:2000 * Math.pow(TUNE.valStage, a.st), span:Math.min(8, 1.5 * a.n), max:a.n, v:l => l ? `${l}台` : 'なし'},
-    {cat:'arms', id:a.id + 'P', name:a.name + 'の威力', note:a.name + 'のダメージ（上限なし）' + (a.st > 1 ? '。後発ボーナス：それより前の兵器の威力Lvの平均の8割が最初から上乗せされる' : ''), cost:3000 * Math.pow(TUNE.valStage, a.st), inf:true, g:TUNE.dmgG, max:1e9, v:l => `×${fmtX(1 + .25 * (l + armCatch(a.id)))}${armCatch(a.id) ? `（後発 +Lv${armCatch(a.id)}）` : ''}`},
+    {cat:'arms', id:a.id + 'N', get name(){ return armName(a.id) + 'の数'; }, get note(){ return evo(a.id) ? `${a.note}（${a.name}が進化）` : a.note; }, cost:2000 * Math.pow(TUNE.valStage, a.st), span:Math.min(8, 1.5 * a.n), max:a.n, v:l => l ? `${l}台` : 'なし'},
+    {cat:'arms', id:a.id + 'P', get name(){ return armName(a.id) + 'の威力'; }, get note(){ return armName(a.id) + 'のダメージ（上限なし）' + (a.st > 1 ? '。後発ボーナス：それより前の兵器の威力Lvの平均の8割が最初から上乗せされる' : ''); }, cost:3000 * Math.pow(TUNE.valStage, a.st), inf:true, g:TUNE.dmgG, max:1e9, v:l => `×${fmtX(1 + .25 * (l + armCatch(a.id)))}${armCatch(a.id) ? `（後発 +Lv${armCatch(a.id)}）` : ''}`},
   ]),
   // モジュール（ビルド）：上限なしの威力。ドローンや兵器と同じく後半まで伸ばせるように
   {cat:'build', id:'modpow', name:'モジュールの威力', note:'猛毒・炎上・雷撃・誘爆・衛星・流星・波動のダメージ（上限なし）', cost:20000, inf:true, g:TUNE.dmgG, max:1e9, v:l => `×${fmtX(1+.25*l)}`},
@@ -401,8 +401,8 @@ const SPECIALS = [
   {cat:'arms', id:'bh1', name:'事象の地平線',     note:'ブラックホールの範囲 ×1.4',           ref:['holeN',2], req:() => L('holeN') >= 2, rq:'ブラックホールの数 Lv2'},
   // 兵器の威力を大きく伸ばす改良（ドローン改良と同じく、後半に兵器が置いていかれないように）
   ...ARMS.flatMap(a => [
-    {cat:'arms', id:a.id + 'u1', name:a.name + '改良 I',  note:a.name + 'の威力 ×2', ref:[a.id + 'P', 10], req:() => L(a.id + 'P') >= 10, rq:a.name + 'の威力 Lv10'},
-    {cat:'arms', id:a.id + 'u2', name:a.name + '改良 II', note:a.name + 'の威力 ×3', ref:[a.id + 'P', 25], req:() => L(a.id + 'P') >= 25, rq:a.name + 'の威力 Lv25'},
+    {cat:'arms', id:a.id + 'u1', get name(){ return armName(a.id) + '改良 I'; }, get note(){ return armName(a.id) + 'の威力 ×2'; }, ref:[a.id + 'P', 10], req:() => L(a.id + 'P') >= 10, get rq(){ return armName(a.id) + 'の威力 Lv10'; }},
+    {cat:'arms', id:a.id + 'u2', get name(){ return armName(a.id) + '改良 II'; }, get note(){ return armName(a.id) + 'の威力 ×3'; }, ref:[a.id + 'P', 25], req:() => L(a.id + 'P') >= 25, get rq(){ return armName(a.id) + 'の威力 Lv25'; }},
   ]),
   {cat:'tap',  id:'tp1', name:'鉄拳',             note:'タップのボスへの威力と衝撃波 ×2',     ref:['tapburst',5],   req:() => L('tapburst') >= 5, rq:'タップの破片 Lv5'},
   {cat:'tap',  id:'tp2', name:'連打の達人',       note:'長押しの連打が速くなる（毎秒4回→6回）', ref:['tapburst',10], req:() => L('tapburst') >= 10, rq:'タップの破片 Lv10'},
@@ -486,7 +486,7 @@ const armName = id => evo(id) ? EVO[id].names[evo(id) - 1] : EVO[id].base;
 const evoCol = (id, def) => evo(id) ? EVO[id].cols[evo(id) - 1] : def;
 for (const [id, e] of Object.entries(EVO)) for (let k = 0; k < 2; k++){
   SPECIALS.push({cat:id === 'drone' ? 'idle' : 'arms', id:`${id}e${k + 1}`, evo:true, name:`進化：${e.names[k]}`, note:`${k ? e.names[0] : e.base}が${e.names[k]}に進化する。威力 ×4・見た目が変わる`,
-    ref:[e.up, e.at[k]], req:() => L(e.up) >= e.at[k] && save.st.deepest >= EVO_AT[k] && (k === 0 || SP(id + 'e1')), rq:`${e.upName} Lv${e.at[k]}・${STAGES[EVO_AT[k]].name}に到達`});
+    ref:[e.up, e.at[k]], req:() => L(e.up) >= e.at[k] && save.st.deepest >= EVO_AT[k] && (k === 0 || SP(id + 'e1')), get rq(){ return `${id === 'drone' ? e.upName : armName(id) + 'の威力'} Lv${e.at[k]}・${STAGES[EVO_AT[k]].name}に到達`; }});
 }
 // ===== シナジー：別々の系統どうしを掛け合わせて火力を伸ばす特殊強化 =====
 const ARM_RELIC = {cannon:['powder', .2], laser:['prism', .2], missile:['fuse', .25], hole:['graviton', .25]};
