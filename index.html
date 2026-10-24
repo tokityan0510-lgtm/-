@@ -365,9 +365,10 @@ const UPG = [
   {cat:'idle', id:'dronedmg', name:'弾の威力',       get note(){ return armName('drone') + 'の弾が与えるダメージ（上限なし）'; }, cost:900, inf:true, g:TUNE.dmgG, max:1e9, v:l => `×${fmtX(TUNE.droneDmg*(1+.25*l))}`},
   {cat:'idle', id:'spawn',    name:'共鳴',           note:'1秒ごとに、直前1秒に与えたダメージの一部をもう一度与える', cost:1200, span:8, max:15, v:l => l ? `${Math.round(stat.reso(l)*100)}%` : 'なし'},
   {cat:'idle', id:'drburst',  name:'弾の炸裂',       note:'弾が当たったとき飛び散るかけら',     cost:2500,  span:8,  max:10,  v:l => `+${l*2*(SP('bu1')?2:1)}個`},
+  // 兵器の1台目は、手に入る目安の素材の半分くらい手前で買える値段（次の兵器が前の素材の途中で手に入り、やることが途切れないように）
   // 兵器（台数も威力も上限なし。画面に出す台数は a.n まで、その先は台数に比例して威力が増える）。値段は手に入る目安の段の価値に合わせる
   ...ARMS.flatMap(a => [
-    {cat:'arms', id:a.id + 'N', get name(){ return armName(a.id) + 'の数'; }, get note(){ return evo(a.id) ? `${a.note}（${a.name}が進化）` : a.note; }, cost:(a.id === 'cannon' ? 400 : 2000) * Math.pow(TUNE.valStage, a.st), inf:true, g:Math.pow(TUNE.valStage, 2 * Math.min(8, .75 * a.n) / a.n), max:1e9, v:l => l ? `${l}台${l > a.n ? `（${a.n}台を超えた分は威力 ×${fmtX(l / a.n)}）` : ''}` : 'なし'},
+    {cat:'arms', id:a.id + 'N', get name(){ return armName(a.id) + 'の数'; }, get note(){ return evo(a.id) ? `${a.note}（${a.name}が進化）` : a.note; }, cost:(a.id === 'cannon' ? 400 : 20) * Math.pow(TUNE.valStage, a.st), inf:true, g:Math.pow(TUNE.valStage, 2 * Math.min(8, .75 * a.n) / a.n), max:1e9, v:l => l ? `${l}台${l > a.n ? `（${a.n}台を超えた分は威力 ×${fmtX(l / a.n)}）` : ''}` : 'なし'},
     {cat:'arms', id:a.id + 'P', get name(){ return armName(a.id) + 'の威力'; }, get note(){ return armName(a.id) + 'のダメージ（上限なし）' + (a.st > 1 ? '。後発ボーナス：それより前の兵器の威力Lvの平均の8割が最初から上乗せされる' : ''); }, cost:3000 * Math.pow(TUNE.valStage, a.st), inf:true, g:TUNE.dmgG, max:1e9, v:l => `×${fmtX(1 + .25 * (l + armCatch(a.id)))}${armCatch(a.id) ? `（後発 +Lv${armCatch(a.id)}）` : ''}`},
   ]),
   // モジュール（ビルド）：上限なしの威力。ドローンや兵器と同じく後半まで伸ばせるように
