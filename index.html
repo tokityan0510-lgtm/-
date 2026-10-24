@@ -326,7 +326,7 @@ const sv = s => Math.pow(10, svLog(s) - save.ec);
 const relC = lg => { const v = Math.pow(10, lg - save.ec); return save.ec === 0 && v < 1e15 ? Math.ceil(v) : v; };
 // コインの基準：ブロック1個ぶんのHPを削ると coinBase × 素材の価値。値段も同じ割合（costX）
 const coinBase = () => 100 * TUNE.coinK;
-const TUNE = {fhp:4000, fhpLate:4000, fdmg:4000, reqBase:135000, reqPow:6.4, dmgG:1.5, hpPow:3.4, hpMul:1, lvBonus:.01, tapProg:1.5, dustBase:18, dustCap:2000, dustSoftPow:.3, dustDiv:8, dustBonus:.001, pmultBonus:.1, idleBonus:7, idleRamp:30, idleDmgK:.5, feverReward:2, costX:3, coinK:.03, valBeyond:100, valStage:1e4, modSpan:7, droneDmg:5, droneInt:1.5, armMul:15, armCatch:.8, modMul:.12, armIdle:0, reso:.01, bossHp:1500, bossGrow:1.35, bossReward:300, comboDecay:.6};
+const TUNE = {fhp:4000, fhpLate:4000, fdmg:4000, reqBase:150000, early:[.025, .02, .03, .08, .2, .5], reqPow:6.4, dmgG:1.5, hpPow:3.4, hpMul:1, lvBonus:.01, tapProg:1.5, dustBase:18, dustCap:2000, dustSoftPow:.3, dustDiv:8, dustBonus:.001, pmultBonus:.1, idleBonus:7, idleRamp:30, idleDmgK:.5, feverReward:2, costX:3, coinK:.03, valBeyond:100, valStage:1e4, modSpan:7, droneDmg:5, droneInt:1.5, armMul:15, armCatch:.8, modMul:.12, armIdle:0, reso:.01, bossHp:1500, bossGrow:1.35, bossReward:300, comboDecay:.6};
 const DEFAULT = {
   coins:0, stage:0, lv:{}, mods:{}, best:0, ended:false, muted:false, t:0, idleRate:0, prog:0, started:false, kills:0, boss:null,
   sp:{}, ach:{}, dust:0, perm:{}, off:{}, runs:0, buyMode:1, endSeen:false, relics:{}, scale2:1, scale3:1, ec:0,
@@ -367,7 +367,7 @@ const UPG = [
   {cat:'idle', id:'drburst',  name:'弾の炸裂',       note:'弾が当たったとき飛び散るかけら',     cost:2500,  span:8,  max:10,  v:l => `+${l*2*(SP('bu1')?2:1)}個`},
   // 兵器（台数も威力も上限なし。画面に出す台数は a.n まで、その先は台数に比例して威力が増える）。値段は手に入る目安の段の価値に合わせる
   ...ARMS.flatMap(a => [
-    {cat:'arms', id:a.id + 'N', get name(){ return armName(a.id) + 'の数'; }, get note(){ return evo(a.id) ? `${a.note}（${a.name}が進化）` : a.note; }, cost:2000 * Math.pow(TUNE.valStage, a.st), inf:true, g:Math.pow(TUNE.valStage, 2 * Math.min(8, .75 * a.n) / a.n), max:1e9, v:l => l ? `${l}台${l > a.n ? `（${a.n}台を超えた分は威力 ×${fmtX(l / a.n)}）` : ''}` : 'なし'},
+    {cat:'arms', id:a.id + 'N', get name(){ return armName(a.id) + 'の数'; }, get note(){ return evo(a.id) ? `${a.note}（${a.name}が進化）` : a.note; }, cost:(a.id === 'cannon' ? 400 : 2000) * Math.pow(TUNE.valStage, a.st), inf:true, g:Math.pow(TUNE.valStage, 2 * Math.min(8, .75 * a.n) / a.n), max:1e9, v:l => l ? `${l}台${l > a.n ? `（${a.n}台を超えた分は威力 ×${fmtX(l / a.n)}）` : ''}` : 'なし'},
     {cat:'arms', id:a.id + 'P', get name(){ return armName(a.id) + 'の威力'; }, get note(){ return armName(a.id) + 'のダメージ（上限なし）' + (a.st > 1 ? '。後発ボーナス：それより前の兵器の威力Lvの平均の8割が最初から上乗せされる' : ''); }, cost:3000 * Math.pow(TUNE.valStage, a.st), inf:true, g:TUNE.dmgG, max:1e9, v:l => `×${fmtX(1 + .25 * (l + armCatch(a.id)))}${armCatch(a.id) ? `（後発 +Lv${armCatch(a.id)}）` : ''}`},
   ]),
   // モジュール（ビルド）：上限なしの威力。ドローンや兵器と同じく後半まで伸ばせるように
@@ -656,7 +656,9 @@ const bossK = () => Math.max(save.stage, save.kills);
 // 稼ぎの倍率は「相場」×「コンボ係数」で、どちらもボス撃破のたびに買えるLvに比例して伸びる（段階の2乗ほど）。
 // ゲージはそれに合わせて (1 + gaugeA×段階)² で伸ばし、さらに (1 + 段階)^gaugePow で後半ほど少し長くする
 // 巨大ブロックが砕けるまでに必要なダメージ（ブロック1個ぶんのHPの何個分か × (1+段階)^reqPow）
-const gaugeNeed = () => blockHp(save.stage) * TUNE.reqBase * Math.pow(1 + bossK(), TUNE.reqPow) * Math.pow(.92, P('pgauge')) * Math.pow(.95, RL('endbell'));
+// 序盤の素材は軽くする（後半に合わせてノルマ全体を重くしたら、木箱だけで4分かかり、砲台まで遠かった）。6段目から通常
+const earlyK = k => k < TUNE.early.length ? TUNE.early[k] : 1;
+const gaugeNeed = () => blockHp(save.stage) * TUNE.reqBase * earlyK(bossK()) * Math.pow(1 + bossK(), TUNE.reqPow) * Math.pow(.92, P('pgauge')) * Math.pow(.95, RL('endbell'));
 const bossHp = () => blockHp(save.stage) * TUNE.bossHp * Math.pow(TUNE.bossGrow, bossK());
 const dustSoft = d => d <= TUNE.dustCap ? d : TUNE.dustCap * Math.pow(d / TUNE.dustCap, TUNE.dustSoftPow);
 const dustGain = () => { if (save.stage < PRESTIGE_STAGE) return 0; const lv = Math.log10(TUNE.valStage) / 5; const raw = TUNE.dustBase * Math.pow(2, (Math.max(0, lg10(save.st.earnedRun) + save.ec - Math.log10(TUNE.coinK)) - 37 * lv) / (TUNE.dustDiv * lv));
