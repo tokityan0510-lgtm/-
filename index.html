@@ -283,7 +283,7 @@ for (let k = 1; k <= 38; k++){
 const PRESTIGE_STAGE = 8;   // この素材に到達したら「砕く」が解放される
 // ブロックの価値の素材倍率（TUNE.valStage）
 const sv = s => Math.pow(TUNE.valStage, s);
-const TUNE = {fhp:4000, fhpLate:4000, fdmg:4000, reqBase:8000, reqPow:6.4, dmgG:1.5, hpPow:3.4, hpMul:1, lvBonus:.01, tapProg:1.5, dustBase:18, dustDiv:8, dustBonus:.001, pmultBonus:.1, idleBonus:7, idleRamp:30, idleDmgK:.5, feverReward:2, costX:3, valStage:1e4, modSpan:7, droneDmg:5, droneInt:1.5, armMul:15, armIdle:0, reso:.01, bossHp:1500, bossGrow:1.35, bossReward:300, comboDecay:.6};
+const TUNE = {fhp:4000, fhpLate:4000, fdmg:4000, reqBase:11000, reqPow:6.4, dmgG:1.5, hpPow:3.4, hpMul:1, lvBonus:.01, tapProg:1.5, dustBase:18, dustDiv:8, dustBonus:.001, pmultBonus:.1, idleBonus:7, idleRamp:30, idleDmgK:.5, feverReward:2, costX:3, valStage:1e4, modSpan:7, droneDmg:5, droneInt:1.5, armMul:15, modMul:3, armIdle:0, reso:.01, bossHp:1500, bossGrow:1.35, bossReward:300, comboDecay:.6};
 const DEFAULT = {
   coins:0, stage:0, lv:{}, mods:{}, best:0, ended:false, muted:false, t:0, idleRate:0, prog:0, started:false, kills:0, boss:null,
   sp:{}, ach:{}, dust:0, perm:{}, off:{}, runs:0, buyMode:1, endSeen:false, relics:{},
@@ -326,6 +326,8 @@ const UPG = [
     {cat:'arms', id:a.id + 'N', name:a.name + 'の数', note:a.note, cost:2000 * Math.pow(TUNE.valStage, a.st), span:8, max:a.n, v:l => l ? `${l}台` : 'なし'},
     {cat:'arms', id:a.id + 'P', name:a.name + 'の威力', note:a.name + 'のダメージ（上限なし）', cost:3000 * Math.pow(TUNE.valStage, a.st), inf:true, g:TUNE.dmgG, max:1e9, v:l => `×${fmtX(1 + .25 * l)}`},
   ]),
+  // モジュール（ビルド）：上限なしの威力。ドローンや兵器と同じく後半まで伸ばせるように
+  {cat:'build', id:'modpow', name:'モジュールの威力', note:'猛毒・炎上・雷撃・誘爆・衛星・流星・波動のダメージ（上限なし）', cost:20000, inf:true, g:TUNE.dmgG, max:1e9, v:l => `×${fmtX(1+.25*l)}`},
   // 操作
   {cat:'tap',  id:'tapburst', name:'タップの破片',   note:'タップしたとき飛び散るかけらの倍率',     cost:500,   span:9,  max:10,  v:l => `×${2+l}`},
   {cat:'tap',  id:'heat',     name:'熱量',           note:'1タップで溜まるフィーバーゲージ',     cost:1500,  span:7,  max:12,  v:l => `+${((8+2*l)*(SP('ht1')?1.5:1)).toFixed(0)}`},
@@ -347,11 +349,11 @@ const MODS = [
   {id:'homing',   name:'誘導', note:'かけらがブロックへ早く戻ってくる',               unlock:50000,  cost:30000, st:1, max:10, v:l => `曲がる強さ ${l}`},
   {id:'pierce',   name:'貫通', note:'かけらがブロックを突き抜けて、もう一度戻ってくる',                       unlock:80000,  cost:45000, st:2, max:8,  v:l => `${l}枚`},
   {id:'bolt',     name:'雷撃', note:'当たったところから雷が走り、ブロックに何度も落ちる',       unlock:150000, cost:80000, st:3, max:10, v:l => `${Math.round(Math.min(.6,.15+.05*(l-1))*100)}%で${2+Math.floor((l-1)/2)}本`},
-  {id:'burn',     name:'炎上', note:'かけらが当たるとブロックが燃え、少しずつダメージ',   unlock:250000, cost:120000, st:4, max:10, v:l => `毎秒 威力×${(0.8*(1+.3*(l-1))).toFixed(1)}`},
+  {id:'burn',     name:'炎上', note:'かけらが当たるとブロックが燃え、少しずつダメージ',   unlock:250000, cost:120000, st:4, max:10, v:l => `毎秒 威力×${(1000*(1+.3*(l-1))).toFixed(0)}`},
   {id:'frost',    name:'凍結', note:'かけらが当たると、ときどきブロックが凍る。凍っている間は受けるダメージが増える', unlock:1e5, cost:5e4, st:2, max:10, v:l => `凍ると +${15+5*(l-1)}%`},
   {id:'orbit',    name:'衛星', note:'ブロックの周りを衛星が回り、近づくたびに撃ち込む',       unlock:2e5, cost:1e5, st:3, max:10, v:l => `${1+Math.floor(l/3)}機・威力×${(1+.25*(l-1)).toFixed(2)}`},
   {id:'poison',   name:'猛毒', note:'かけらが当たるたびに毒が溜まり、溜まった量に応じて削り続ける', unlock:3e5, cost:1.5e5, st:4, max:10, v:l => `最大${30+10*l}層`},
-  {id:'charge',   name:'会心', note:'何回か当てるごとに、次の一撃が会心の一撃になる',         unlock:5e5, cost:2.2e5, st:5, max:10, v:l => `${200-10*(l-1)}回ごとに ×${30+5*l}`},
+  {id:'charge',   name:'会心', note:'数秒ごとに、次の一撃が会心の一撃になる',         unlock:5e5, cost:2.2e5, st:5, max:10, v:l => `${(6-.3*(l-1)).toFixed(1)}秒ごとに ×${30+5*l}`},
   {id:'meteor',   name:'流星', note:'一定時間ごとに流星が降ってきて、ブロックに激突する',     unlock:8e5, cost:3e5, st:6, max:10, v:l => `${(5-.3*(l-1)).toFixed(1)}秒ごと`},
   {id:'pulse',    name:'波動', note:'ブロックの中心から衝撃の波が広がり、かけらをまき散らす', unlock:1.2e6, cost:4.5e5, st:7, max:10, v:l => `3秒ごと・かけら${2+Math.floor(l/2)}個`},
   {id:'blast',    name:'誘爆', note:'当たったところがときどき爆発する',                 unlock:400000, cost:180000, st:5, max:10, v:l => `${Math.round(Math.min(.5,.08+.04*(l-1))*100)}%`},
@@ -540,6 +542,7 @@ const stat = {
   droneInt: () => TUNE.droneInt * Math.pow(.85, L('droneint')) * (SP('rl1') ? .8 : 1) * (buffs.barrage > 0 ? .125 : 1) * (SP('sy5') && fever > 0 ? 1 / 1.3 : 1),
   droneDmg: () => TUNE.droneDmg * (1 + .25 * L('dronedmg')) * (SP('dr1') ? 1.5 : 1) * (SP('dr2') ? 1.5 : 1) * (SP('dr3') ? 2 : 1) * (SP('dr4') ? 2 : 1)
               * droneX(),
+  modPow:   () => TUNE.modMul * (1 + .25 * L('modpow')),
   reso:     (l = L('spawn')) => TUNE.reso * l * (SP('sp1') ? 2 : 1) + .003 * RL('fork') + (SP('sy8') ? .05 : 0),
   drburst:  () => L('drburst') * 2 * (SP('bu1') ? 2 : 1),
   tapburst: () => 2 + L('tapburst'),
@@ -574,7 +577,7 @@ let BX = 195, BY = 300, BS = 240, big = {flash:0, wob:0, wx:0, wy:0, spawn:1, bu
 // blocks と boss は旧方式の名残（常に空）。表示側の互換のために残している
 let blocks = [], boss = null, shards = [], booms = [], zaps = [], bullets = [], drones = [], lucky = null;
 // 連鎖で爆発・雷が増えすぎると重くなるので、保留できる数に上限を付ける。あふれた分はダメージだけまとめて次のフレームで与える
-const MAXB = 48, MAXZ = 16;
+const MAXB = 48, MAXZ = 6;
 let overflow = {};
 function queueBoom(e){ if (booms.length < MAXB) booms.push(e); else overflow[e.src] = (overflow[e.src] || 0) + e.dmg; }
 let shells = [], beams = [], missiles = [], holes = [], armT = {}, armK = 0;
@@ -699,9 +702,9 @@ const allDmg = () => (1 + .5 * RL('seed')) * (SP('sy4') ? 1 + Math.min(.25, comb
 const DOT = new Set(['burn', 'reso', 'poison']);
 function hit(dmg, src, x, y, d = 0, burst = 0){
   let crit = false;
-  // 会心：決まった回数当てるごとに、次の一撃が大きくなる
+  // 会心：決まった秒数ごとに、次の一撃が大きくなる（回数で数えると、終盤は当たる回数が多すぎて毎秒何回も出た）
   const ch = M('charge');
-  if (ch && !DOT.has(src) && ++chargeN >= 200 - 10 * (ch - 1)){ chargeN = 0; dmg *= 30 + 5 * ch; crit = true; fx.charge(x, y); if (CB('critical')) spawnShards(x, y, 10, d + 1); }
+  if (ch && !DOT.has(src) && chargeN <= 0){ chargeN = 6 - .3 * (ch - 1); dmg *= 30 + 5 * ch; crit = true; fx.charge(x, y); if (CB('critical')) spawnShards(x, y, 10, d + 1); }
   // 凍っている間は受けるダメージが増える
   if (big.frost > 0) dmg *= 1.1 + .05 * M('frost');
   if (!crit && !DOT.has(src) && Math.random() < stat.crit()){ dmg *= stat.critX(); crit = true; }
@@ -729,17 +732,16 @@ function hit(dmg, src, x, y, d = 0, burst = 0){
   if (!DOT.has(src)){
     if (Math.random() < stat.bomb() * .3) queueBoom({x, y, R:cell * 1.7 * (SP('bm1') ? 1.3 : 1), dmg:stat.dmg() * 5 * (SP('bm1') ? 2 : 1) * kp, t:.08, big:true, d:nd, src:'bomb'});
     const bl = M('blast');
-    if (bl && Math.random() < Math.min(.5, .08 + .04 * (bl - 1)) * .3){ queueBoom({x, y, R:cell * 1.25, dmg:stat.dmg() * 2 * kp, t:.08, big:false, d:nd, src:'blast'}); if (CB('toxboom')) big.poison = Math.min(poisonMax(), big.poison + 10); }
+    if (bl && src !== 'blast' && Math.random() < Math.min(.5, .08 + .04 * (bl - 1)) * .3){ queueBoom({x, y, R:cell * 1.25, dmg:stat.dmg() * stat.modPow() * 20 * kp, t:.08, big:false, d:nd, src:'blast'}); if (CB('toxboom')) big.poison = Math.min(poisonMax(), big.poison + 10); }
     const bo = M('bolt');
-    if (bo && Math.random() < Math.min(.6, .15 + .05 * (bo - 1)) * .3 * (big.frost > 0 && CB('supercon') ? 2 : 1)){
+    if (bo && src !== 'bolt' && Math.random() < Math.min(.6, .15 + .05 * (bo - 1)) * .3 * (big.frost > 0 && CB('supercon') ? 2 : 1)){
       const n = 2 + Math.floor((bo - 1) / 2);
-      if (zaps.length < MAXZ) zaps.push({x, y, n, t:.05, d:nd}); else overflow.bolt = (overflow.bolt || 0) + stat.dmg() * 3 * Math.pow(stat.keep(), nd) * n;
+      if (zaps.length < MAXZ) zaps.push({x, y, n, t:.05, d:nd}); else overflow.bolt = (overflow.bolt || 0) + stat.dmg() * stat.modPow() * 4 * Math.pow(stat.keep(), nd) * n;
     }
-    if (src === 'shard'){
-      const fr = M('frost'); if (fr && Math.random() < .01 + .003 * (fr - 1)){ if (big.frost <= 0) fx.frost(); big.frost = 2.5; }
-      if (M('poison')) big.poison = Math.min(poisonMax(), big.poison + 1);
-    }
-    if (src === 'shard' && M('burn')){ big.burn = 2; big.burnDps = Math.max(big.burnDps * .9, stat.dmg() * .8 * (1 + .3 * (M('burn') - 1))); big.bd = d; }
+    // 凍結・猛毒・炎上は、かけらだけでなくドローンや兵器の直撃でも起きる（放置でかけらが少なくても発動するように）
+    const fr = M('frost'); if (fr && Math.random() < .015 + .004 * (fr - 1)){ if (big.frost <= 0) fx.frost(); big.frost = 2.5; }
+    if (M('poison')) big.poison = Math.min(poisonMax(), big.poison + 1);
+    if (M('burn')){ big.burn = 2; big.burnDps = Math.max(big.burnDps * .9, stat.dmg() * stat.modPow() * 1000 * (1 + .3 * (M('burn') - 1))); big.bd = d; }
   }
   const cm = Math.floor(combo);
   if (cm > save.best) save.best = cm;
@@ -750,11 +752,12 @@ function hit(dmg, src, x, y, d = 0, burst = 0){
 const poisonMax = () => 30 + 10 * M('poison');
 function stepMods(dt){
   if (big.frost > 0) big.frost -= dt;
+  if (chargeN > 0) chargeN -= dt;
   // 猛毒：溜まった層の数に応じて削り続ける。毎秒15%ずつ抜けていく
   const po = M('poison');
   if (big.poison > 0){
     if (po){
-      big.poisonAcc += big.poison * stat.dmg() * .3 * (1 + .2 * (po - 1)) * (big.burn > 0 && CB('scorch') ? 2 : 1) * dt;
+      big.poisonAcc += big.poison * stat.dmg() * stat.modPow() * 7 * (1 + .2 * (po - 1)) * (big.burn > 0 && CB('scorch') ? 2 : 1) * dt;
       if (Math.random() < dt * 3){ const [x, y] = bigPoint(); hit(big.poisonAcc, 'poison', x, y); big.poisonAcc = 0; }
     }
     big.poison = Math.max(0, big.poison - big.poison * .15 * dt - (po ? 0 : 5 * dt));
@@ -768,7 +771,7 @@ function stepMods(dt){
     const s = sats[k], a = satA + k * 6.283 / ns, r = BS * .66;
     s.x = BX + Math.cos(a) * r; s.y = BY + Math.sin(a) * r; s.fl = Math.max(0, s.fl - dt * 4); s.t -= dt;
     if (s.t <= 0){ s.t = .6; s.fl = 1; const tx = BX + Math.cos(a) * BS * .4, ty = BY + Math.sin(a) * BS * .4; s.tx = tx; s.ty = ty;
-      hit(stat.dmg() * 12 * (1 + .25 * (ob - 1)), 'orbit', tx, ty, 0, 1 + (CB('satgun') ? 2 : 0)); }
+      hit(stat.dmg() * stat.modPow() * 96 * (1 + .25 * (ob - 1)), 'orbit', tx, ty, 0, 1 + (CB('satgun') ? 2 : 0)); }
   }
   // 流星：一定時間ごとに上から降ってくる
   const me = M('meteor');
@@ -780,13 +783,13 @@ function stepMods(dt){
     const p = Math.min(1, m.t / m.dur); m.x = m.x0 + (m.tx - m.x0) * p; m.y = m.y0 + (m.ty - m.y0) * p;
     if (p >= 1){
       meteors.splice(k, 1);
-      queueBoom({x:m.tx, y:m.ty, R:cell * 2 * m.s, dmg:stat.dmg() * 80 * (1 + .3 * (Math.max(1, me) - 1)) * m.s, t:0, big:true, d:0, burst:Math.round(6 * m.s), src:'meteor', arm:true, missile:m.s >= 1});
+      queueBoom({x:m.tx, y:m.ty, R:cell * 2 * m.s, dmg:stat.dmg() * stat.modPow() * 640 * (1 + .3 * (Math.max(1, me) - 1)) * m.s, t:0, big:true, d:0, burst:Math.round(6 * m.s), src:'meteor', arm:true, missile:m.s >= 1});
       if (m.s >= 1 && CB('shower')) spawnMeteor(.5, 2);
     }
   }
   // 波動：3秒ごとに中心から波が広がる
   const pu = M('pulse');
-  if (pu){ pulseT -= dt; if (pulseT <= 0){ pulseT = 3; fx.pulse(); hit(stat.dmg() * 30 * (3 + pu) * (CB('tidal') ? 2 : 1), 'pulse', BX, BY, 0, 2 + Math.floor(pu / 2)); } }
+  if (pu){ pulseT -= dt; if (pulseT <= 0){ pulseT = 3; fx.pulse(); hit(stat.dmg() * stat.modPow() * 80 * (3 + pu) * (CB('tidal') ? 2 : 1), 'pulse', BX, BY, 0, 2 + Math.floor(pu / 2)); } }
 }
 function spawnMeteor(s, n = 1){
   for (let q = 0; q < n; q++){
@@ -990,7 +993,7 @@ function step(dt){
     const z = zaps[k]; z.t -= dt; if (z.t > 0) continue;
     zaps.splice(k, 1);
     const pts = [[z.x, z.y]];
-    for (let m = 0; m < z.n; m++){ const [px, py] = bigPoint(); pts.push([px, py]); hit(stat.dmg() * 3 * Math.pow(stat.keep(), z.d), 'bolt', px, py, z.d); }
+    for (let m = 0; m < z.n; m++){ const [px, py] = bigPoint(); pts.push([px, py]); hit(stat.dmg() * stat.modPow() * 4 * Math.pow(stat.keep(), z.d), 'bolt', px, py, z.d); }
     fx.bolt(pts);
   }
   for (const src in overflow){ const [ox, oy] = bigPoint(); hit(overflow[src], src, ox, oy, 6); }
@@ -1756,7 +1759,7 @@ const TABS = [['idle', '放置'], ['arms', '兵器'], ['tap', '操作'], ['core'
 const cs = n => fmt(n);
 const specialsFor = cat => SPECIALS.filter(s => s.cat === cat && !SP(s.id) && s.req());
 function anyAffordable(kind){
-  if (kind === 'build') return MODS.some(m => ML(m.id) < m.max && save.coins >= modCost(m));
+  if (kind === 'build') return MODS.some(m => ML(m.id) < m.max && save.coins >= modCost(m)) || UPG.some(u => u.cat === 'build' && save.coins >= upCost(u));
   if (kind === 'ach' || kind === 'relic') return false;
   if (kind === 'dust') return PERM.some(p => P(p.id) < p.max && save.dust >= permCost(p));
   return UPG.some(u => u.cat === kind && L(u.id) < u.max && save.coins >= upCost(u)) || specialsFor(kind).some(s => save.coins >= spCost(s));
@@ -1783,7 +1786,7 @@ function armsTopHtml(){
 function sheetHtml(){
   let h = `<p class="hint">${HINTS[tab]}</p>`;
   if (tab === 'arms') h += armsTopHtml();
-  if (tab === 'idle' || tab === 'arms' || tab === 'tap' || tab === 'core'){
+  if (tab === 'idle' || tab === 'arms' || tab === 'tap' || tab === 'core' || tab === 'build'){
     h += `<div class="modes">${[[1, '×1'], [10, '×10'], ['max', '×MAX']].map(([m, n]) => `<button class="mode ${save.buyMode === m ? 'on' : ''}" data-mode="${m}">${n}</button>`).join('')}</div>`;
     h += '<ul class="list">';
     for (const u of UPG){
@@ -1809,7 +1812,8 @@ function sheetHtml(){
     const next = SPECIALS.filter(s => s.cat === tab && !SP(s.id) && !s.req()).slice(0, 2);
     if (next.length) h += `<p class="hint">次の特殊強化：${next.map(s => `${s.name}（${s.rq}）`).join('、')}</p>`;
     if (tab === 'core') h += `<button class="small" data-act="reset">データを消す</button>`;
-  } else if (tab === 'build'){
+  }
+  if (tab === 'build'){
     const on = COMBOS.filter(c => CB(c.id)).length;
     h += `<div class="section-title">組み合わせ技 ${on} / ${COMBOS.length}（2つのモジュールがどちらもLv3以上・ONで発動）</div><div class="combos">`;
     for (const c of COMBOS){
