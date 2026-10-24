@@ -399,6 +399,18 @@ const SPECIALS = [
   {cat:'arms', id:'lz1', name:'十字照射',         note:'レーザーが横と縦の十字に撃つ',        ref:['laserN',3], req:() => L('laserN') >= 3, rq:'レーザーの数 Lv3'},
   {cat:'arms', id:'ms1', name:'多弾頭',           note:'ミサイルが着弾後に子弾を3つばらまく', ref:['missileN',3], req:() => L('missileN') >= 3, rq:'ミサイルの数 Lv3'},
   {cat:'arms', id:'bh1', name:'事象の地平線',     note:'ブラックホールの範囲 ×1.4',           ref:['holeN',2], req:() => L('holeN') >= 2, rq:'ブラックホールの数 Lv2'},
+  // 兵器の動きが変わる特殊強化（後半の目標。威力だけでなく、見た目と当たり方が変わる）
+  {cat:'arms', id:'cn2', name:'散弾',         note:'砲弾が着弾すると、小さな砲弾が3つはじけ飛ぶ',       ref:['cannonN', 9],  req:() => L('cannonN') >= 9,  get rq(){ return armName('cannon') + 'の数 Lv9'; }},
+  {cat:'arms', id:'lz2', name:'乱反射',       note:'レーザーが反射して、さらに2本走る',                  ref:['laserN', 8],   req:() => L('laserN') >= 8,   get rq(){ return armName('laser') + 'の数 Lv8'; }},
+  {cat:'arms', id:'dl2', name:'双頭ドリル',   note:'ドリルが1回で2本刺さる',                             ref:['drillN', 6],   req:() => L('drillN') >= 6,   get rq(){ return armName('drill') + 'の数 Lv6'; }},
+  {cat:'arms', id:'ms2', name:'一斉発射',     note:'ミサイルが1回で3発飛ぶ',                             ref:['missileN', 8], req:() => L('missileN') >= 8, get rq(){ return armName('missile') + 'の数 Lv8'; }},
+  {cat:'arms', id:'ts2', name:'連鎖延長',     note:'テスラコイルの電撃が跳ねる回数 5→10',                ref:['teslaN', 6],   req:() => L('teslaN') >= 6,   get rq(){ return armName('tesla') + 'の数 Lv6'; }},
+  {cat:'arms', id:'bh2', name:'連星',         note:'ブラックホールが2つ同時に生まれ、最後の爆発が大きくなる', ref:['holeN', 5], req:() => L('holeN') >= 5, get rq(){ return armName('hole') + 'の数 Lv5'; }},
+  {cat:'arms', id:'hm2', name:'地割れ',       note:'ハンマーが振り下ろされると地割れが走り、かけらが倍飛ぶ', ref:['hammerN', 5], req:() => L('hammerN') >= 5, get rq(){ return armName('hammer') + 'の数 Lv5'; }},
+  {cat:'arms', id:'or2', name:'掃射',         note:'軌道砲の柱が横へずれながら3本撃ち下ろされる',        ref:['orbitalN', 5], req:() => L('orbitalN') >= 5, get rq(){ return armName('orbital') + 'の数 Lv5'; }},
+  {cat:'arms', id:'nn2', name:'自己増殖',     note:'ナノマシンが削るたびに、ときどき増える',             ref:['nanoN', 8],    req:() => L('nanoN') >= 8,    get rq(){ return armName('nano') + 'の数 Lv8'; }},
+  {cat:'arms', id:'nv2', name:'連鎖超新星',   note:'超新星が爆発すると、小さな超新星が2つ生まれる',      ref:['novaN', 3],    req:() => L('novaN') >= 3,    get rq(){ return armName('nova') + 'の数 Lv3'; }},
+  {cat:'idle', id:'dr5', name:'全機斉射',     note:'10秒ごとに、全部のドローンが5発ずつ一斉に撃つ',      ref:['drones', 11],  req:() => L('drones') >= 11 && SP('dr4'), rq:'ドローン軍団を買う'},
   // 兵器の威力を大きく伸ばす改良（ドローン改良と同じく、後半に兵器が置いていかれないように）
   ...ARMS.flatMap(a => [
     {cat:'arms', id:a.id + 'u1', get name(){ return armName(a.id) + '改良 I'; }, get note(){ return armName(a.id) + 'の威力 ×2'; }, ref:[a.id + 'P', 10], req:() => L(a.id + 'P') >= 10, get rq(){ return armName(a.id) + 'の威力 Lv10'; }},
@@ -609,7 +621,7 @@ const MAXB = 48, MAXZ = 6;
 let overflow = {};
 function queueBoom(e){ if (booms.length < MAXB) booms.push(e); else overflow[e.src] = (overflow[e.src] || 0) + e.dmg; }
 let shells = [], beams = [], missiles = [], holes = [], armT = {}, armK = 0;
-let drills = [], arcs = [], hammers = [], nanos = [], novas = [];
+let drills = [], arcs = [], hammers = [], nanos = [], novas = [], volleyT = 10, volley = 0;
 let combo = 0, fever = 0, heat = 0, state = 'title', lastTap = 0, earnedTick = 0, luckyT = 60, autoT = 0;
 let MAXS = 900;   // 破片の上限（自動画質で変わる）
 const fx = {slam(){}, nova(){}, dig(){}, arm(){}, beam(){}, hole(){}, hit(){}, brk(){}, boom(){}, bolt(){}, fever(){}, milestone(){}, tap(){}, split(){}, bossHit(){}, bossSpawn(){}, bossDie(){}, shoot(){}, land(){}, lucky(){}, luckyHit(){}, ach(){}, relic(){}, charge(){}, frost(){}, pulse(){}};
@@ -852,28 +864,33 @@ function fireArm(a, n){
   } else if (a.id === 'laser'){
     beams.push({kind:'row', y:ty, t:.55, fireAt:.25, fired:false});
     if (SP('lz1')) beams.push({kind:'col', x:tx, t:.55, fireAt:.25, fired:false});
+    if (SP('lz2')) for (let q = 1; q <= 2; q++){ const [, y2] = bigPoint(); beams.push({kind:'row', y:y2, t:.55 + q * .12, fireAt:.25, fired:false}); }
     fx.arm('laser', 0, ty);
   } else if (a.id === 'missile'){
-    const x = W * (.1 + Math.random() * .8), y = H + cell * .3;
-    missiles.push({x, y, vx:(Math.random() - .5) * cell * 4, vy:-cell * 7, tx, ty, life:4});
-    fx.arm('missile', x, y);
+    for (let q = 0; q < (SP('ms2') ? 3 : 1); q++){
+      const x = W * (.1 + Math.random() * .8), y = H + cell * .3, [mx, my] = q ? bigPoint() : [tx, ty];
+      missiles.push({x, y, vx:(Math.random() - .5) * cell * 4, vy:-cell * 7, tx:mx, ty:my, life:4});
+    }
+    fx.arm('missile', W * .5, H);
   } else if (a.id === 'hole'){
     const R = cell * 1.6 * (SP('bh1') ? 1.4 : 1) * (1 + .3 * evo('hole'));
     holes.push({x:tx, y:ty, life:3, max:3, tick:0, R});
     fx.hole(tx, ty, R);
+    if (SP('bh2')){ const [x2, y2] = bigPoint(); holes.push({x:x2, y:y2, life:3, max:3, tick:.12, R, twin:true}); }
   } else if (a.id === 'drill'){
-    if (drills.length < 20){ const ang = Math.atan2(ty - BY, tx - BX); drills.push({x:tx, y:ty, ang, life:3, tick:0, sx:BX + Math.cos(ang) * BS, sy:BY + Math.sin(ang) * BS, in:0}); }
+    for (let q = 0; q < (SP('dl2') ? 2 : 1) && drills.length < 24; q++){ const [dx, dy] = q ? bigPoint() : [tx, ty], ang = Math.atan2(dy - BY, dx - BX); drills.push({x:dx, y:dy, ang, life:3, tick:0, sx:BX + Math.cos(ang) * BS, sy:BY + Math.sin(ang) * BS, in:0}); }
     fx.arm('drill', tx, ty);
   } else if (a.id === 'tesla'){
     const pts = [[W * (.15 + Math.random() * .7), H - ucell * .3]];
-    for (let q = 0; q < 5; q++) pts.push(bigPoint());
-    arcs.push({pts, k:1, t:0, life:.5});
+    for (let q = 0; q < (SP('ts2') ? 10 : 5); q++) pts.push(bigPoint());
+    arcs.push({pts, k:1, t:0, life:SP('ts2') ? .95 : .5});
     fx.arm('tesla', pts[0][0], pts[0][1]);
   } else if (a.id === 'hammer'){
     hammers.push({x:tx, t:0, dur:.45, life:.9});
     fx.arm('hammer', tx, 0);
   } else if (a.id === 'orbital'){
     beams.push({kind:'orb', x:tx, t:.9, fireAt:.35, fired:false});
+    if (SP('or2')) for (let q = 1; q <= 2; q++) beams.push({kind:'orb', x:Math.max(BX - BS * .45, Math.min(BX + BS * .45, tx + (q === 1 ? -1 : 1) * BS * .25)), t:.9 + q * .18, fireAt:.35, fired:false});
     fx.arm('orbital', tx, 0);
   } else if (a.id === 'nano'){
     for (let q = 0; q < 6 && nanos.length < 36; q++){ const [x, y] = bigPoint(); nanos.push({x, y, vx:rnd(-1, 1) * cell, vy:rnd(-1, 1) * cell, life:4, tick:Math.random() * .3}); }
@@ -893,6 +910,7 @@ function stepArms(dt){
   const base = stat.dmg();
   for (let k = shells.length - 1; k >= 0; k--){
     const o = shells[k]; o.t += dt;
+    if (o.t >= o.dur && SP('cn2')) for (let q = 0; q < 3; q++){ const a2 = Math.random() * 6.283, r2 = cell * rnd(.8, 1.6); queueBoom({x:o.tx + Math.cos(a2) * r2, y:o.ty + Math.sin(a2) * r2, R:cell * .9, dmg:base * armDmg('cannon') * .5, t:.1 + q * .07, big:false, arm:true, d:0, src:'cannon'}); }
     if (o.t >= o.dur){ shells.splice(k, 1); booms.push({x:o.tx, y:o.ty, dmg:base * armDmg('cannon'), t:0, big:false, arm:true, d:0, burst:3 + 2 * evo('cannon'), src:'cannon', R:cell * 1.4 * (SP('cn1') ? 1.2 : 1) * (1 + .3 * evo('cannon'))}); }
   }
   for (let k = beams.length - 1; k >= 0; k--){
@@ -919,7 +937,7 @@ function stepArms(dt){
   for (let k = holes.length - 1; k >= 0; k--){
     const h = holes[k]; h.life -= dt; h.tick -= dt;
     if (h.tick <= 0){ h.tick = .25; hit(base * armDmg('hole'), 'hole', h.x, h.y, 0); }
-    if (h.life <= 0){ holes.splice(k, 1); booms.push({x:h.x, y:h.y, R:h.R * 1.4, dmg:base * 5 * armDmg('hole'), t:0, big:true, d:0, burst:10, src:'hole'}); }
+    if (h.life <= 0){ holes.splice(k, 1); booms.push({x:h.x, y:h.y, R:h.R * (SP('bh2') ? 2 : 1.4), dmg:base * (SP('bh2') ? 8 : 5) * armDmg('hole'), t:0, big:true, d:0, burst:10, src:'hole'}); }
   }
   // ドリル：外から飛び込んで突き刺さり、0.2秒ごとに削る
   for (let k = drills.length - 1; k >= 0; k--){
@@ -938,7 +956,8 @@ function stepArms(dt){
   // 巨大ハンマー：振り下ろして当たった瞬間に大ダメージ
   for (let k = hammers.length - 1; k >= 0; k--){
     const o = hammers[k]; o.t += dt;
-    if (!o.hit && o.t >= o.dur){ o.hit = true; hit(base * armDmg('hammer'), 'hammer', o.x, BY - BS * .45, 0, 12 + 4 * evo('hammer')); fx.slam(o.x); }
+    if (!o.hit && o.t >= o.dur){ o.hit = true; hit(base * armDmg('hammer'), 'hammer', o.x, BY - BS * .45, 0, (12 + 4 * evo('hammer')) * (SP('hm2') ? 2 : 1)); fx.slam(o.x);
+      if (SP('hm2')) for (let q = 0; q < 4; q++) queueBoom({x:o.x + (q - 1.5) * BS * .22, y:BY - BS * .45 + q * BS * .25, R:cell * 1.2, dmg:base * armDmg('hammer') * .25, t:.08 + q * .07, big:false, arm:true, d:0, src:'hammer'}); }
     if (o.t >= o.life) hammers.splice(k, 1);
   }
   // ナノマシン：ブロックの上を這い回って0.3秒ごとに削る
@@ -946,13 +965,14 @@ function stepArms(dt){
     const o = nanos[k]; o.life -= dt; o.tick -= dt;
     o.vx += rnd(-1, 1) * cell * 6 * dt; o.vy += rnd(-1, 1) * cell * 6 * dt; o.x += o.vx * dt; o.y += o.vy * dt;
     if (!inBig(o.x, o.y, -cell * .2)){ o.vx = (BX - o.x) * .8; o.vy = (BY - o.y) * .8; }
-    if (o.tick <= 0){ o.tick = .3; hit(base * armDmg('nano'), 'nano', o.x, o.y, 0); }
+    if (o.tick <= 0){ o.tick = .3; hit(base * armDmg('nano'), 'nano', o.x, o.y, 0); if (SP('nn2') && nanos.length < 60 && Math.random() < .1) nanos.push({x:o.x, y:o.y, vx:-o.vx, vy:-o.vy, life:3, tick:.3}); }
     if (o.life <= 0) nanos.splice(k, 1);
   }
   // 超新星：3秒かけて膨らみ、最後に大爆発
   for (let k = novas.length - 1; k >= 0; k--){
     const o = novas[k]; o.t += dt;
-    if (o.t >= o.dur){ novas.splice(k, 1); booms.push({x:o.x, y:o.y, R:BS * .9, dmg:base * armDmg('nova'), t:0, big:true, d:0, burst:30, src:'nova'}); fx.nova(o.x, o.y); }
+    if (o.t >= o.dur){ novas.splice(k, 1); booms.push({x:o.x, y:o.y, R:BS * .9 * (o.mini ? .5 : 1), dmg:base * armDmg('nova') * (o.mini ? .3 : 1), t:0, big:true, d:0, burst:o.mini ? 10 : 30, src:'nova'}); fx.nova(o.x, o.y);
+      if (SP('nv2') && !o.mini) for (let q = 0; q < 2; q++){ const [x2, y2] = bigPoint(); novas.push({x:x2, y:y2, t:0, dur:1.5, mini:true}); } }
   }
 }
 function step(dt){
@@ -982,11 +1002,15 @@ function step(dt){
     autoT += dt;
     if (autoT >= 1 / P('pauto')){ autoT = 0; const [x, y] = bigPoint(); tap(x, y, true); }
   }
+  // 全機斉射（特殊強化）：10秒ごとに0.25秒間、全部のドローンが撃ちまくる
+  if (SP('dr5')){ volleyT -= dt; if (volleyT <= 0){ volleyT = 10; volley = .25; } }
+  if (volley > 0) volley -= dt;
   // ドローン
   const nd = armOn('drone') ? stat.drones() : 0, di = stat.droneInt() * (fever > 0 ? .5 : 1);
   for (let k = 0; k < nd; k++){
     const dr = drones[k]; dr.ph += dt; dr.t -= dt;
     if (dr.t <= 0){ dr.t = di * (.8 + Math.random() * .4); fireDrone(dr); if (SP('rl2')) fireDrone(dr); }
+    if (volley > 0 && Math.random() < dt * 20) fireDrone(dr);
   }
   stepArms(dt);
   for (let k = bullets.length - 1; k >= 0; k--){
