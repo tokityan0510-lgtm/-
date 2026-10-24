@@ -302,7 +302,7 @@ const PRESTIGE_STAGE = 8;   // この素材に到達したら「砕く」が解�
 const sv = s => Math.pow(TUNE.valStage, s);
 // コインの基準：ブロック1個ぶんのHPを削ると coinBase × 素材の価値。値段も同じ割合（costX）
 const coinBase = () => 100 * TUNE.coinK;
-const TUNE = {fhp:4000, fhpLate:4000, fdmg:4000, reqBase:50000, reqPow:6.4, dmgG:1.5, hpPow:3.4, hpMul:1, lvBonus:.01, tapProg:1.5, dustBase:18, dustDiv:8, dustBonus:.001, pmultBonus:.1, idleBonus:7, idleRamp:30, idleDmgK:.5, feverReward:2, costX:3, coinK:.03, valStage:1e4, modSpan:7, droneDmg:5, droneInt:1.5, armMul:15, armCatch:.8, modMul:6, armIdle:0, reso:.01, bossHp:1500, bossGrow:1.35, bossReward:300, comboDecay:.6};
+const TUNE = {fhp:4000, fhpLate:4000, fdmg:4000, reqBase:62000, reqPow:6.4, dmgG:1.5, hpPow:3.4, hpMul:1, lvBonus:.01, tapProg:1.5, dustBase:18, dustCap:2000, dustSoftPow:.3, dustDiv:8, dustBonus:.001, pmultBonus:.1, idleBonus:7, idleRamp:30, idleDmgK:.5, feverReward:2, costX:3, coinK:.03, valStage:1e4, modSpan:7, droneDmg:5, droneInt:1.5, armMul:15, armCatch:.8, modMul:6, armIdle:0, reso:.01, bossHp:1500, bossGrow:1.35, bossReward:300, comboDecay:.6};
 const DEFAULT = {
   coins:0, stage:0, lv:{}, mods:{}, best:0, ended:false, muted:false, t:0, idleRate:0, prog:0, started:false, kills:0, boss:null,
   sp:{}, ach:{}, dust:0, perm:{}, off:{}, runs:0, buyMode:1, endSeen:false, relics:{}, scale2:1,
@@ -336,14 +336,14 @@ const ARMS = [
 //   それ以外 … 上限あり。span 段ぶんの価値の伸びをかけて上限に届くよう、1Lvごとに大きく上がる（素材が進むごとに解放される感覚）
 const UPG = [
   // 放置
-  {cat:'idle', id:'drones',   get name(){ return armName('drone') + 'の台数'; }, get note(){ return evo('drone') ? `勝手に撃ち続ける${armName('drone')}（ドローンが進化）` : '勝手に撃ち続けるドローン'; },           cost:800,   span:10, max:11,  v:l => `${1+l+P('pdrone')}台`},
+  {cat:'idle', id:'drones',   get name(){ return armName('drone') + 'の台数'; }, get note(){ return evo('drone') ? `勝手に撃ち続ける${armName('drone')}（ドローンが進化）` : '勝手に撃ち続けるドローン'; },           cost:800,   inf:true, g:Math.pow(TUNE.valStage, 10 / 11), max:1e9,  v:l => `${1+l+P('pdrone')}台${1+l+P('pdrone') > 12 ? `（12台を超えた分は威力 ×${fmtX((1+l+P('pdrone')) / 12)}）` : ''}`},
   {cat:'idle', id:'droneint', name:'連射速度',       get note(){ return armName('drone') + 'が撃つ間隔'; },                 cost:600,   span:9,  max:8,  v:l => `${(TUNE.droneInt*Math.pow(.85,l)*(SP('rl1')?.8:1)).toFixed(2)}秒`},
   {cat:'idle', id:'dronedmg', name:'弾の威力',       get note(){ return armName('drone') + 'の弾が与えるダメージ（上限なし）'; }, cost:900, inf:true, g:TUNE.dmgG, max:1e9, v:l => `×${fmtX(TUNE.droneDmg*(1+.25*l))}`},
   {cat:'idle', id:'spawn',    name:'共鳴',           note:'1秒ごとに、直前1秒に与えたダメージの一部をもう一度与える', cost:1200, span:8, max:15, v:l => l ? `${Math.round(stat.reso(l)*100)}%` : 'なし'},
   {cat:'idle', id:'drburst',  name:'弾の炸裂',       note:'弾が当たったとき飛び散るかけら',     cost:2500,  span:8,  max:10,  v:l => `+${l*2*(SP('bu1')?2:1)}個`},
-  // 兵器（台数は上限あり、威力は上限なし）。値段は手に入る目安の段の価値に合わせる
+  // 兵器（台数も威力も上限なし。画面に出す台数は a.n まで、その先は台数に比例して威力が増える）。値段は手に入る目安の段の価値に合わせる
   ...ARMS.flatMap(a => [
-    {cat:'arms', id:a.id + 'N', get name(){ return armName(a.id) + 'の数'; }, get note(){ return evo(a.id) ? `${a.note}（${a.name}が進化）` : a.note; }, cost:2000 * Math.pow(TUNE.valStage, a.st), span:2 * Math.min(8, .75 * a.n), max:a.n, v:l => l ? `${l}台` : 'なし'},
+    {cat:'arms', id:a.id + 'N', get name(){ return armName(a.id) + 'の数'; }, get note(){ return evo(a.id) ? `${a.note}（${a.name}が進化）` : a.note; }, cost:2000 * Math.pow(TUNE.valStage, a.st), inf:true, g:Math.pow(TUNE.valStage, 2 * Math.min(8, .75 * a.n) / a.n), max:1e9, v:l => l ? `${l}台${l > a.n ? `（${a.n}台を超えた分は威力 ×${fmtX(l / a.n)}）` : ''}` : 'なし'},
     {cat:'arms', id:a.id + 'P', get name(){ return armName(a.id) + 'の威力'; }, get note(){ return armName(a.id) + 'のダメージ（上限なし）' + (a.st > 1 ? '。後発ボーナス：それより前の兵器の威力Lvの平均の8割が最初から上乗せされる' : ''); }, cost:3000 * Math.pow(TUNE.valStage, a.st), inf:true, g:TUNE.dmgG, max:1e9, v:l => `×${fmtX(1 + .25 * (l + armCatch(a.id)))}${armCatch(a.id) ? `（後発 +Lv${armCatch(a.id)}）` : ''}`},
   ]),
   // モジュール（ビルド）：上限なしの威力。ドローンや兵器と同じく後半まで伸ばせるように
@@ -441,7 +441,7 @@ const SPECIALS = [
 ];
 // ===== 遺物：ひびが満タンで砕けたとき（と幸運ブロックからたまに）落ちる。集めた遺物は全部効き、宇宙を砕いても消えない =====
 // rar：0 コモン / 1 レア / 2 エピック / 3 レジェンド（名前・色・出る重み）。同じ遺物がまた出たらLvが上がる
-const RARITY = [['コモン', '#b9c2cc', 62], ['レア', '#4cc9ff', 27], ['エピック', '#c38bff', 9], ['レジェンド', '#ffd84d', 2]];
+const RARITY = [['コモン', '#b9c2cc', 62], ['レア', '#4cc9ff', 27], ['エピック', '#c38bff', 9], ['レジェンド', '#ffd84d', 2], ['神話', '#ff4c88', 0]];
 const RELICS = [
   {id:'hammer',   name:'古代の槌',         rar:0, max:10, v:l => `破片の威力 +${10*l}%`},
   {id:'prop',     name:'錆びたプロペラ',   rar:0, max:10, v:l => `ドローンの威力 +${15*l}%`},
@@ -463,6 +463,11 @@ const RELICS = [
   {id:'crown',    name:'王冠',             rar:2, max:5,  v:l => `全部の報酬 ×${Math.pow(1.25,l).toFixed(2)}`},
   {id:'seed',     name:'ビッグバンの種',   rar:3, max:3,  v:l => `すべてのダメージ +${50*l}%`},
   {id:'tear',     name:'星屑の涙',         rar:3, max:3,  v:l => `星屑の獲得 +${25*l}%`},
+  // 神話：宇宙の先の深淵でだけ落ちる（ふつうの抽選には出ない）
+  {id:'abyss',    name:'深淵の瞳',         rar:4, max:5,  v:l => `すべてのダメージ ×${Math.pow(1.5,l).toFixed(2)}`},
+  {id:'void',     name:'虚無の欠片',       rar:4, max:5,  v:l => `星屑の獲得 +${20*l}%`},
+  {id:'origin',   name:'始原の炎',         rar:4, max:5,  v:l => `兵器とドローンの連射 +${10*l}%`},
+  {id:'endbell',  name:'終焉の鐘',         rar:4, max:5,  v:l => `砕くのに必要なダメージ −${Math.round((1-Math.pow(.95,l))*100)}%`},
   {id:'eye',      name:'創造主の眼',       rar:3, max:3,  v:l => `金のかけらの確率 +${3*l}%`},
 ];
 const RL = id => save.relics[id] || 0;
@@ -473,7 +478,7 @@ function dropRelic(minRar = 0){
   for (let k = RARITY.length - 1; k >= 0; k--){ x -= RARITY[k][2]; if (x < 0){ rar = k; break; } }
   rar = Math.max(rar, minRar);
   let pool = RELICS.filter(r => r.rar === rar && RL(r.id) < r.max);
-  if (!pool.length) pool = RELICS.filter(r => RL(r.id) < r.max);
+  if (!pool.length) pool = RELICS.filter(r => r.rar < 4 && RL(r.id) < r.max);
   if (!pool.length) return null;
   const r = pool[Math.floor(Math.random() * pool.length)];
   save.relics[r.id] = RL(r.id) + 1; save.st.relics++;
@@ -504,14 +509,24 @@ for (const [id, e] of Object.entries(EVO)) for (let k = 0; k < 2; k++){
   SPECIALS.push({cat:id === 'drone' ? 'idle' : 'arms', id:`${id}e${k + 1}`, evo:true, name:`進化：${e.names[k]}`, note:`${k ? e.names[0] : e.base}が${e.names[k]}に進化する。威力 ×4・見た目が変わる`,
     ref:[e.up, e.at[k]], req:() => L(e.up) >= e.at[k] - 10 * P('pevo') && save.st.deepest >= EVO_AT[k] && (k === 0 || SP(id + 'e1')), get rq(){ return `${id === 'drone' ? e.upName : armName(id) + 'の威力'} Lv${e.at[k] - 10 * P('pevo')}・${STAGES[EVO_AT[k]].name}に到達`; }});
 }
+// ===== 極み：威力のLvが300、400、500…に届くたびに出る特殊強化（威力 ×1.5）。後半もずっと買うものがあるように =====
+const MASTER_UP = {drone:'dronedmg', mod:'modpow', ...Object.fromEntries(ARMS.map(a => [a.id, a.id + 'P']))};
+const MASTER_N = 40, masterAt = k => 200 + 100 * k;   // k = 1..40（Lv300 〜 Lv4200。1周目の終わりごろから）
+const masterName = id => id === 'drone' ? armName('drone') : id === 'mod' ? 'モジュール' : armName(id);
+const mastery = id => { let n = 0; for (let k = 1; k <= MASTER_N && SP(id + 'm' + k); k++) n++; return Math.pow(1.5, n); };
+for (const [id, up] of Object.entries(MASTER_UP)) for (let k = 1; k <= MASTER_N; k++){
+  SPECIALS.push({cat:id === 'drone' ? 'idle' : id === 'mod' ? 'build' : 'arms', id:id + 'm' + k, master:true,
+    get name(){ return `${masterName(id)}の極み ${k}`; }, get note(){ return `${masterName(id)}の威力 ×1.5（重ねがけ）`; },
+    ref:[up, masterAt(k)], req:() => L(up) >= masterAt(k) && (k === 1 || SP(id + 'm' + (k - 1))), get rq(){ return `${id === 'drone' ? '弾の威力' : id === 'mod' ? 'モジュールの威力' : armName(id) + 'の威力'} Lv${masterAt(k)}`; }});
+}
 // ===== シナジー：別々の系統どうしを掛け合わせて火力を伸ばす特殊強化 =====
 const ARM_RELIC = {cannon:['powder', .2], laser:['prism', .2], missile:['fuse', .25], hole:['graviton', .25]};
 const armCount = () => ARMS.reduce((a, x) => a + L(x.id + 'N'), 0);
 // 遺物・進化・シナジーの火力の倍率。これらは「ひびの進み」だけを速くし、コインには効かせない
 // （コインはダメージに比例するので、効かせると ダメージ→コイン→強化→ダメージ の雪だるまで1周が数分で終わってしまう）
 const coreX = () => (1 + .1 * RL('hammer')) * (SP('sy3') ? 1 + .005 * Object.keys(save.ach).length : 1) * (SP('sy7') ? 1 + .005 * modTotal() : 1);
-const droneX = () => (1 + .15 * RL('prop')) * Math.pow(4, evo('drone')) * (SP('sy1') ? 1 + .03 * armCount() : 1);
-const armX = id => (ARM_RELIC[id] ? 1 + ARM_RELIC[id][1] * RL(ARM_RELIC[id][0]) : 1) * Math.pow(4, evo(id)) * (SP('sy2') ? 1 + .03 * stat.drones() : 1);
+const droneX = () => Math.max(1, stat.droneCount() / 12) * mastery('drone') * (1 + .1 * P('pwing')) * (1 + .15 * RL('prop')) * Math.pow(4, evo('drone')) * (SP('sy1') ? 1 + .03 * armCount() : 1);
+const armX = id => mastery(id) * (1 + .1 * P('pforge')) * (ARM_RELIC[id] ? 1 + ARM_RELIC[id][1] * RL(ARM_RELIC[id][0]) : 1) * Math.pow(4, evo(id)) * (SP('sy2') ? 1 + .03 * stat.drones() : 1);
 const modTotal = () => MODS.reduce((a, m) => a + ML(m.id), 0);
 SPECIALS.push(
   {cat:'idle', id:'sy1', name:'兵器連動',     note:'兵器の台数の合計1台ごとに、ドローンの威力 +3%',        cost:5e6, req:() => armCount() >= 12, rq:'兵器の台数 合計12台'},
@@ -527,7 +542,7 @@ SPECIALS.push(
 
 // 星屑で買う永続強化（砕いても残る）
 const PERM = [
-  {id:'pmult',  name:'星屑の輝き',     note:'全部の報酬 +10%',                       cost:4,  g:1.6, max:20, v:l => `+${l*10}%`},
+  {id:'pmult',  name:'星屑の輝き',     note:'全部の報酬 +10%（上限なし）',           cost:4,  g:1.35, max:1e9, v:l => `+${l*10}%`},
   {id:'pdrone', name:'初期ドローン',   note:'最初からドローンが多い',                cost:8,  g:1.8, max:5,  v:l => `+${l}台`},
   {id:'pstage', name:'先の素材から',   note:'砕いたあと、先の素材から始まる',        cost:10, g:1.8, max:7,  v:l => l ? `${STAGES[l].name}から` : '木箱から'},
   {id:'plucky', name:'幸運の軌道',     note:'幸運ブロックの出現間隔 −15%',           cost:12, g:1.7, max:5,  v:l => `−${Math.round((1-Math.pow(.85,l))*100)}%`},
@@ -537,16 +552,19 @@ const PERM = [
   {id:'pmodc',  name:'モジュール工房', note:'モジュールの値段 −30%',                 cost:30, g:2.5, max:2,  v:l => `−${Math.round((1-Math.pow(.7,l))*100)}%`},
   {id:'pkeep',  name:'モジュール記憶', note:'砕いてもモジュールのLvが残る',          cost:80, g:1,   max:1,  v:l => l ? '有効' : '無効'},
   {id:'pcrit',  name:'星の眼',         note:'クリティカル率 +5%',                    cost:15, g:1.8, max:4,  v:l => `+${5*l}%`},
-  {id:'pdmg',   name:'星の力',         note:'すべてのダメージ +10%（ひびだけが速くなる）', cost:5, g:1.55, max:30, v:l => `+${10*l}%`},
-  {id:'pidle',  name:'瞑想',           note:'放置ボーナスの上限 +1',                 cost:15, g:2,   max:5,  v:l => `最大 ×${TUNE.idleBonus + l}`},
-  {id:'pfever', name:'熱狂',           note:'フィーバーの時間 +2秒',                 cost:12, g:1.8, max:5,  v:l => `+${2*l}秒`},
+  {id:'pdmg',   name:'星の力',         note:'すべてのダメージ +10%（ひびだけが速くなる・上限なし）', cost:5, g:1.3, max:1e9, v:l => `+${10*l}%`},
+  {id:'pidle',  name:'瞑想',           note:'放置ボーナスの上限 +1（上限なし）',     cost:15, g:1.6, max:1e9,  v:l => `最大 ×${TUNE.idleBonus + l}`},
+  {id:'pfever', name:'熱狂',           note:'フィーバーの時間 +2秒（上限なし）',     cost:12, g:1.5, max:1e9,  v:l => `+${2*l}秒`},
   {id:'pcombo', name:'連鎖の記憶',     note:'コンボが減る速さ −10%',                 cost:10, g:1.8, max:5,  v:l => `−${Math.round((1-Math.pow(.9,l))*100)}%`},
   {id:'pluckt', name:'幸運の加護',     note:'幸運ブロックの効果時間 +20%',           cost:12, g:1.8, max:5,  v:l => `+${20*l}%`},
   {id:'pjack',  name:'星の導き',       note:'幸運ブロックでジャックポットが出る確率 ×2', cost:50, g:3, max:3, v:l => `×${Math.pow(2,l)}`},
   {id:'prelic', name:'発掘家',         note:'砕けたとき、遺物がもう1つ落ちる確率 +10%', cost:25, g:2, max:5, v:l => `${10*l}%`},
   {id:'pspc',   name:'値切り上手',     note:'特殊強化の値段 −20%',                   cost:20, g:2.2, max:3,  v:l => `−${Math.round((1-Math.pow(.8,l))*100)}%`},
-  {id:'pcash',  name:'支度金',         note:'砕いたあと、コインを持った状態で始まる', cost:8, g:1.9, max:5,  v:l => l ? `${fmt(10 * Math.pow(100, l))}コイン（素材の価値の分だけ増える）` : 'なし'},
+  {id:'pcash',  name:'支度金',         note:'砕いたあと、コインを持った状態で始まる（上限なし）', cost:8, g:1.6, max:1e9,  v:l => l ? `${fmt(10 * Math.pow(100, l))}コイン（素材の価値の分だけ増える）` : 'なし'},
   {id:'parms',  name:'兵器庫',         note:'砕いたあと、砲台とレーザーを持った状態で始まる', cost:20, g:2, max:3, v:l => l ? `${2*l}台ずつ` : 'なし'},
+  {id:'pforge', name:'星の鍛冶',       note:'兵器の威力 +10%（ひびだけが速くなる・上限なし）', cost:10, g:1.3, max:1e9, v:l => `+${10*l}%`},
+  {id:'pwing',  name:'星の翼',         note:'ドローンの威力 +10%（ひびだけが速くなる・上限なし）', cost:10, g:1.3, max:1e9, v:l => `+${10*l}%`},
+  {id:'pcrys',  name:'星の結晶',       note:'モジュールの威力 +10%（上限なし）', cost:10, g:1.3, max:1e9, v:l => `+${10*l}%`},
   {id:'pevo',   name:'進化の近道',     note:'進化に必要な威力Lv −10',                cost:60, g:2.5, max:3,  v:l => `−${10*l}`},
 ];
 const upG = u => u.inf ? u.g : Math.pow(TUNE.valStage, u.span / u.max);
@@ -583,10 +601,11 @@ const stat = {
   dmg:      () => Math.pow(TUNE.fdmg, save.stage) * (1 + .2 * L('power')) * (SP('sh1') ? 2 : 1) * (SP('sh2') ? 2 : 1) * (SP('sh3') ? 3 : 1)
               * coreX(),
   drones:   () => Math.min(12, 1 + L('drones') + P('pdrone')),
-  droneInt: () => TUNE.droneInt * Math.pow(.85, L('droneint')) * (SP('rl1') ? .8 : 1) * (buffs.barrage > 0 ? .125 : 1) * (SP('sy5') && fever > 0 ? 1 / 1.3 : 1),
+  droneCount: () => 1 + L('drones') + P('pdrone'),
+  droneInt: () => TUNE.droneInt * Math.pow(.85, L('droneint')) * (SP('rl1') ? .8 : 1) * (buffs.barrage > 0 ? .125 : 1) * (SP('sy5') && fever > 0 ? 1 / 1.3 : 1) / (1 + .1 * RL('origin')),
   droneDmg: () => TUNE.droneDmg * (1 + .25 * L('dronedmg')) * (SP('dr1') ? 1.5 : 1) * (SP('dr2') ? 1.5 : 1) * (SP('dr3') ? 2 : 1) * (SP('dr4') ? 2 : 1)
               * droneX(),
-  modPow:   () => TUNE.modMul * (1 + .25 * L('modpow')),
+  modPow:   () => TUNE.modMul * (1 + .25 * L('modpow')) * mastery('mod') * (1 + .1 * P('pcrys')),
   reso:     (l = L('spawn')) => TUNE.reso * l * (SP('sp1') ? 2 : 1) + .003 * RL('fork') + (SP('sy8') ? .05 : 0),
   drburst:  () => L('drburst') * 2 * (SP('bu1') ? 2 : 1),
   tapburst: () => 2 + L('tapburst'),
@@ -612,9 +631,11 @@ const bossK = () => Math.max(save.stage, save.kills);
 // 稼ぎの倍率は「相場」×「コンボ係数」で、どちらもボス撃破のたびに買えるLvに比例して伸びる（段階の2乗ほど）。
 // ゲージはそれに合わせて (1 + gaugeA×段階)² で伸ばし、さらに (1 + 段階)^gaugePow で後半ほど少し長くする
 // 巨大ブロックが砕けるまでに必要なダメージ（ブロック1個ぶんのHPの何個分か × (1+段階)^reqPow）
-const gaugeNeed = () => blockHp(save.stage) * TUNE.reqBase * Math.pow(1 + bossK(), TUNE.reqPow) * Math.pow(.92, P('pgauge'));
+const gaugeNeed = () => blockHp(save.stage) * TUNE.reqBase * Math.pow(1 + bossK(), TUNE.reqPow) * Math.pow(.92, P('pgauge')) * Math.pow(.95, RL('endbell'));
 const bossHp = () => blockHp(save.stage) * TUNE.bossHp * Math.pow(TUNE.bossGrow, bossK());
-const dustGain = () => { if (save.stage < PRESTIGE_STAGE) return 0; const lv = Math.log10(TUNE.valStage) / 5; return Math.floor(TUNE.dustBase * Math.pow(2, (Math.log10(Math.max(1, save.st.earnedRun / TUNE.coinK)) - 37 * lv) / (TUNE.dustDiv * lv)) * (1 + .25 * RL('tear'))); };
+const dustSoft = d => d <= TUNE.dustCap ? d : TUNE.dustCap * Math.pow(d / TUNE.dustCap, TUNE.dustSoftPow);
+const dustGain = () => { if (save.stage < PRESTIGE_STAGE) return 0; const lv = Math.log10(TUNE.valStage) / 5; const raw = TUNE.dustBase * Math.pow(2, (Math.log10(Math.max(1, save.st.earnedRun / TUNE.coinK)) - 37 * lv) / (TUNE.dustDiv * lv));
+  return Math.floor(dustSoft(raw) * (1 + .25 * RL('tear')) * (1 + .2 * RL('void'))); };
 
 let W = 390, H = 560, cell = 55.7, ucell = 55.7, topBand = 0, botBand = 0;
 let BX = 195, BY = 300, BS = 240, big = {flash:0, wob:0, wx:0, wy:0, spawn:1, burn:0, burnDps:0, burnAcc:0, bd:0, frost:0, poison:0, poisonAcc:0};
@@ -628,7 +649,7 @@ let shells = [], beams = [], missiles = [], holes = [], armT = {}, armK = 0;
 let drills = [], arcs = [], hammers = [], nanos = [], novas = [], volleyT = 10, volley = 0;
 let combo = 0, fever = 0, heat = 0, state = 'title', lastTap = 0, earnedTick = 0, luckyT = 60, autoT = 0;
 let MAXS = 900;   // 破片の上限（自動画質で変わる）
-const fx = {slam(){}, nova(){}, dig(){}, arm(){}, beam(){}, hole(){}, hit(){}, brk(){}, boom(){}, bolt(){}, fever(){}, milestone(){}, tap(){}, split(){}, bossHit(){}, bossSpawn(){}, bossDie(){}, shoot(){}, land(){}, lucky(){}, luckyHit(){}, ach(){}, relic(){}, charge(){}, frost(){}, pulse(){}};
+const fx = {slam(){}, nova(){}, dig(){}, arm(){}, beam(){}, hole(){}, hit(){}, brk(){}, boom(){}, bolt(){}, fever(){}, milestone(){}, tap(){}, split(){}, bossHit(){}, bossSpawn(){}, bossDie(){}, shoot(){}, land(){}, lucky(){}, luckyHit(){}, ach(){}, relic(){}, record(){}, charge(){}, frost(){}, pulse(){}};
 const TIERS = [[25, 'いいぞ', '#ffe14d'], [50, 'ナイス！', '#ffe14d'], [100, 'スゴい！', '#ff9a3c'], [250, 'ヤバい！', '#ff4c88'], [500, '狂気', '#c38bff'], [1000, '神', '#4cc9ff'], [2500, '宇宙', '#ffffff'], [5000, '無量大数', '#ffffff']];
 let milestoneSeen = 0;
 
@@ -662,6 +683,14 @@ function shatter(){
   // 宇宙を初めて砕いたらエンディング。そのあとも「宇宙の先」へ進める
   if (save.stage === UNIVERSE) save.ended = true;
   if (save.stage < STAGES.length - 1) save.stage++;
+  // 深淵（宇宙の先の7つ目以降）で一番深い記録を更新したら：星屑と、レア以上の遺物。ときどき神話の遺物
+  if (save.stage > save.st.deepest && save.stage > UNIVERSE + 6){
+    const bonus = Math.max(10, Math.floor(dustGain() * .05)); save.dust += bonus; save.st.bestDust += bonus;
+    fx.record(save.stage, bonus);
+    dropRelic(1);
+    const myth = RELICS.filter(r => r.rar === 4 && RL(r.id) < r.max);
+    if (myth.length && Math.random() < .3){ const r = myth[Math.floor(Math.random() * myth.length)]; save.relics[r.id] = RL(r.id) + 1; save.st.relics++; fx.relic(r, RL(r.id)); }
+  }
   save.st.deepest = Math.max(save.st.deepest, save.stage);
   dropRelic();
   if (Math.random() < .1 * P('prelic')) dropRelic();
@@ -743,7 +772,7 @@ function trackDps(dt){
 // 兵器のON/OFF（save.off[id] が 1 なら撃たない）
 const armOn = id => !(save.off && save.off[id]);
 // すべてのダメージに効く倍率（遺物「ビッグバンの種」、シナジー）
-const allDmg = () => (1 + .5 * RL('seed')) * (SP('sy4') ? 1 + Math.min(.25, combo / 4000) : 1) * (SP('sy6') ? 1 + .02 * relicKinds() : 1) * (SP('sy9') && idleMult() >= idleMax() ? 1.25 : 1) * (1 + .1 * P('pdmg'));
+const allDmg = () => Math.pow(1.5, RL('abyss')) * (1 + .5 * RL('seed')) * (SP('sy4') ? 1 + Math.min(.25, combo / 4000) : 1) * (SP('sy6') ? 1 + .02 * relicKinds() : 1) * (SP('sy9') && idleMult() >= idleMax() ? 1.25 : 1) * (1 + .1 * P('pdmg'));
 const DOT = new Set(['burn', 'reso', 'poison']);
 function hit(dmg, src, x, y, d = 0, burst = 0){
   let crit = false;
@@ -848,7 +877,7 @@ function fireDrone(dr){
   bullets.push({x:dr.x, y:dr.y, vx:dx / len * v, vy:dy / len * v, tx, ty, life:len / v + .05});
   fx.shoot(dr, tx, ty);
 }
-const armRate = () => (1 + TUNE.armIdle * (idleMult() - 1) / (idleMax() - 1)) * (1 + .1 * RL('gear')) * (SP('sy5') && fever > 0 ? 1.3 : 1) * (buffs.assault > 0 ? 5 : 1);
+const armRate = () => (1 + TUNE.armIdle * (idleMult() - 1) / (idleMax() - 1)) * (1 + .1 * RL('gear')) * (SP('sy5') && fever > 0 ? 1.3 : 1) * (buffs.assault > 0 ? 5 : 1) * (1 + .1 * RL('origin'));
 const armCatch = id => {
   const me = ARM_BY[id], prev = ARMS.filter(a => a.st < me.st && L(a.id + 'N') > 0);
   return prev.length ? Math.floor(TUNE.armCatch * prev.reduce((t, a) => t + L(a.id + 'P'), 0) / prev.length) : 0;
@@ -857,7 +886,8 @@ const armPow = id => (1 + .25 * (L(id + 'P') + armCatch(id))) * (id === 'cannon'
   * armX(id);
 // 兵器1発の威力（破片1つの何倍か）。ブラックホールは1回の吸い込みぶん（最後の爆発はその5倍）
 const ARM_BY = Object.fromEntries(ARMS.map(a => [a.id, a]));
-const armDmg = id => ARM_BY[id].dmg * TUNE.armMul * armPow(id);
+// 画面に出す台数（a.n）を超えた分は、発射の回数ではなく1発の威力で増やす（重くならないように）
+const armDmg = id => ARM_BY[id].dmg * TUNE.armMul * armPow(id) * Math.max(1, L(id + 'N') / ARM_BY[id].n);
 function fireArm(a, n){
   const [tx, ty] = bigPoint();
   if (a.id === 'cannon'){
@@ -908,7 +938,7 @@ function stepArms(dt){
   for (const a of ARMS){
     const n = L(a.id + 'N'); if (!n || !armOn(a.id)) continue;
     // 放置ボーナスで連射を上げる場合は TUNE.armIdle（今は0：兵器は威力が強いぶん、連射は上げない）
-    armT[a.id] = (armT[a.id] || Math.random()) + dt * n / a.every * armRate();
+    armT[a.id] = (armT[a.id] || Math.random()) + dt * Math.min(n, a.n) / a.every * armRate();
     while (armT[a.id] >= 1){ armT[a.id] -= 1; fireArm(a, n); }
   }
   const base = stat.dmg();
@@ -1089,7 +1119,9 @@ ACH.push({id:'mall', name:'全モジュール', desc:`${MODS.length}種のモジ
 ACH.push({id:'slot4', name:'フル装備', desc:`${MODS.length}種のモジュールを全部Lv5以上にする`, ok:() => MODS.every(m => ML(m.id) >= 5)});
 ACH.push({id:'off1', name:'おかえり', desc:'オフライン収入を受け取る', ok:() => save.st.offline >= 1});
 ACH.push({id:'sp10', name:'特殊部隊', desc:'特殊強化を10個買う', ok:() => Object.keys(save.sp).length >= 10});
-ACH.push({id:'spall', name:'全部入り', desc:'特殊強化を全部買う', ok:() => SPECIALS.every(s => SP(s.id))});
+ACH.push({id:'spall', name:'全部入り', desc:'特殊強化を全部買う（極みは除く）', ok:() => SPECIALS.every(s => s.master || SP(s.id))});
+ACH.push({id:'myth', name:'神話', desc:'神話の遺物を手に入れる', ok:() => RELICS.some(r => r.rar === 4 && RL(r.id) > 0)});
+ACH.push({id:'master10', name:'極めし兵器', desc:'極みを合計10個買う', ok:() => SPECIALS.filter(s => s.master && SP(s.id)).length >= 10});
 ACH.push({id:'dust100', name:'星屑の山', desc:'星屑を累計100集める', ok:() => save.st.bestDust >= 100});
 achSet('r', '遺物の種類', [1, 5, 10, 15, RELICS.length], ['掘り出し物', '収集家', '博物館', '考古学者', '完全図鑑'], () => relicKinds(), n => n + '種');
 ACH.push({id:'rleg', name:'伝説', desc:'レジェンドの遺物を手に入れる', ok:() => RELICS.some(r => r.rar === 3 && RL(r.id) > 0)});
@@ -1336,6 +1368,7 @@ fx.luckyHit = (lk, text, kind) => {
   sfxJackpot();
 };
 fx.ach = a => { showToast(a.name, a.desc); sfxAch(); };
+fx.record = (st, bonus) => setTimeout(() => { showToast(`${STAGES[st].name}に到達`, `最深記録を更新！　星屑 +${bonus.toLocaleString('ja-JP')}`, '新記録', 3500); }, 2200);
 // 遺物：砕けた演出のあとに、レア度の色で名前を出す。エピック以上は画面を光らせる
 fx.relic = (r, lv) => {
   const [rn, rc] = RARITY[r.rar];
@@ -1343,7 +1376,7 @@ fx.relic = (r, lv) => {
     bigText(lv === 1 ? `遺物発見！（${rn}）` : `遺物強化！（${rn}）`, .64, rc, 2.2, 10);
     bigText(`${r.name}${lv > 1 ? ' Lv' + lv : ''}`, .72, rc, 2.2, 8);
     showToast(`${r.name}${lv > 1 ? ' Lv' + lv : ''}`, r.v(lv), `遺物（${rn}）`);
-    if (r.rar >= 2){ flash = Math.max(flash, r.rar === 3 ? .9 : .5); flashColor = r.rar === 3 ? '255,216,77' : '195,139,255'; sfxJackpot(); } else sfxLucky();
+    if (r.rar >= 2){ flash = Math.max(flash, r.rar >= 3 ? .9 : .5); flashColor = r.rar === 4 ? '255,76,136' : r.rar === 3 ? '255,216,77' : '195,139,255'; sfxJackpot(); } else sfxLucky();
     pushNews(`<b style="color:${rc}">${r.name}</b>${lv > 1 ? ` が Lv${lv} に` : ' を見つけた'}。${r.v(lv)}`);
   }, 1100);
 };
@@ -1887,7 +1920,7 @@ function helpHtml(){
       <li><b>操作</b>：タップ・フィーバー・衝撃波</li>
       <li><b>共通</b>：破片の威力・クリティカル・コンボ係数・相場など全体に効くもの</li>
       <li><b>ビルド</b>：モジュール（下の項目）</li></ul>
-      <p>Lvに上限があるものは1Lvごとに値段が大きく上がる。上限なしのものは少しずつ上がる（威力系は1.5倍ずつ）。条件を満たすと<b>特殊強化</b>（一度きり）が現れる。<b>改良</b>で兵器の威力が大きく伸び、<b>進化</b>で名前と見た目が変わる。</p>`),
+      <p>Lvに上限があるものは1Lvごとに値段が大きく上がる。上限なしのものは少しずつ上がる（威力系は1.5倍ずつ）。兵器とドローンの台数も上限なしで、画面に出る数を超えた分は1発の威力が増える。威力Lvが300・400・500…に届くたびに<b>極み</b>（威力×1.5）が買える。条件を満たすと<b>特殊強化</b>（一度きり）が現れる。<b>改良</b>で兵器の威力が大きく伸び、<b>進化</b>で名前と見た目が変わる。</p>`),
     sec('モジュールと組み合わせ技', `<p>モジュールは解放したら全部効く（枠はない）。右のボタンでON/OFFできる。「モジュールの威力」は上限なしで、全部のモジュールのダメージに効く。</p>
       <p>2つのモジュールがどちらもLv3以上・ONだと<b>組み合わせ技</b>が発動する（ビルドタブの上に一覧）。</p>`),
     sec('遺物', `<p>ひびが満タンで砕けるたびに1つ落ちる（幸運ブロックからもたまに）。レア度は4段階。集めた遺物は全部効き、宇宙を砕いても消えない。同じ遺物がまた出るとLvが上がる。</p>`),
@@ -1969,7 +2002,7 @@ function sheetHtml(){
     h += '</div>';
   } else if (tab === 'relic'){
     h += `<div class="section-title">遺物 ${relicKinds()} / ${RELICS.length} 種類</div>
-      <p class="hint">出る確率：${RARITY.map(([n, c, w]) => `<b style="color:${c}">${n}</b> ${w}%`).join('　')}</p><div class="relics">`;
+      <p class="hint">出る確率：${RARITY.slice(0, 4).map(([n, c, w]) => `<b style="color:${c}">${n}</b> ${w}%`).join('　')}　<b style="color:${RARITY[4][1]}">神話</b>は深淵で一番深い記録を更新したときだけ</p><div class="relics">`;
     for (const r of RELICS){
       const l = RL(r.id), [rn, rc] = RARITY[r.rar];
       h += l ? `<div class="relic" style="--rc:${rc}"><b>${r.name}</b><span class="rr">${rn}　Lv ${l}${l >= r.max ? '（最大）' : ' / ' + r.max}</span><span class="d">${r.v(l)}</span></div>`
