@@ -34,11 +34,13 @@ for (let k = 1; k <= 38; k++){
 const PRESTIGE_STAGE = 8;   // この素材に到達したら「砕く」が解放される
 // ブロックの価値の素材倍率（TUNE.valStage）
 const sv = s => Math.pow(TUNE.valStage, s);
-const TUNE = {fhp:4000, fhpLate:4000, fdmg:4000, reqBase:11000, reqPow:6.4, dmgG:1.5, hpPow:3.4, hpMul:1, lvBonus:.01, tapProg:1.5, dustBase:18, dustDiv:8, dustBonus:.001, pmultBonus:.1, idleBonus:7, idleRamp:30, idleDmgK:.5, feverReward:2, costX:3, valStage:1e4, modSpan:7, droneDmg:5, droneInt:1.5, armMul:15, modMul:3, armIdle:0, reso:.01, bossHp:1500, bossGrow:1.35, bossReward:300, comboDecay:.6};
+// コインの基準：ブロック1個ぶんのHPを削ると coinBase × 素材の価値。値段も同じ割合（costX）
+const coinBase = () => 100 * TUNE.coinK;
+const TUNE = {fhp:4000, fhpLate:4000, fdmg:4000, reqBase:11000, reqPow:6.4, dmgG:1.5, hpPow:3.4, hpMul:1, lvBonus:.01, tapProg:1.5, dustBase:18, dustDiv:8, dustBonus:.001, pmultBonus:.1, idleBonus:7, idleRamp:30, idleDmgK:.5, feverReward:2, costX:3, coinK:.03, valStage:1e4, modSpan:7, droneDmg:5, droneInt:1.5, armMul:15, modMul:3, armIdle:0, reso:.01, bossHp:1500, bossGrow:1.35, bossReward:300, comboDecay:.6};
 Object.assign(TUNE, JSON.parse(process.env.TUNE || '{}'));
 const DEFAULT = {
   coins:0, stage:0, lv:{}, mods:{}, best:0, ended:false, muted:false, t:0, idleRate:0, prog:0, started:false, kills:0, boss:null,
-  sp:{}, ach:{}, dust:0, perm:{}, off:{}, runs:0, buyMode:1, endSeen:false, relics:{},
+  sp:{}, ach:{}, dust:0, perm:{}, off:{}, runs:0, buyMode:1, endSeen:false, relics:{}, scale2:1,
   st:{depth:0, destroyed:0, taps:0, bosses:0, lucky:0, fevers:0, time:0, earnedRun:0, earnedAll:0, offline:0, bestDust:0, bigCombo:0, deepest:0, relics:0, luckyKinds:{}},
 };
 let save = JSON.parse(JSON.stringify(DEFAULT));
@@ -260,13 +262,13 @@ const PERM = [
   {id:'pcrit',  name:'星の眼',         note:'クリティカル率 +5%',                    cost:15, g:1.8, max:4,  v:l => `+${5*l}%`},
 ];
 const upG = u => u.inf ? u.g : Math.pow(TUNE.valStage, u.span / u.max);
-const upCost  = (u, l = L(u.id)) => Math.ceil(u.cost * TUNE.costX * Math.pow(upG(u), l));
+const upCost  = (u, l = L(u.id)) => Math.ceil(u.cost * TUNE.costX * TUNE.coinK * Math.pow(upG(u), l));
 const upCostN = (u, n) => { let s = 0; for (let k = 0; k < n; k++) s += upCost(u, L(u.id) + k); return s; };
 const upMaxN  = u => { let n = 0, s = 0; while (L(u.id) + n < u.max){ const c = upCost(u, L(u.id) + n); if (s + c > save.coins) break; s += c; n++; } return n; };
 // モジュールは st 段目あたりで解放できる値段。Lvは modSpan 段かけて上限へ
-const modCost = m => Math.ceil((ML(m.id) ? m.cost * Math.pow(TUNE.valStage, TUNE.modSpan * (ML(m.id) - 1) / m.max) : m.unlock) * TUNE.costX * sv(m.st) * Math.pow(.7, P('pmodc')));
+const modCost = m => Math.ceil((ML(m.id) ? m.cost * Math.pow(TUNE.valStage, TUNE.modSpan * (ML(m.id) - 1) / m.max) : m.unlock) * TUNE.costX * TUNE.coinK * sv(m.st) * Math.pow(.7, P('pmodc')));
 // Lv条件の特殊強化は、条件になったLvの値段の4倍。記録条件のものは今の素材の価値に合わせる
-const spCost = s => Math.ceil(s.ref ? 4 * upCost(UPG.find(u => u.id === s.ref[0]), s.ref[1]) : s.cost * TUNE.costX * sv(save.stage) / 10);
+const spCost = s => Math.ceil(s.ref ? 4 * upCost(UPG.find(u => u.id === s.ref[0]), s.ref[1]) : s.cost * TUNE.costX * TUNE.coinK * sv(save.stage) / 10);
 const permCost = p => Math.ceil(p.cost * Math.pow(p.g, P(p.id)));
 
 // 幸運ブロックの効果（バフ）
@@ -289,7 +291,7 @@ const luckyInterval = () => 110 * (SP('lk1') ? .75 : 1) * (SP('lk2') ? .75 : 1) 
 
 const stat = {
   shards:   () => 3 + L('shards'),
-  dmg:      () => 100 * Math.pow(TUNE.fdmg, save.stage) * (1 + .2 * L('power')) * (SP('sh1') ? 2 : 1) * (SP('sh2') ? 2 : 1) * (SP('sh3') ? 3 : 1)
+  dmg:      () => Math.pow(TUNE.fdmg, save.stage) * (1 + .2 * L('power')) * (SP('sh1') ? 2 : 1) * (SP('sh2') ? 2 : 1) * (SP('sh3') ? 3 : 1)
               * coreX(),
   drones:   () => Math.min(12, 1 + L('drones') + P('pdrone')),
   droneInt: () => TUNE.droneInt * Math.pow(.85, L('droneint')) * (SP('rl1') ? .8 : 1) * (buffs.barrage > 0 ? .125 : 1) * (SP('sy5') && fever > 0 ? 1 / 1.3 : 1),
@@ -315,7 +317,7 @@ const stat = {
 };
 // 暗黒物質以降はHPの伸びをダメージと揃える（差が積み重なって終盤だけ詰まるのを防ぐ）
 // HPは威力と同じ伸び（×4000/段）に加えて、強化で積み上がる火力に見合うよう (1+段階)^hpPow 倍を上乗せする（掘る速さ＝威力÷HP）
-const blockHp = s => 300 * TUNE.hpMul * Math.pow(TUNE.fhp, s) * Math.pow(1 + s, TUNE.hpPow);
+const blockHp = s => 3 * TUNE.hpMul * Math.pow(TUNE.fhp, s) * Math.pow(1 + s, TUNE.hpPow);
 // 何体目か：先の素材から始めても軽くならないよう、素材の段階と撃破数の大きいほう
 const bossK = () => Math.max(save.stage, save.kills);
 // 稼ぎの倍率は「相場」×「コンボ係数」で、どちらもボス撃破のたびに買えるLvに比例して伸びる（段階の2乗ほど）。
@@ -323,7 +325,7 @@ const bossK = () => Math.max(save.stage, save.kills);
 // 巨大ブロックが砕けるまでに必要なダメージ（ブロック1個ぶんのHPの何個分か × (1+段階)^reqPow）
 const gaugeNeed = () => blockHp(save.stage) * TUNE.reqBase * Math.pow(1 + bossK(), TUNE.reqPow) * Math.pow(.92, P('pgauge'));
 const bossHp = () => blockHp(save.stage) * TUNE.bossHp * Math.pow(TUNE.bossGrow, bossK());
-const dustGain = () => { if (save.stage < PRESTIGE_STAGE) return 0; const lv = Math.log10(TUNE.valStage) / 5; return Math.floor(TUNE.dustBase * Math.pow(2, (Math.log10(Math.max(1, save.st.earnedRun)) - 37 * lv) / (TUNE.dustDiv * lv)) * (1 + .25 * RL('tear'))); };
+const dustGain = () => { if (save.stage < PRESTIGE_STAGE) return 0; const lv = Math.log10(TUNE.valStage) / 5; return Math.floor(TUNE.dustBase * Math.pow(2, (Math.log10(Math.max(1, save.st.earnedRun / TUNE.coinK)) - 37 * lv) / (TUNE.dustDiv * lv)) * (1 + .25 * RL('tear'))); };
 
 let W = 390, H = 560, cell = 55.7, ucell = 55.7, topBand = 0, botBand = 0;
 let BX = 195, BY = 300, BS = 240, big = {flash:0, wob:0, wx:0, wy:0, spawn:1, burn:0, burnDps:0, burnAcc:0, bd:0, frost:0, poison:0, poisonAcc:0};
@@ -365,7 +367,7 @@ const bigPoint = () => [BX + rnd(-.42, .42) * BS, BY + rnd(-.42, .42) * BS];
 function earn(gain){ save.coins += gain; earnedTick += gain; save.st.earnedRun += gain; save.st.earnedAll += gain; return gain; }
 // ひびが満タンになったら砕けて次の素材へ
 function shatter(){
-  const gain = earn(100 * sv(save.stage) * TUNE.bossReward * comboMult() * rewardMult());
+  const gain = earn(coinBase() * sv(save.stage) * TUNE.bossReward * comboMult() * rewardMult());
   save.kills++; save.st.bosses++; save.prog = 0;
   const prevStage = save.stage;
   // 宇宙を初めて砕いたらエンディング。そのあとも「宇宙の先」へ進める
@@ -387,7 +389,7 @@ function spawnLucky(){
 const LUCKY = [
   {id:'frenzy',  w:20, name:'フレンジー',   note:'60秒 報酬×7',                   run:(lk, d) => { buffs.frenzy = 60 * d; return 'フレンジー！　報酬 ×7'; }},
   {id:'barrage', w:11, name:'弾幕',         note:'25秒 ドローンの連射×8',         run:(lk, d) => { buffs.barrage = 25 * d; return '弾幕！　ドローン連射 ×8'; }},
-  {id:'rain',    w:10, name:'コイン雨',     note:'放置の稼ぎ15分ぶんのコイン',    run:() => 'コイン雨！　+' + fmt(earn(Math.max(100 * sv(save.stage) * 200, save.idleRate * 900) * rewardMult()))},
+  {id:'rain',    w:10, name:'コイン雨',     note:'放置の稼ぎ15分ぶんのコイン',    run:() => 'コイン雨！　+' + fmt(earn(Math.max(coinBase() * sv(save.stage) * 200, save.idleRate * 900) * rewardMult()))},
   {id:'awaken',  w:9,  name:'覚醒',         note:'20秒 クリティカル100%',         run:(lk, d) => { buffs.awaken = 20 * d; return '覚醒！　クリティカル100%'; }},
   {id:'storm',   w:6,  name:'かけら嵐',     note:'かけら300個',                   run:lk => { buffs.storm = 1; spawnShards(lk.x, lk.y, 300, 0); return 'かけら嵐！'; }},
   {id:'assault', w:10, name:'総攻撃',       note:'20秒 兵器の連射×5',             run:(lk, d) => { buffs.assault = 20 * d; return '総攻撃！　兵器の連射 ×5'; }},
@@ -473,7 +475,7 @@ function hit(dmg, src, x, y, d = 0, burst = 0){
   combo += DOT.has(src) ? .2 : 1; save.st.destroyed++;
   // コインは与えたダメージに比例（ブロック1個ぶんのHPで、その素材のブロック1個ぶんの価値）
   const nx = allDmg() * coreX() * (src === 'drone' ? droneX() : ARM_BY[src] ? armX(src) : 1);
-  let gain = 100 * sv(save.stage) * dmg / nx / blockHp(save.stage) * comboMult() * rewardMult(), gold = false;
+  let gain = coinBase() * sv(save.stage) * dmg / nx / blockHp(save.stage) * comboMult() * rewardMult(), gold = false;
   if (!DOT.has(src) && Math.random() < stat.gold()){ gain *= 15 * (SP('go1') ? 2 : 1); gold = true; }
   earn(gain);
   if (src !== 'reso') resoWin += dmg;
