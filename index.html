@@ -166,10 +166,6 @@ body:not(.loud) #fever span{animation:none}
 .eq:disabled{opacity:.45;cursor:default}
 .locked .name{color:var(--muted)}
 .done .name{color:var(--good)}
-.slots{display:flex;gap:6px;margin-top:10px;flex-wrap:wrap}
-.slot{flex:1;min-width:64px;padding:10px 6px;border-radius:10px;border:2px solid var(--accent);text-align:center;font-weight:700;font-size:14px}
-.slot.empty{border-style:dashed;border-color:var(--line);color:var(--muted)}
-.slot.lockd{border-style:dashed;border-color:var(--line);color:var(--muted);font-size:12px}
 .section-title{font-size:13px;color:var(--muted);font-weight:700;margin:14px 0 2px}
 .toggle{appearance:none;border:1.5px solid var(--line);background:var(--surface);border-radius:999px;padding:7px 14px;font-weight:700;cursor:pointer;white-space:nowrap;color:var(--muted)}
 .toggle.on{background:var(--good);border-color:var(--good);color:#fff}
@@ -271,14 +267,15 @@ const PRESTIGE_STAGE = 8;   // この素材に到達したら「砕く」が解�
 const sv = s => Math.pow(TUNE.valStage, s);
 const TUNE = {fhp:4000, fhpLate:4000, fdmg:4000, reqBase:2200, reqPow:5.4, dmgG:1.5, hpPow:3.4, hpMul:1, lvBonus:.01, tapProg:1.5, dustBase:18, dustDiv:8, dustBonus:.001, pmultBonus:.1, idleBonus:7, idleRamp:30, idleDmgK:.35, feverReward:2, costX:3, valStage:1e4, modSpan:7, droneDmg:5, droneInt:1.5, armMul:15, armIdle:0, reso:.01, bossHp:1500, bossGrow:1.35, bossReward:300, comboDecay:.6};
 const DEFAULT = {
-  coins:0, stage:0, lv:{}, mods:{}, equip:[], slots:2, best:0, ended:false, muted:false, t:0, idleRate:0, prog:0, started:false, kills:0, boss:null,
+  coins:0, stage:0, lv:{}, mods:{}, best:0, ended:false, muted:false, t:0, idleRate:0, prog:0, started:false, kills:0, boss:null,
   sp:{}, ach:{}, dust:0, perm:{}, off:{}, runs:0, buyMode:1, endSeen:false,
   st:{depth:0, destroyed:0, taps:0, bosses:0, lucky:0, fevers:0, time:0, earnedRun:0, earnedAll:0, offline:0, bestDust:0, bigCombo:0},
 };
 let save = JSON.parse(JSON.stringify(DEFAULT));
 const L = id => save.lv[id] || 0;
 const ML = id => save.mods[id] || 0;
-const M = id => save.equip.includes(id) ? ML(id) : 0;
+// モジュールは解放したら全部効く（装備枠はなし）。ON/OFFボタンで止めたものだけ効かない
+const M = id => save.off && save.off[id] ? 0 : ML(id);
 const SP = id => !!save.sp[id];
 const P = id => save.perm[id] || 0;
 
@@ -376,18 +373,16 @@ const PERM = [
   {id:'pgauge', name:'因果の短縮',     note:'ボス出現に必要な稼ぎ −8%',              cost:6,  g:1.9, max:5,  v:l => `−${Math.round((1-Math.pow(.92,l))*100)}%`},
   {id:'pauto',  name:'自動タップ',     note:'毎秒勝手にタップする（熱量は半分。幸運ブロックは叩かない）', cost:40, g:2.2, max:3, v:l => `毎秒${l}回`},
   {id:'poff',   name:'長期休暇',       note:'オフライン収入の上限時間 +4時間',      cost:10, g:1.7, max:4,  v:l => `${8+4*l}時間`},
-  {id:'pslot',  name:'広い装備枠',     note:'最初から装備枠が多い',                  cost:30, g:2.5, max:2,  v:l => `${2+l}枠から`},
+  {id:'pmodc',  name:'モジュール工房', note:'モジュールの値段 −30%',                 cost:30, g:2.5, max:2,  v:l => `−${Math.round((1-Math.pow(.7,l))*100)}%`},
   {id:'pkeep',  name:'モジュール記憶', note:'砕いてもモジュールのLvが残る',          cost:80, g:1,   max:1,  v:l => l ? '有効' : '無効'},
   {id:'pcrit',  name:'星の眼',         note:'クリティカル率 +5%',                    cost:15, g:1.8, max:4,  v:l => `+${5*l}%`},
 ];
-const SLOT_COST = [0, 0, 3e5, 1e8], SLOT_STAGE = [0, 0, 1, 4];
 const upG = u => u.inf ? u.g : Math.pow(TUNE.valStage, u.span / u.max);
 const upCost  = (u, l = L(u.id)) => Math.ceil(u.cost * TUNE.costX * Math.pow(upG(u), l));
 const upCostN = (u, n) => { let s = 0; for (let k = 0; k < n; k++) s += upCost(u, L(u.id) + k); return s; };
 const upMaxN  = u => { let n = 0, s = 0; while (L(u.id) + n < u.max){ const c = upCost(u, L(u.id) + n); if (s + c > save.coins) break; s += c; n++; } return n; };
 // モジュールは st 段目あたりで解放できる値段。Lvは modSpan 段かけて上限へ
-const modCost = m => Math.ceil((ML(m.id) ? m.cost * Math.pow(TUNE.valStage, TUNE.modSpan * (ML(m.id) - 1) / m.max) : m.unlock) * TUNE.costX * sv(m.st));
-const slotCost = () => SLOT_COST[save.slots] * TUNE.costX * sv(SLOT_STAGE[save.slots]);
+const modCost = m => Math.ceil((ML(m.id) ? m.cost * Math.pow(TUNE.valStage, TUNE.modSpan * (ML(m.id) - 1) / m.max) : m.unlock) * TUNE.costX * sv(m.st) * Math.pow(.7, P('pmodc')));
 // Lv条件の特殊強化は、条件になったLvの値段の4倍。記録条件のものは今の素材の価値に合わせる
 const spCost = s => Math.ceil(s.ref ? 4 * upCost(UPG.find(u => u.id === s.ref[0]), s.ref[1]) : s.cost * TUNE.costX * sv(save.stage) / 10);
 const permCost = p => Math.ceil(p.cost * Math.pow(p.g, P(p.id)));
@@ -757,7 +752,7 @@ achSet('u', '強化レベル合計', [10, 100, 300, 1000, 3000], ['初心者', '
 achSet('h', 'プレイ時間', [600, 3600, 3 * 3600, 10 * 3600, 24 * 3600], ['10分', '1時間', '3時間', '10時間', '丸一日'], () => save.st.time, fmtT);
 ACH.push({id:'arms4', name:'兵器工場', desc:'4種類の兵器をすべてそろえる', ok:() => ARMS.every(a => L(a.id + 'N') > 0)});
 ACH.push({id:'mall', name:'全モジュール', desc:'7種のモジュールを全部解放', ok:() => MODS.every(m => ML(m.id) > 0)});
-ACH.push({id:'slot4', name:'フル装備', desc:'装備枠を4つにする', ok:() => save.slots >= 4});
+ACH.push({id:'slot4', name:'フル装備', desc:'7種のモジュールを全部Lv5以上にする', ok:() => MODS.every(m => ML(m.id) >= 5)});
 ACH.push({id:'off1', name:'おかえり', desc:'オフライン収入を受け取る', ok:() => save.st.offline >= 1});
 ACH.push({id:'sp10', name:'特殊部隊', desc:'特殊強化を10個買う', ok:() => Object.keys(save.sp).length >= 10});
 ACH.push({id:'spall', name:'全部入り', desc:'特殊強化を全部買う', ok:() => SPECIALS.every(s => SP(s.id))});
@@ -771,7 +766,7 @@ function prestige(){
   const d = dustGain();
   save.dust += d; save.st.bestDust += d; save.runs++;
   const keepMods = P('pkeep') ? save.mods : {};
-  Object.assign(save, {coins:0, stage:Math.min(P('pstage'), STAGES.length - 1), lv:{}, mods:keepMods, equip:[], slots:2 + P('pslot'), ended:false, endSeen:false, prog:0, kills:0, boss:null, sp:{}, idleRate:0});
+  Object.assign(save, {coins:0, stage:Math.min(P('pstage'), STAGES.length - 1), lv:{}, mods:keepMods, ended:false, endSeen:false, prog:0, kills:0, boss:null, sp:{}, idleRate:0});
   save.st.earnedRun = 0;
   for (const k in buffs) buffs[k] = 0;
   combo = 0; fever = 0; heat = 0; boss = null; lucky = null; luckyT = 30;
@@ -792,6 +787,9 @@ function load(){
     if (s){ const o = JSON.parse(s); save = Object.assign(JSON.parse(JSON.stringify(DEFAULT)), o); save.st = Object.assign(JSON.parse(JSON.stringify(DEFAULT.st)), o.st || {}); }
     // 掘削方式（段数のノルマ）より前のセーブは進み具合の単位が違うので、ノルマ未満に切り詰める
     save.prog = Math.min(Math.floor(save.prog || 0), gaugeNeed() - 1);
+    // 装備枠をなくしたので、永続強化「広い装備枠」に使った星屑を返す
+    if (save.perm && save.perm.pslot){ for (let k = 0; k < save.perm.pslot; k++) save.dust += Math.ceil(30 * Math.pow(2.5, k)); delete save.perm.pslot; }
+    delete save.equip; delete save.slots;
   } catch(e) {}
 }
 function persist(){ save.t = Date.now(); try { localStorage.setItem(KEY, JSON.stringify(save)); } catch(e) {} }
@@ -1385,7 +1383,7 @@ const TABS = [['idle', '放置'], ['arms', '兵器'], ['tap', '操作'], ['core'
 const cs = n => fmt(n);
 const specialsFor = cat => SPECIALS.filter(s => s.cat === cat && !SP(s.id) && s.req());
 function anyAffordable(kind){
-  if (kind === 'build') return MODS.some(m => ML(m.id) < m.max && save.coins >= modCost(m)) || (save.slots < 4 && save.coins >= slotCost());
+  if (kind === 'build') return MODS.some(m => ML(m.id) < m.max && save.coins >= modCost(m));
   if (kind === 'ach') return false;
   if (kind === 'dust') return PERM.some(p => P(p.id) < p.max && save.dust >= permCost(p));
   return UPG.some(u => u.cat === kind && L(u.id) < u.max && save.coins >= upCost(u)) || specialsFor(kind).some(s => save.coins >= spCost(s));
@@ -1393,7 +1391,7 @@ function anyAffordable(kind){
 function renderTabs(){
   tabsEl.innerHTML = TABS.map(([k, n]) => `<button class="tab" role="tab" data-tab="${k}" aria-selected="${tab === k}">${n}${tab !== k && anyAffordable(k) ? '<span class="dot"></span>' : ''}</button>`).join('');
 }
-const HINTS = {arms:'放置で勝手に戦ってくれる兵器。威力を上げると「改良」で大きく伸びる。素材を進めるほど新しい兵器が手に入る。上のボタンで兵器ごとに止められる。', idle:'ドローンは目を離していても撃ち続ける。放置の稼ぎはここで伸びる。', tap:'タップは加速役。叩くほどフィーバーゲージが溜まり、満タンで全部が速くなる。長押しで連打できる。', core:'ドローンにもタップにも効く土台の強化。', build:'モジュールは装備枠に入れたものだけが効く。組み合わせでビルドが決まる。', ach:'実績1個ごとに全部の報酬が+1%。', dust:'宇宙を砕くと星屑が手に入り、すべてがリセットされる代わりに永続強化が買える。'};
+const HINTS = {arms:'放置で勝手に戦ってくれる兵器。威力を上げると「改良」で大きく伸びる。素材を進めるほど新しい兵器が手に入る。上のボタンで兵器ごとに止められる。', idle:'ドローンは目を離していても撃ち続ける。放置の稼ぎはここで伸びる。', tap:'タップは加速役。叩くほどフィーバーゲージが溜まり、満タンで全部が速くなる。長押しで連打できる。', core:'ドローンにもタップにも効く土台の強化。', build:'モジュールは解放したら全部効く。かけらの動きが変わって、重ねるほど連鎖が派手になる。右のボタンで止められる。', ach:'実績1個ごとに全部の報酬が+1%。', dust:'宇宙を砕くと星屑が手に入り、すべてがリセットされる代わりに永続強化が買える。'};
 function buyN(u){ return save.buyMode === 'max' ? Math.max(1, upMaxN(u)) : Math.min(save.buyMode, u.max - L(u.id)); }
 const DPS_NAMES = {tap:['タップ', '#ffffff'], shard:['かけら', '#9fe6ff'], drone:['ドローン', '#4cc9ff'], cannon:['砲台', '#ffb13b'], laser:['レーザー', '#ff5a6e'], missile:['ミサイル', '#ff8a1f'], hole:['ブラックホール', '#b48cff'], reso:['共鳴', '#3ddc97'], bolt:['雷撃', '#bfe9ff'], burn:['炎上', '#ff7a1a'], bomb:['爆発するかけら', '#e0263f'], blast:['誘爆', '#ff4c88'], boom:['爆発', '#ffd84d']};
 function dpsHtml(){
@@ -1439,23 +1437,16 @@ function sheetHtml(){
     if (next.length) h += `<p class="hint">次の特殊強化：${next.map(s => `${s.name}（${s.rq}）`).join('、')}</p>`;
     if (tab === 'core') h += `<button class="small" data-act="reset">データを消す</button>`;
   } else if (tab === 'build'){
-    h += '<div class="slots">';
-    for (let k = 0; k < 4; k++){
-      if (k >= save.slots) h += `<div class="slot lockd">未解放</div>`;
-      else { const m = MODS.find(x => x.id === save.equip[k]); h += m ? `<div class="slot">${m.name}</div>` : `<div class="slot empty">空き</div>`; }
-    }
-    h += '</div>';
-    if (save.slots < 4){ const c = slotCost(); h += `<button class="buy" style="margin-top:10px" data-act="slot" data-cid="slot" ${save.coins < c ? 'disabled' : ''}>装備枠を増やす　${cs(c)}</button>`; }
-    h += '<ul class="list" style="margin-top:14px">';
+    h += '<ul class="list">';
     for (const m of MODS){
-      const l = ML(m.id), on = save.equip.includes(m.id), mx = l >= m.max, c = modCost(m), can = !mx && save.coins >= c, full = !on && save.equip.length >= save.slots;
+      const l = ML(m.id), on = !(save.off && save.off[m.id]), mx = l >= m.max, c = modCost(m), can = !mx && save.coins >= c;
       h += `<li><div class="item ${l ? '' : 'locked'}">
         <span class="name">${m.name}${l ? `<span class="lv">Lv ${l}</span>` : ''}</span>
         <span class="val">${l ? (mx ? m.v(l) + '（最大）' : `${m.v(l)} → ${m.v(l + 1)}`) : m.v(1)}</span>
         <span class="note">${m.note}</span>
         <span class="acts">
           ${mx ? '<span class="cost">最大</span>' : `<button class="cost ${can ? 'can' : ''}" data-mod="${m.id}" data-cid="mod:${m.id}" aria-disabled="${!can}">${l ? '' : '解放 '}${cs(c)}</button>`}
-          ${l ? `<button class="eq ${on ? 'on' : ''}" data-eq="${m.id}" ${full ? 'disabled' : ''}>${on ? '装備中' : full ? '枠がいっぱい' : '装備する'}</button>` : ''}
+          ${l ? `<button class="eq ${on ? 'on' : ''}" data-off="${m.id}">${on ? 'ON' : 'OFF'}</button>` : ''}
         </span></div></li>`;
     }
     h += '</ul>';
@@ -1514,9 +1505,7 @@ function refreshSheet(){
     else if (kind === 'mod') c = modCost(MODS.find(m => m.id === id));
     else if (kind === 'sp') c = spCost(SPECIALS.find(s => s.id === id));
     else if (kind === 'perm'){ c = permCost(PERM.find(p => p.id === id)); have = save.dust; }
-    else c = slotCost();
     const can = have >= c;
-    if (kind === 'slot'){ e.disabled = !can; return; }
     const target = (kind === 'up' || kind === 'sp' || kind === 'perm') ? e.closest('.item') : e;
     target.classList.toggle('can', can); target.setAttribute('aria-disabled', String(!can));
   });
@@ -1535,10 +1524,8 @@ sheet.addEventListener('click', e => {
   if (d.mode){ save.buyMode = d.mode === 'max' ? 'max' : +d.mode; persist(); sheetSig = ''; renderSheet(true); return; }
   if (d.up){ const u = UPG.find(x => x.id === d.up); const n = buyN(u); if (n > 0) buy(upCostN(u, n), () => save.lv[u.id] = L(u.id) + n); return; }
   if (d.sp){ const s = SPECIALS.find(x => x.id === d.sp); if (!SP(s.id) && s.req()) buy(spCost(s), () => { save.sp[s.id] = 1; showToast(s.name, s.note); }); return; }
-  if (d.mod){ const m = MODS.find(x => x.id === d.mod); if (ML(m.id) < m.max) buy(modCost(m), () => { const was = ML(m.id); save.mods[m.id] = was + 1; if (!was && save.equip.length < save.slots) save.equip.push(m.id); }); return; }
-  if (d.eq){ const i = save.equip.indexOf(d.eq); if (i >= 0) save.equip.splice(i, 1); else if (save.equip.length < save.slots) save.equip.push(d.eq); persist(); renderSheet(true); return; }
+  if (d.mod){ const m = MODS.find(x => x.id === d.mod); if (ML(m.id) < m.max) buy(modCost(m), () => { const was = ML(m.id); save.mods[m.id] = was + 1; }); return; }
   if (d.perm){ const p = PERM.find(x => x.id === d.perm); const c = permCost(p); if (P(p.id) < p.max && save.dust >= c){ save.dust -= c; save.perm[p.id] = P(p.id) + 1; persist(); sfxBuy(); updateStageLabel(); renderSheet(true); } return; }
-  if (d.act === 'slot'){ if (save.slots < 4) buy(slotCost(), () => save.slots++); return; }
   if (d.act === 'prestige'){ if (save.stage >= PRESTIGE_STAGE && dustGain() > 0){ closeSheet(); showPrestige(); } return; }
   if (d.act === 'reset'){
     if (t.classList.contains('armed')){

@@ -23,8 +23,7 @@ function run(mode, maxMin = 120, dt = 1/30, fresh = true){
         const opts = [];
         for (const u of G.UPG) if (!(process.env.SKIP || '').split(',').includes(u.id) && G.L(u.id) < u.max && G.upCost(u) <= save.coins) opts.push(() => { let n = Math.random() < .5 ? 1e9 : 1; while (n-- > 0 && G.L(u.id) < u.max && G.upCost(u) <= save.coins){ save.coins -= G.upCost(u); save.lv[u.id] = G.L(u.id) + 1; } });
         for (const s of G.SPECIALS) if (!G.SP(s.id) && s.req() && G.spCost(s) <= save.coins) opts.push(() => { save.coins -= G.spCost(s); save.sp[s.id] = 1; });
-        for (const m of G.MODS) if (G.ML(m.id) < m.max && G.modCost(m) <= save.coins) opts.push(() => { save.coins -= G.modCost(m); const w = G.ML(m.id); save.mods[m.id] = w + 1; if (!w && save.equip.length < save.slots) save.equip.push(m.id); });
-        if (save.slots < 4 && G.slotCost() <= save.coins) opts.push(() => { save.coins -= G.slotCost(); save.slots++; });
+        for (const m of G.MODS) if (G.ML(m.id) < m.max && G.modCost(m) <= save.coins) opts.push(() => { save.coins -= G.modCost(m); const w = G.ML(m.id); save.mods[m.id] = w + 1; });
         if (!opts.length) break;
         opts[(Math.random() * opts.length) | 0]();
       }
@@ -35,8 +34,7 @@ function run(mode, maxMin = 120, dt = 1/30, fresh = true){
         let best = null, bc = Infinity;
         for (const u of G.UPG){ if (G.L(u.id) < u.max){ const c = G.upCost(u); if (c < bc){ bc = c; best = () => save.lv[u.id] = G.L(u.id) + 1; } } }
         for (const s of G.SPECIALS){ if (!G.SP(s.id) && s.req()){ const c = G.spCost(s); if (c < bc){ bc = c; best = () => save.sp[s.id] = 1; } } }
-        for (const m of G.MODS){ if (G.ML(m.id) < m.max){ const c = G.modCost(m); if (c < bc){ bc = c; best = () => { const was = G.ML(m.id); save.mods[m.id] = was + 1; if (!was && save.equip.length < save.slots) save.equip.push(m.id); }; } } }
-        if (save.slots < 4){ const c = G.slotCost(); if (c < bc){ bc = c; best = () => save.slots++; } }
+        for (const m of G.MODS){ if (G.ML(m.id) < m.max){ const c = G.modCost(m); if (c < bc){ bc = c; best = () => { const was = G.ML(m.id); save.mods[m.id] = was + 1; }; } } }
         if (!best || save.coins < bc) break;
         save.coins -= bc; best();
       }
