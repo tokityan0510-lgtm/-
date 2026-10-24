@@ -298,7 +298,7 @@ const PRESTIGE_STAGE = 8;   // この素材に到達したら「砕く」が解�
 const sv = s => Math.pow(TUNE.valStage, s);
 // コインの基準：ブロック1個ぶんのHPを削ると coinBase × 素材の価値。値段も同じ割合（costX）
 const coinBase = () => 100 * TUNE.coinK;
-const TUNE = {fhp:4000, fhpLate:4000, fdmg:4000, reqBase:19000, reqPow:6.4, dmgG:1.5, hpPow:3.4, hpMul:1, lvBonus:.01, tapProg:1.5, dustBase:18, dustDiv:8, dustBonus:.001, pmultBonus:.1, idleBonus:7, idleRamp:30, idleDmgK:.5, feverReward:2, costX:3, coinK:.03, valStage:1e4, modSpan:7, droneDmg:5, droneInt:1.5, armMul:15, armCatch:.6, modMul:3, armIdle:0, reso:.01, bossHp:1500, bossGrow:1.35, bossReward:300, comboDecay:.6};
+const TUNE = {fhp:4000, fhpLate:4000, fdmg:4000, reqBase:42000, reqPow:6.4, dmgG:1.5, hpPow:3.4, hpMul:1, lvBonus:.01, tapProg:1.5, dustBase:18, dustDiv:8, dustBonus:.001, pmultBonus:.1, idleBonus:7, idleRamp:30, idleDmgK:.5, feverReward:2, costX:3, coinK:.03, valStage:1e4, modSpan:7, droneDmg:5, droneInt:1.5, armMul:15, armCatch:.8, modMul:6, armIdle:0, reso:.01, bossHp:1500, bossGrow:1.35, bossReward:300, comboDecay:.6};
 const DEFAULT = {
   coins:0, stage:0, lv:{}, mods:{}, best:0, ended:false, muted:false, t:0, idleRate:0, prog:0, started:false, kills:0, boss:null,
   sp:{}, ach:{}, dust:0, perm:{}, off:{}, runs:0, buyMode:1, endSeen:false, relics:{}, scale2:1,
@@ -314,17 +314,18 @@ const P = id => save.perm[id] || 0;
 
 // ===== 兵器：放置で勝手に戦う。素材を進めるほど新しい兵器が手に入る =====
 //   st：手に入る目安の素材の段。n：最大台数。every：1台あたりの発射間隔（秒）。dmg：1発の威力（破片1つの何倍か。さらに TUNE.armMul 倍）
+//   手に入るのが後の兵器ほど強い：1台あたりの毎秒の威力（dmg ÷ every、1回で何発も当たるものはその合計）が約2倍ずつ上がる（砲台=1 → 超新星≒500）
 const ARMS = [
-  {id:'cannon',  name:'砲台',           st:1, n:6, every:3.0, dmg:3,  note:'画面下の砲台が砲弾を撃ち、着弾した周りを吹き飛ばす'},
-  {id:'laser',   name:'レーザー',       st:2, n:5, every:4.5, dmg:10, note:'横一列をまとめて焼き払う'},
-  {id:'missile', name:'ミサイル',       st:4, n:5, every:5.0, dmg:20, note:'狙ったブロックへ曲がって飛び、大爆発する'},
-  {id:'hole',    name:'ブラックホール', st:6, n:3, every:10,  dmg:8,  note:'周りを吸い込みながら削り、最後に爆発する'},
-  {id:'drill',   name:'ドリル',         st:3, n:4, every:6,   dmg:3,  note:'ブロックに突き刺さり、3秒間削り続ける'},
-  {id:'tesla',   name:'テスラコイル',   st:5, n:4, every:4,   dmg:12, note:'ブロックの上を電撃が5回跳ね回る'},
-  {id:'hammer',  name:'巨大ハンマー',   st:7, n:3, every:8,   dmg:260, note:'上から巨大なハンマーが振り下ろされる'},
-  {id:'orbital', name:'軌道砲',         st:9, n:3, every:7,   dmg:240, note:'宇宙から太い光の柱が撃ち下ろされる'},
-  {id:'nano',    name:'ナノマシン',     st:10, n:5, every:3,  dmg:2.5,  note:'小さな機械の群れがブロックを這い回って分解する'},
-  {id:'nova',    name:'超新星',         st:13, n:2, every:15, dmg:4000, note:'中心に星が生まれ、膨らんでから大爆発する（宇宙の先で手に入る）'},
+  {id:'cannon',  name:'砲台',           st:1, n:6, every:3.0, dmg:3, note:'画面下の砲台が砲弾を撃ち、着弾した周りを吹き飛ばす'},
+  {id:'laser',   name:'レーザー',       st:2, n:5, every:4.5, dmg:9, note:'横一列をまとめて焼き払う'},
+  {id:'drill',   name:'ドリル',         st:3, n:4, every:6,   dmg:1.6, note:'ブロックに突き刺さり、3秒間削り続ける'},
+  {id:'missile', name:'ミサイル',       st:4, n:5, every:5.0, dmg:40, note:'狙ったブロックへ曲がって飛び、大爆発する'},
+  {id:'tesla',   name:'テスラコイル',   st:5, n:4, every:4,   dmg:12.8, note:'ブロックの上を電撃が5回跳ね回る'},
+  {id:'hole',    name:'ブラックホール', st:6, n:3, every:10,  dmg:18.8, note:'周りを吸い込みながら削り、最後に爆発する'},
+  {id:'hammer',  name:'巨大ハンマー',   st:7, n:3, every:8,   dmg:512, note:'上から巨大なハンマーが振り下ろされる'},
+  {id:'orbital', name:'軌道砲',         st:9, n:3, every:7,   dmg:896, note:'宇宙から太い光の柱が撃ち下ろされる'},
+  {id:'nano',    name:'ナノマシン',     st:10, n:5, every:3,  dmg:9.8, note:'小さな機械の群れがブロックを這い回って分解する'},
+  {id:'nova',    name:'超新星',         st:13, n:2, every:15, dmg:7680, note:'中心に星が生まれ、膨らんでから大爆発する（宇宙の先で手に入る）'},
 ];
 // 値段はボスを倒しても上がらない（クッキークリッカー型）。上がるのは買ったときだけ。
 //   inf:true … 上限なし。値段は g 倍ずつ。効果は足し算で伸びる（ボス撃破のたびに数十Lvまとめて買える）
@@ -339,7 +340,7 @@ const UPG = [
   // 兵器（台数は上限あり、威力は上限なし）。値段は手に入る目安の段の価値に合わせる
   ...ARMS.flatMap(a => [
     {cat:'arms', id:a.id + 'N', name:a.name + 'の数', note:a.note, cost:2000 * Math.pow(TUNE.valStage, a.st), span:Math.min(8, 1.5 * a.n), max:a.n, v:l => l ? `${l}台` : 'なし'},
-    {cat:'arms', id:a.id + 'P', name:a.name + 'の威力', note:a.name + 'のダメージ（上限なし）' + (a.st > 1 ? '。後発ボーナス：それより前の兵器の威力Lvの平均の6割が最初から上乗せされる' : ''), cost:3000 * Math.pow(TUNE.valStage, a.st), inf:true, g:TUNE.dmgG, max:1e9, v:l => `×${fmtX(1 + .25 * (l + armCatch(a.id)))}${armCatch(a.id) ? `（後発 +Lv${armCatch(a.id)}）` : ''}`},
+    {cat:'arms', id:a.id + 'P', name:a.name + 'の威力', note:a.name + 'のダメージ（上限なし）' + (a.st > 1 ? '。後発ボーナス：それより前の兵器の威力Lvの平均の8割が最初から上乗せされる' : ''), cost:3000 * Math.pow(TUNE.valStage, a.st), inf:true, g:TUNE.dmgG, max:1e9, v:l => `×${fmtX(1 + .25 * (l + armCatch(a.id)))}${armCatch(a.id) ? `（後発 +Lv${armCatch(a.id)}）` : ''}`},
   ]),
   // モジュール（ビルド）：上限なしの威力。ドローンや兵器と同じく後半まで伸ばせるように
   {cat:'build', id:'modpow', name:'モジュールの威力', note:'猛毒・炎上・雷撃・誘爆・衛星・流星・波動のダメージ（上限なし）', cost:20000, inf:true, g:TUNE.dmgG, max:1e9, v:l => `×${fmtX(1+.25*l)}`},
