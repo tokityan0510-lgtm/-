@@ -189,6 +189,17 @@ body:not(.loud) #fever span{animation:none}
 .ach b{display:block;font-size:13px}
 .ach .d{color:var(--muted)}
 .ach div:not(.got){opacity:.55}
+.help{border:1.5px solid var(--line);border-radius:10px;margin-top:8px;background:var(--surface);font-size:13px;line-height:1.7}
+.help summary{padding:10px 12px;font-weight:700;cursor:pointer;list-style:none;display:flex;justify-content:space-between}
+.help summary::-webkit-details-marker{display:none}
+.help summary::after{content:'＋';color:var(--muted)}
+.help[open] summary::after{content:'−'}
+.help>div{padding:0 12px 10px}
+.help p{margin:6px 0}
+.help ul{margin:6px 0;padding-left:18px}
+.units{display:grid;grid-template-columns:repeat(3,max-content 1fr);gap:4px 8px;font-size:12px;margin-top:6px}
+.units span{white-space:nowrap}
+.units b{font-weight:400;color:var(--muted)}
 .relics{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:6px;margin-top:8px}
 .relic{border:2px solid var(--rc);border-radius:10px;padding:8px;font-size:12px;line-height:1.4;background:color-mix(in srgb,var(--rc) 10%,var(--surface));display:flex;flex-direction:column;gap:2px}
 .relic b{font-size:13px}
@@ -1763,12 +1774,12 @@ cv.addEventListener('pointerup', stopHold); cv.addEventListener('pointercancel',
 
 /* ---- シート（強化） ---- */
 let tab = 'idle';
-const TABS = [['idle', '放置'], ['arms', '兵器'], ['tap', '操作'], ['core', '共通'], ['build', 'ビルド'], ['relic', '遺物'], ['ach', '実績'], ['dust', '砕く']];
+const TABS = [['idle', '放置'], ['arms', '兵器'], ['tap', '操作'], ['core', '共通'], ['build', 'ビルド'], ['relic', '遺物'], ['ach', '実績'], ['dust', '砕く'], ['help', 'ヘルプ']];
 const cs = n => fmt(n);
 const specialsFor = cat => SPECIALS.filter(s => s.cat === cat && !SP(s.id) && s.req());
 function anyAffordable(kind){
   if (kind === 'build') return MODS.some(m => ML(m.id) < m.max && save.coins >= modCost(m)) || UPG.some(u => u.cat === 'build' && save.coins >= upCost(u));
-  if (kind === 'ach' || kind === 'relic') return false;
+  if (kind === 'ach' || kind === 'relic' || kind === 'help') return false;
   if (kind === 'dust') return PERM.some(p => P(p.id) < p.max && save.dust >= permCost(p));
   return UPG.some(u => u.cat === kind && L(u.id) < u.max && save.coins >= upCost(u)) || specialsFor(kind).some(s => save.coins >= spCost(s));
 }
@@ -1777,7 +1788,7 @@ function renderTabs(){
   const on = tabsEl.querySelector('[aria-selected="true"]');
   if (on){ const l = on.getBoundingClientRect().left - tabsEl.getBoundingClientRect().left + tabsEl.scrollLeft - (tabsEl.clientWidth - on.offsetWidth) / 2; tabsEl.scrollTo({left:Math.max(0, l), behavior:reduceMotion ? 'auto' : 'smooth'}); }
 }
-const HINTS = {arms:'放置で勝手に戦ってくれる兵器。威力を上げると「改良」で大きく伸びる。素材を進めるほど新しい兵器が手に入る。上のボタンで兵器ごとに止められる。', idle:'ドローンは目を離していても撃ち続ける。放置の稼ぎはここで伸びる。', tap:'タップは加速役。叩くほどフィーバーゲージが溜まり、満タンで全部が速くなる。長押しで連打できる。', core:'ドローンにもタップにも効く土台の強化。', build:'モジュールは解放したら全部効く。重ねるほど連鎖が派手になる。2つを育てると組み合わせ技が発動する。右のボタンで止められる。', ach:'実績1個ごとに全部の報酬が+1%。', relic:'ひびが満タンで砕けるたびに遺物が1つ落ちる（幸運ブロックからもたまに）。集めた遺物は全部効き、宇宙を砕いても消えない。同じ遺物が出たらLvが上がる。', dust:'宇宙を砕くと星屑が手に入り、すべてがリセットされる代わりに永続強化が買える。'};
+const HINTS = {arms:'放置で勝手に戦ってくれる兵器。威力を上げると「改良」で大きく伸びる。素材を進めるほど新しい兵器が手に入る。上のボタンで兵器ごとに止められる。', idle:'ドローンは目を離していても撃ち続ける。放置の稼ぎはここで伸びる。', tap:'タップは加速役。叩くほどフィーバーゲージが溜まり、満タンで全部が速くなる。長押しで連打できる。', core:'ドローンにもタップにも効く土台の強化。', build:'モジュールは解放したら全部効く。重ねるほど連鎖が派手になる。2つを育てると組み合わせ技が発動する。右のボタンで止められる。', ach:'実績1個ごとに全部の報酬が+1%。', help:'分かりにくいところの解説。見出しを押すと開く。', relic:'ひびが満タンで砕けるたびに遺物が1つ落ちる（幸運ブロックからもたまに）。集めた遺物は全部効き、宇宙を砕いても消えない。同じ遺物が出たらLvが上がる。', dust:'宇宙を砕くと星屑が手に入り、すべてがリセットされる代わりに永続強化が買える。'};
 function buyN(u){ return save.buyMode === 'max' ? Math.max(1, upMaxN(u)) : Math.min(save.buyMode, u.max - L(u.id)); }
 const DPS_NAMES = {tap:['タップ', '#ffffff'], shard:['かけら', '#9fe6ff'], drone:['ドローン', '#4cc9ff'], cannon:['砲台', '#ffb13b'], laser:['レーザー', '#ff5a6e'], missile:['ミサイル', '#ff8a1f'], hole:['ブラックホール', '#b48cff'], reso:['共鳴', '#3ddc97'], bolt:['雷撃', '#bfe9ff'], burn:['炎上', '#ff7a1a'], bomb:['爆発するかけら', '#e0263f'], blast:['誘爆', '#ff4c88'], boom:['爆発', '#ffd84d'], poison:['猛毒', '#5fe36b'], drill:['ドリル', '#c9d3de'], tesla:['テスラコイル', '#bfe9ff'], hammer:['巨大ハンマー', '#8a94a3'], orbital:['軌道砲', '#ffe14d'], nano:['ナノマシン', '#9dffb0'], nova:['超新星', '#fff3b0'], orbit:['衛星', '#7cf5ff'], meteor:['流星', '#ff9a3c'], pulse:['波動', '#3fd9c0']};
 function dpsHtml(){
@@ -1792,6 +1803,47 @@ function armsTopHtml(){
   const list = [['drone', armName('drone'), true], ...ARMS.map(a => [a.id, armName(a.id), L(a.id + 'N') > 0])].filter(([, , own]) => own);
   return `<div class="section-title">兵器の稼働（押すと止める／動かす）</div><div class="arm-toggles">${list.map(([id, name]) => `<button class="toggle ${armOn(id) ? 'on' : ''}" data-off="${id}">${name}　${armOn(id) ? 'ON' : 'OFF'}</button>`).join('')}</div>
     <div class="section-title">火力の内訳（直近10秒くらい）</div><div id="dpsBox">${dpsHtml()}</div>`;
+}
+// ヘルプ：見出しを押すと開く解説。今の数字が入るところはその場で計算して出す
+function helpHtml(){
+  const per = coinBase() * sv(save.stage) / blockHp(save.stage), cm = comboMult() * rewardMult();
+  const unitRows = UNITS.slice(1).map((u, k) => `<span>${u}</span><b>10<sup>${4 * (k + 1)}</sup></b>`).join('');
+  const sec = (title, body, open = false) => `<details class="help"${open ? ' open' : ''}><summary>${title}</summary><div>${body}</div></details>`;
+  return [
+    sec('基本の流れ', `<p>真ん中の巨大ブロックは何度叩いても壊れない。与えたダメージが<b>ひび</b>として溜まり、100%になると砕けて次の素材に進む。</p>
+      <p>タップ・ドローン・兵器・モジュールでダメージを与えると、同時に<b>コイン</b>も入る。コインで強化を買って火力を上げ、もっと速く砕く。全部で12の素材があり、最後の「宇宙」を砕くとエンディング。</p>`, true),
+    sec('ダメージとコインのちがい', `<p><b>ダメージ</b>はひびを進めるもの。<b>コイン</b>は強化を買うためのもの。単位が別なので、桁が大きく離れていても正常。</p>
+      <p>コイン ＝ ダメージ ×（その素材でのダメージ1あたりの値段）×（コイン倍率）</p>
+      <p>今は：ダメージ1あたり 約${fmtX(per)} × コイン倍率 ×${fmtX(cm)} ＝ <b>約${fmtX(per * cm)}コイン</b></p>
+      <p>コイン倍率はコンボの数字の下に「コイン ×◯」で出ている。コンボ・相場・強化ボーナス・報酬（実績・星屑・放置・フレンジー・フィーバー・遺物）を全部掛けたもの。</p>`),
+    sec('画面の上の数字', `<ul><li><b>毎秒 +◯</b>：1秒あたりに入っているコイン（数秒の平均）</li>
+      <li><b>放置 ×◯</b>：触らずにいると30秒かけて最大×7まで上がる報酬の倍率。ダメージにも半分くらい効く。タップすると1に戻る</li>
+      <li><b>強化 ×◯</b>：強化を1Lv買うごとに+1%される報酬の倍率（どの強化でも増える）</li>
+      <li><b>報酬 ×◯</b>：実績・星屑・遺物・フレンジー・フィーバーなどをまとめた報酬の倍率</li></ul>`),
+    sec('ひびのゲージ', `<p>画面下のゲージ。<b>ひび◯%</b> は、砕くのに必要なダメージのうち何%を与えたか。「あと約◯分」は今の火力のままの見積もりで、強化すると縮む。押すと実際のダメージの数字が見られる。</p>
+      <p>直接タップしたダメージは、ひびが1.5倍進む。</p>`),
+    sec('コンボ', `<p>当てるたびにコンボが増え、時間がたつと少しずつ減る。コンボが多いほどコインが増える（コンボ係数を上げると伸びが大きくなる）。ダメージは増えない。</p>`),
+    sec('フィーバー', `<p>タップするとフィーバーゲージ（画面下の虹色の線）が溜まり、満タンで<b>フィーバー</b>。数秒間、報酬2倍・威力2倍・ドローンの連射2倍になる。長さは「操作」タブのフィーバーで延びる。</p>`),
+    sec('放置とタップ', `<p>放置ゲームなので、触らなくてもドローンと兵器が壊し続ける。しばらく触らないと放置ボーナスが上がる。タップは加速役で、フィーバーと幸運ブロックはタップでしか取れない。</p>
+      <p>長押しすると連打になる。アプリを閉じている間もオフライン収入が入る（上限あり）。</p>`),
+    sec('幸運ブロック', `<p>ときどき光る星形のブロックが画面の端から流れてくる。叩くと${LUCKY.length}種類のどれかの効果（フレンジー・総攻撃・宝箱など）。実績タブで見た効果の一覧と、出る確率が見られる。</p>`),
+    sec('強化の種類', `<ul><li><b>放置</b>：ドローン（台数・連射・威力）と共鳴</li>
+      <li><b>兵器</b>：素材を進めるほど新しい兵器が買える。台数（上限あり）と威力（上限なし）。上のボタンで兵器ごとに止められ、火力の内訳も見られる</li>
+      <li><b>操作</b>：タップ・フィーバー・衝撃波</li>
+      <li><b>共通</b>：破片の威力・クリティカル・コンボ係数・相場など全体に効くもの</li>
+      <li><b>ビルド</b>：モジュール（下の項目）</li></ul>
+      <p>Lvに上限があるものは1Lvごとに値段が大きく上がる。上限なしのものは少しずつ上がる（威力系は1.5倍ずつ）。条件を満たすと<b>特殊強化</b>（一度きり）が現れる。<b>改良</b>で兵器の威力が大きく伸び、<b>進化</b>で名前と見た目が変わる。</p>`),
+    sec('モジュールと組み合わせ技', `<p>モジュールは解放したら全部効く（枠はない）。右のボタンでON/OFFできる。「モジュールの威力」は上限なしで、全部のモジュールのダメージに効く。</p>
+      <p>2つのモジュールがどちらもLv3以上・ONだと<b>組み合わせ技</b>が発動する（ビルドタブの上に一覧）。</p>`),
+    sec('遺物', `<p>ひびが満タンで砕けるたびに1つ落ちる（幸運ブロックからもたまに）。レア度は4段階。集めた遺物は全部効き、宇宙を砕いても消えない。同じ遺物がまた出るとLvが上がる。</p>`),
+    sec('宇宙を砕く（転生）と星屑', `<p>${STAGES[PRESTIGE_STAGE].name}に届くと「砕く」タブでやり直せる。強化・コイン・モジュールなどはリセットされるが、<b>星屑</b>が手に入る。星屑は永続強化に使え、集めた量だけ報酬も上がる（使っても減らない）。実績・遺物・星屑・永続強化は残る。</p>
+      <p>今の宇宙で稼いだコインが多いほど星屑が増えるので、行けるところまで進んでから砕くのがおすすめ。</p>`),
+    sec('宇宙の先', `<p>宇宙を砕いたあとも「宇宙の先へ進む」で素材が続く（多元宇宙 → … → 深淵）。一番深く届いた素材は記録され、兵器の進化の条件にもなる。</p>`),
+    sec('数字の単位', `<p>4桁ごとに単位が変わる。無量大数より先は「1.00万無量大数」のように重ねる。</p><div class="units">${unitRows}</div>`),
+    sec('画面と操作', `<ul><li>右上の 🌙／🎆 で演出の強さ（控えめ／派手）を切り替え。カクつくときは控えめに</li>
+      <li>重いときは自動で画質が下がる</li>
+      <li>強化パネルは左右にスワイプしてタブを移れる</li></ul>`),
+  ].join('');
 }
 function sheetHtml(){
   let h = `<p class="hint">${HINTS[tab]}</p>`;
@@ -1869,6 +1921,8 @@ function sheetHtml(){
              : `<div class="relic unk" style="--rc:${rc}"><b>？？？</b><span class="rr">${rn}</span></div>`;
     }
     h += '</div>';
+  } else if (tab === 'help'){
+    h += helpHtml();
   } else if (tab === 'dust'){
     const d = dustGain(), ok = save.stage >= PRESTIGE_STAGE;
     h += `<div class="prestige-box">
