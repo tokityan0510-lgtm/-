@@ -287,7 +287,7 @@ const TUNE = {fhp:4000, fhpLate:4000, fdmg:4000, reqBase:3200, reqPow:6.4, dmgG:
 const DEFAULT = {
   coins:0, stage:0, lv:{}, mods:{}, best:0, ended:false, muted:false, t:0, idleRate:0, prog:0, started:false, kills:0, boss:null,
   sp:{}, ach:{}, dust:0, perm:{}, off:{}, runs:0, buyMode:1, endSeen:false, relics:{},
-  st:{depth:0, destroyed:0, taps:0, bosses:0, lucky:0, fevers:0, time:0, earnedRun:0, earnedAll:0, offline:0, bestDust:0, bigCombo:0, deepest:0, relics:0},
+  st:{depth:0, destroyed:0, taps:0, bosses:0, lucky:0, fevers:0, time:0, earnedRun:0, earnedAll:0, offline:0, bestDust:0, bigCombo:0, deepest:0, relics:0, luckyKinds:{}},
 };
 let save = JSON.parse(JSON.stringify(DEFAULT));
 const L = id => save.lv[id] || 0;
@@ -360,7 +360,7 @@ const COMBOS = [
   {id:'critical', name:'臨界',   a:'charge', b:'ricochet', note:'会心の一撃でかけらが10個飛ぶ'},
   {id:'tidal',    name:'潮汐',   a:'pulse',  b:'homing',   note:'波動の威力 ×2'},
 ];
-const CB = id => { const c = COMBOS.find(x => x.id === id); return M(c.a) >= 3 && M(c.b) >= 3; };
+const CB = id => { if (buffs.combo > 0) return true; const c = COMBOS.find(x => x.id === id); return M(c.a) >= 3 && M(c.b) >= 3; };
 // 特殊強化：強化Lvなどが条件で現れる一発もの
 const SPECIALS = [
   {cat:'idle', id:'dr1', name:'ドローン改良 I',   note:'ドローンの弾の威力 ×1.5',             ref:['drones',3], req:() => L('drones') >= 3, rq:'ドローンの台数 Lv3'},
@@ -428,9 +428,10 @@ const RELICS = [
 const RL = id => save.relics[id] || 0;
 const relicKinds = () => RELICS.filter(r => RL(r.id) > 0).length;
 // 出す遺物を選ぶ：まずレア度を重みで決め、そのレア度で最大Lvでないものから1つ。全部最大ならほかのレア度から
-function dropRelic(){
+function dropRelic(minRar = 0){
   let x = Math.random() * 100, rar = 0;
   for (let k = RARITY.length - 1; k >= 0; k--){ x -= RARITY[k][2]; if (x < 0){ rar = k; break; } }
+  rar = Math.max(rar, minRar);
   let pool = RELICS.filter(r => r.rar === rar && RL(r.id) < r.max);
   if (!pool.length) pool = RELICS.filter(r => RL(r.id) < r.max);
   if (!pool.length) return null;
@@ -502,8 +503,9 @@ const spCost = s => Math.ceil(s.ref ? 4 * upCost(UPG.find(u => u.id === s.ref[0]
 const permCost = p => Math.ceil(p.cost * Math.pow(p.g, P(p.id)));
 
 // 幸運ブロックの効果（バフ）
-const buffs = {frenzy:0, barrage:0, awaken:0, storm:0};
-const BUFF_INFO = {frenzy:['フレンジー 報酬×7', '#ffd84d'], barrage:['弾幕 連射×8', '#4cc9ff'], awaken:['覚醒 クリティカル100%', '#ffe14d'], storm:['破片嵐', '#ff4c88']};
+const buffs = {frenzy:0, barrage:0, awaken:0, storm:0, assault:0, mrain:0, combo:0, gold:0};
+const BUFF_INFO = {frenzy:['フレンジー 報酬×7', '#ffd84d'], barrage:['弾幕 連射×8', '#4cc9ff'], awaken:['覚醒 クリティカル100%', '#ffe14d'], storm:['破片嵐', '#ff4c88'],
+  assault:['総攻撃 兵器の連射×5', '#ff8a1f'], mrain:['流星雨', '#ff9a3c'], combo:['全組み合わせ技', '#c38bff'], gold:['黄金 金のかけら+50%', '#f6b400']};
 const achCount = () => Object.keys(save.ach).length;
 // ずっと残る倍率（実績・星屑）。ボスゲージの進みからは除く（周回で極端に速くならないように）
 const permMult = () => (1 + .01 * achCount()) * (1 + TUNE.pmultBonus * P('pmult')) * (1 + TUNE.dustBonus * save.st.bestDust);
@@ -538,7 +540,7 @@ const stat = {
   crit:     () => buffs.awaken > 0 ? 1 : 0.05 + 0.03 * L('crit') + .05 * P('pcrit') + .01 * RL('lens'),
   critX:    () => (SP('cr2') ? 8 : SP('cr1') ? 6 : 4) + .5 * RL('blade'),
   bomb:     () => Math.min(.25, .02 + .015 * L('bomb')) + .02 * RL('core'),
-  gold:     () => Math.min(.2, .01 + .01 * L('gold')) + .03 * RL('eye'),
+  gold:     () => Math.min(.2, .01 + .01 * L('gold')) + .03 * RL('eye') + (buffs.gold > 0 ? .5 : 0),
   keep:     () => .65 + .025 * L('keep'),
   decay:    () => TUNE.comboDecay * (SP('cb1') ? .5 : 1) * (SP('cb2') ? .5 : 1),
   holdMs:   () => SP('tp2') ? 170 : 250,
@@ -585,7 +587,7 @@ function layout(w, h){
 }
 const freshBig = () => ({flash:0, wob:0, wx:0, wy:0, spawn:0, burn:0, burnDps:0, burnAcc:0, bd:0, frost:0, poison:0, poisonAcc:0});
 // 新しいモジュールの状態：衛星（発射までの時間）、流星、波動、会心までの残り回数
-let sats = [], satA = 0, meteors = [], meteorT = 3, pulseT = 3, chargeN = 0;
+let sats = [], satA = 0, meteors = [], meteorT = 3, mrainT = 0, pulseT = 3, chargeN = 0;
 function buildGrid(){ big = freshBig(); big.spawn = 1; }
 const rnd = (a, b) => a + Math.random() * (b - a);
 const inBig = (x, y, pad = 0) => Math.abs(x - BX) <= BS / 2 + pad && Math.abs(y - BY) <= BS / 2 + pad;
@@ -612,15 +614,29 @@ function spawnLucky(){
   lucky = {x:side < 0 ? -cell : W + cell, y, vx:-side * cell * .55, vy:0, life:14 + (SP('lk3') ? 4 : 0), ph:Math.random() * 6, r:ucell * .42};
   fx.lucky(lucky);
 }
+// 幸運ブロックの効果（w：出る重み）。run は効果を起こして、画面に出す文字を返す
+const LUCKY = [
+  {id:'frenzy',  w:20, name:'フレンジー',   note:'60秒 報酬×7',                   run:(lk, d) => { buffs.frenzy = 60 * d; return 'フレンジー！　報酬 ×7'; }},
+  {id:'barrage', w:11, name:'弾幕',         note:'25秒 ドローンの連射×8',         run:(lk, d) => { buffs.barrage = 25 * d; return '弾幕！　ドローン連射 ×8'; }},
+  {id:'rain',    w:10, name:'コイン雨',     note:'放置の稼ぎ15分ぶんのコイン',    run:() => 'コイン雨！　+' + fmt(earn(Math.max(100 * sv(save.stage) * 200, save.idleRate * 900) * rewardMult()))},
+  {id:'awaken',  w:9,  name:'覚醒',         note:'20秒 クリティカル100%',         run:(lk, d) => { buffs.awaken = 20 * d; return '覚醒！　クリティカル100%'; }},
+  {id:'storm',   w:6,  name:'かけら嵐',     note:'かけら300個',                   run:lk => { buffs.storm = 1; spawnShards(lk.x, lk.y, 300, 0); return 'かけら嵐！'; }},
+  {id:'assault', w:10, name:'総攻撃',       note:'20秒 兵器の連射×5',             run:(lk, d) => { buffs.assault = 20 * d; return '総攻撃！　兵器の連射 ×5'; }},
+  {id:'mrain',   w:8,  name:'流星雨',       note:'15秒 流星が降り注ぐ',           run:(lk, d) => { buffs.mrain = 15 * d; return '流星雨！'; }},
+  {id:'combo',   w:6,  name:'全組み合わせ', note:'30秒 組み合わせ技が全部発動',   run:(lk, d) => { buffs.combo = 30 * d; return '全組み合わせ技、発動！'; }},
+  {id:'gold',    w:6,  name:'黄金',         note:'20秒 金のかけら+50%',           run:(lk, d) => { buffs.gold = 20 * d; return '黄金！　金のかけら +50%'; }},
+  {id:'fever',   w:5,  name:'即フィーバー', note:'すぐにフィーバー',              run:() => { fever = Math.max(fever, stat.fever()); save.st.fevers++; fx.fever(); return 'フィーバー直行！'; }},
+  {id:'crack',   w:4,  name:'大ひび',       note:'ひびが一気に15%進む',           run:() => { save.prog += gaugeNeed() * .15; if (save.prog >= gaugeNeed()) shatterPending = true; return '大ひび！　+15%'; }},
+  {id:'relic',   w:4,  name:'宝箱',         note:'レア以上の遺物が1つ',           run:() => { const r = dropRelic(1); return r ? '宝箱！　遺物を発見' : '宝箱！　（遺物は全部最大）'; }},
+  {id:'jackpot', w:1,  name:'ジャックポット', note:'30秒 フレンジー・弾幕・覚醒・総攻撃・黄金を全部', run:(lk, d) => { for (const k of ['frenzy', 'barrage', 'awaken', 'assault', 'gold']) buffs[k] = Math.max(buffs[k], 30 * d); spawnShards(lk.x, lk.y, 200, 0); return 'ジャックポット！！'; }},
+];
 function hitLucky(){
   const lk = lucky; lucky = null; save.st.lucky++;
   const dur = (SP('lk3') ? 1.5 : 1) * (1 + .1 * RL('comet'));
-  const roll = Math.random(); let kind, text;
-  if (roll < .36){ kind = 'frenzy'; buffs.frenzy = 60 * dur; text = 'フレンジー！　報酬 ×7'; }
-  else if (roll < .58){ kind = 'barrage'; buffs.barrage = 25 * dur; text = '弾幕！　ドローン連射 ×8'; }
-  else if (roll < .76){ kind = 'rain'; const g = earn(Math.max(100 * sv(save.stage) * 200, save.idleRate * 900) * rewardMult()); text = 'コイン雨！　+' + fmt(g); }
-  else if (roll < .92){ kind = 'awaken'; buffs.awaken = 20 * dur; text = '覚醒！　クリティカル100%'; }
-  else { kind = 'storm'; buffs.storm = 1; text = 'かけら嵐！'; spawnShards(lk.x, lk.y, 300, 0); }
+  let x = Math.random() * LUCKY.reduce((a, e) => a + e.w, 0), e = LUCKY[0];
+  for (const c of LUCKY){ x -= c.w; if (x < 0){ e = c; break; } }
+  const kind = e.id, text = e.run(lk, dur);
+  save.st.luckyKinds[kind] = 1;
   if (SP('lk4')) spawnShards(lk.x, lk.y, 100, 0);
   if (Math.random() < .15) dropRelic();
   heat = Math.min(100, heat + 30);
@@ -744,12 +760,14 @@ function stepMods(dt){
   // 流星：一定時間ごとに上から降ってくる
   const me = M('meteor');
   if (me){ meteorT -= dt; if (meteorT <= 0){ meteorT = 5 - .3 * (me - 1); spawnMeteor(1); } }
+  // 流星雨（幸運ブロック）：モジュールがなくても0.4秒ごとに降る
+  if (buffs.mrain > 0){ mrainT -= dt; if (mrainT <= 0){ mrainT = .4; spawnMeteor(.8); } }
   for (let k = meteors.length - 1; k >= 0; k--){
     const m = meteors[k]; m.t += dt;
     const p = Math.min(1, m.t / m.dur); m.x = m.x0 + (m.tx - m.x0) * p; m.y = m.y0 + (m.ty - m.y0) * p;
     if (p >= 1){
       meteors.splice(k, 1);
-      queueBoom({x:m.tx, y:m.ty, R:cell * 2 * m.s, dmg:stat.dmg() * 80 * (1 + .3 * (me - 1)) * m.s, t:0, big:true, d:0, burst:Math.round(6 * m.s), src:'meteor', arm:true, missile:m.s >= 1});
+      queueBoom({x:m.tx, y:m.ty, R:cell * 2 * m.s, dmg:stat.dmg() * 80 * (1 + .3 * (Math.max(1, me) - 1)) * m.s, t:0, big:true, d:0, burst:Math.round(6 * m.s), src:'meteor', arm:true, missile:m.s >= 1});
       if (m.s >= 1 && CB('shower')) spawnMeteor(.5, 2);
     }
   }
@@ -769,7 +787,7 @@ function fireDrone(dr){
   bullets.push({x:dr.x, y:dr.y, vx:dx / len * v, vy:dy / len * v, tx, ty, life:len / v + .05});
   fx.shoot(dr, tx, ty);
 }
-const armRate = () => (1 + TUNE.armIdle * (idleMult() - 1) / (TUNE.idleBonus - 1)) * (1 + .1 * RL('gear')) * (SP('sy5') && fever > 0 ? 1.3 : 1);
+const armRate = () => (1 + TUNE.armIdle * (idleMult() - 1) / (TUNE.idleBonus - 1)) * (1 + .1 * RL('gear')) * (SP('sy5') && fever > 0 ? 1.3 : 1) * (buffs.assault > 0 ? 5 : 1);
 const armPow = id => (1 + .25 * L(id + 'P')) * (id === 'cannon' && SP('cn1') ? 2 : 1) * (SP(id + 'u1') ? 2 : 1) * (SP(id + 'u2') ? 3 : 1)
   * armX(id);
 // 兵器1発の威力（破片1つの何倍か）。ブラックホールは1回の吸い込みぶん（最後の爆発はその5倍）
@@ -944,6 +962,8 @@ achSet('r', '遺物の種類', [1, 5, 10, 15, RELICS.length], ['掘り出し物'
 ACH.push({id:'rleg', name:'伝説', desc:'レジェンドの遺物を手に入れる', ok:() => RELICS.some(r => r.rar === 3 && RL(r.id) > 0)});
 ACH.push({id:'rmax', name:'極めし者', desc:'遺物をどれか1つ最大Lvにする', ok:() => RELICS.some(r => RL(r.id) >= r.max)});
 achSet('z', '到達', [UNIVERSE + 1, UNIVERSE + 5, UNIVERSE + 10, UNIVERSE + 20, STAGES.length - 1], ['宇宙の先へ', '終焉を見た', '深淵', '深淵の底', '果て'], () => save.st.deepest, n => STAGES[n].name);
+ACH.push({id:'luckyall', name:'福の神', desc:`幸運ブロックの効果を全${LUCKY.length}種類見る`, ok:() => LUCKY.every(e => save.st.luckyKinds[e.id])});
+ACH.push({id:'jackpot', name:'大当たり', desc:'ジャックポットを引く', ok:() => !!save.st.luckyKinds.jackpot});
 ACH.push({id:'combo3', name:'組み合わせ上手', desc:'組み合わせ技を3つ同時に発動させる', ok:() => COMBOS.filter(c => CB(c.id)).length >= 3});
 ACH.push({id:'comboall', name:'全部のせ', desc:'組み合わせ技を全部同時に発動させる', ok:() => COMBOS.every(c => CB(c.id))});
 ACH.push({id:'evo1', name:'進化', desc:'兵器をどれか1つ進化させる', ok:() => Object.keys(EVO).some(id => evo(id) > 0)});
@@ -1163,7 +1183,8 @@ fx.luckyHit = (lk, text, kind) => {
   freeze = Math.max(freeze, .1); shake += 16; zoom = .08; flash = 1; flashColor = '255,225,120';
   sparks(lk.x, lk.y, 50, '#ffe14d', 14); sparks(lk.x, lk.y, 30, '#ffffff', 10);
   rings.push({x:lk.x, y:lk.y, to:Math.max(W, H), life:.7, max:.7, c:'#ffe14d', w:.4});
-  bigText(text, .42, '#ffe14d', 2, 9);
+  bigText(text, .42, kind === 'jackpot' ? '#ff4c88' : '#ffe14d', kind === 'jackpot' ? 3 : 2, kind === 'jackpot' ? 6 : 9);
+  if (kind === 'jackpot'){ flashColor = '255,76,136'; shake += 20; sparks(lk.x, lk.y, 80, '#ff4c88', 16); setTimeout(sfxJackpot, 250); }
   sfxJackpot();
 };
 fx.ach = a => { showToast(a.name, a.desc); sfxAch(); };
@@ -1695,6 +1716,10 @@ function sheetHtml(){
       <div><span>プレイ時間</span><b>${fmtT(s.time)}</b></div><div><span>砕いた回数</span><b>${save.runs}</b></div>
       <div><span>最も深い素材</span><b>${STAGES[s.deepest].name}</b></div><div><span>拾った遺物</span><b>${s.relics}個</b></div>
     </div>
+    <div class="section-title">幸運ブロックの効果 ${LUCKY.filter(e => s.luckyKinds[e.id]).length} / ${LUCKY.length}</div><div class="ach">${LUCKY.map(e => {
+      const pc = e.w / LUCKY.reduce((a, c) => a + c.w, 0) * 100;
+      return s.luckyKinds[e.id] ? `<div class="got"><b>${e.name}</b><span class="d">${e.note}（${pc < 1 ? pc.toFixed(1) : Math.round(pc)}%）</span></div>` : `<div><b>？？？</b><span class="d">出る確率 ${pc < 1 ? pc.toFixed(1) : Math.round(pc)}%</span></div>`;
+    }).join('')}</div>
     <div class="section-title">実績 ${achCount()} / ${ACH.length}　→ 報酬 +${achCount()}%</div><div class="ach">`;
     for (const a of ACH) h += `<div class="${save.ach[a.id] ? 'got' : ''}"><b>${save.ach[a.id] ? '🏆 ' : ''}${a.name}</b><span class="d">${a.desc}</span></div>`;
     h += '</div>';
