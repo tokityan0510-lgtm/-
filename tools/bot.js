@@ -7,9 +7,11 @@ function run(mode, maxMin = 120, dt = 1/30, fresh = true){
   G.buildGrid(); G.setState('play');
   const save = G.save, reach = [0], dust = [], lvAt = [];
   const lvsum = () => Object.values(save.lv).reduce((a, b) => a + b, 0);
-  let t = 0, tapT = 0, buyT = 0, achT = 0, lastStage = save.stage, prestigeAt = null, gridLv = -1;
-  while (t < maxMin * 60 && !save.ended){
+  let t = 0, tapT = 0, buyT = 0, achT = 0, lastStage = save.stage, prestigeAt = null, gridLv = -1, endAt = null;
+  // ENDLESS=1 ならエンディング後も「宇宙の先」へ進み続けて測る
+  while (t < maxMin * 60 && (!save.ended || process.env.ENDLESS)){
     G.step(dt); t += dt;
+    if (save.ended && endAt === null) endAt = t;
     if (mode === 'tap' || mode === 'ctap'){ tapT += dt; if (tapT >= (mode === 'ctap' ? .33 : G.stat.holdMs() / 1000)){ tapT = 0;
       // 幸運ブロックが出ていれば叩き、それ以外は巨大ブロックのどこかを叩く
       const lk = G.lucky;
@@ -43,8 +45,8 @@ function run(mode, maxMin = 120, dt = 1/30, fresh = true){
     }
     if (save.stage !== lastStage){ lastStage = save.stage; reach.push(+(t/60).toFixed(1)); lvAt.push(lvsum()); if (save.stage >= G.PRESTIGE_STAGE) dust.push(G.dustGain()); if (save.stage === G.PRESTIGE_STAGE) prestigeAt = G.dustGain(); }
   }
-  return {mode, reach, lvAt, grid: G.L('grid'), cells: G.blocks.length, lvMax: G.UPG.reduce((a, u) => a + Math.min(u.max, 30), 0), dust, best: save.best, destroyed: save.st.destroyed, endMin: save.ended ? +(t/60).toFixed(1) : null, dustAtUnlock: prestigeAt, dustAtEnd: G.dustGain(),
-    sp: Object.keys(save.sp).length + '/' + G.SPECIALS.length, ach: Object.keys(save.ach).length + '/' + G.ACH.length, lucky: save.st.lucky, coins: G.fmt(save.coins)};
+  return {mode, reach, lvAt, grid: G.L('grid'), cells: G.blocks.length, lvMax: G.UPG.reduce((a, u) => a + Math.min(u.max, 30), 0), dust, best: save.best, destroyed: save.st.destroyed, endMin: endAt !== null ? +(endAt/60).toFixed(1) : null, dustAtUnlock: prestigeAt, dustAtEnd: G.dustGain(),
+    sp: Object.keys(save.sp).length + '/' + G.SPECIALS.length, ach: Object.keys(save.ach).length + '/' + G.ACH.length, lucky: save.st.lucky, coins: G.fmt(save.coins), relics: Object.keys(save.relics).length + '種/' + save.st.relics + '個', deepest: G.STAGES[save.st.deepest].name, evo: Object.keys(save.sp).filter(k => /e[12]$/.test(k)).join(',')};
 }
 // 第3引数に周回数を渡すと、エンディング後に砕いて永続強化を買い、次の周を続けて測る
 //   例: node bot.js tap 180 3

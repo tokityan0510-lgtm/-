@@ -3,7 +3,7 @@ function fmt(n){
   if (!isFinite(n)) return '∞';
   if (n < 10000) return Math.floor(n).toLocaleString('ja-JP');
   const k = Math.floor(Math.log10(n) / 4);
-  if (k >= UNITS.length) return n.toExponential(2).replace('e+', 'e');
+  if (k >= UNITS.length) return fmt(n / 1e68) + '無量大数';
   const v = n / Math.pow(10, 4 * k);
   return (v < 10 ? v.toFixed(2) : v < 100 ? v.toFixed(1) : v.toFixed(0)) + UNITS[k];
 }
@@ -24,26 +24,34 @@ const STAGES = [
   {name:'次元',     color:'#ff7ad9', dark:'#a3287f', glow:'#ffd1f4', bg:'#1a0616'},
   {name:'宇宙',     color:'#ffffff', dark:'#6a6a7a', glow:'#ffffff', bg:'#000000'},
 ];
+// 宇宙の先：宇宙を砕いた（エンディング）あとも素材が続く。最初の6つは名前つき、その先は「深淵 第N層」
+const UNIVERSE = STAGES.length - 1;
+const BEYOND = ['多元宇宙', '虚無', '混沌', '始原', '終焉', '神域'];
+for (let k = 1; k <= 38; k++){
+  const h = (k * 47 + 200) % 360;
+  STAGES.push({name:BEYOND[k - 1] || `深淵 第${k - BEYOND.length}層`, color:`hsl(${h},70%,62%)`, dark:`hsl(${h},55%,32%)`, glow:`hsl(${h},100%,82%)`, bg:`hsl(${h},45%,5%)`, beyond:k});
+}
 const PRESTIGE_STAGE = 8;   // この素材に到達したら「砕く」が解放される
 // ブロックの価値の素材倍率（TUNE.valStage）
 const sv = s => Math.pow(TUNE.valStage, s);
-const TUNE = {fhp:4000, fhpLate:4000, fdmg:4000, reqBase:2000, reqPow:5.4, dmgG:1.5, hpPow:3.4, hpMul:1, lvBonus:.01, tapProg:1.5, dustBase:18, dustDiv:8, dustBonus:.001, pmultBonus:.1, idleBonus:7, idleRamp:30, idleDmgK:.5, feverReward:2, costX:3, valStage:1e4, modSpan:7, droneDmg:5, droneInt:1.5, armMul:15, reso:.01, bossHp:1500, bossGrow:1.35, bossReward:300, comboDecay:.6};
+const TUNE = {fhp:4000, fhpLate:4000, fdmg:4000, reqBase:2200, reqPow:5.4, dmgG:1.5, hpPow:3.4, hpMul:1, lvBonus:.01, tapProg:1.5, dustBase:18, dustDiv:8, dustBonus:.001, pmultBonus:.1, idleBonus:7, idleRamp:30, idleDmgK:.35, feverReward:2, costX:3, valStage:1e4, modSpan:7, droneDmg:5, droneInt:1.5, armMul:15, armIdle:0, reso:.01, bossHp:1500, bossGrow:1.35, bossReward:300, comboDecay:.6};
 Object.assign(TUNE, JSON.parse(process.env.TUNE || '{}'));
 const DEFAULT = {
-  coins:0, stage:0, lv:{}, mods:{}, equip:[], slots:2, best:0, ended:false, muted:false, t:0, idleRate:0, prog:0, started:false, kills:0, boss:null,
-  sp:{}, ach:{}, dust:0, perm:{}, off:{}, runs:0, buyMode:1, endSeen:false,
-  st:{depth:0, destroyed:0, taps:0, bosses:0, lucky:0, fevers:0, time:0, earnedRun:0, earnedAll:0, offline:0, bestDust:0, bigCombo:0},
+  coins:0, stage:0, lv:{}, mods:{}, best:0, ended:false, muted:false, t:0, idleRate:0, prog:0, started:false, kills:0, boss:null,
+  sp:{}, ach:{}, dust:0, perm:{}, off:{}, runs:0, buyMode:1, endSeen:false, relics:{},
+  st:{depth:0, destroyed:0, taps:0, bosses:0, lucky:0, fevers:0, time:0, earnedRun:0, earnedAll:0, offline:0, bestDust:0, bigCombo:0, deepest:0, relics:0},
 };
 let save = JSON.parse(JSON.stringify(DEFAULT));
 const setSave = s => { save = s; };
 const L = id => save.lv[id] || 0;
 const ML = id => save.mods[id] || 0;
-const M = id => save.equip.includes(id) ? ML(id) : 0;
+// モジュールは解放したら全部効く（装備枠はなし）。ON/OFFボタンで止めたものだけ効かない
+const M = id => save.off && save.off[id] ? 0 : ML(id);
 const SP = id => !!save.sp[id];
 const P = id => save.perm[id] || 0;
 
 // ===== 兵器：放置で勝手に戦う。素材を進めるほど新しい兵器が手に入る =====
-//   st：手に入る目安の素材の段。n：最大台数。every：1台あたりの発射間隔（秒）。dmg：威力（破片1つの何倍か）
+//   st：手に入る目安の素材の段。n：最大台数。every：1台あたりの発射間隔（秒）。dmg：1発の威力（破片1つの何倍か。さらに TUNE.armMul 倍）
 const ARMS = [
   {id:'cannon',  name:'砲台',           st:1, n:6, every:3.0, dmg:3,  note:'画面下の砲台が砲弾を撃ち、着弾した周りを吹き飛ばす'},
   {id:'laser',   name:'レーザー',       st:2, n:5, every:4.5, dmg:10, note:'横一列をまとめて焼き払う'},
@@ -127,6 +135,84 @@ const SPECIALS = [
   {cat:'core', id:'lk3', name:'幸運の持続',       note:'幸運ブロックの効果時間 ×1.5',        cost:1e8,   req:() => save.st.lucky >= 25, rq:'幸運ブロック25回'},
   {cat:'core', id:'lk4', name:'幸運の連鎖',       note:'幸運ブロックを叩くと破片が100個飛ぶ', cost:5e6, req:() => save.st.lucky >= 5, rq:'幸運ブロック5回'},
 ];
+// ===== 遺物：ひびが満タンで砕けたとき（と幸運ブロックからたまに）落ちる。集めた遺物は全部効き、宇宙を砕いても消えない =====
+// rar：0 コモン / 1 レア / 2 エピック / 3 レジェンド（名前・色・出る重み）。同じ遺物がまた出たらLvが上がる
+const RARITY = [['コモン', '#b9c2cc', 62], ['レア', '#4cc9ff', 27], ['エピック', '#c38bff', 9], ['レジェンド', '#ffd84d', 2]];
+const RELICS = [
+  {id:'hammer',   name:'古代の槌',         rar:0, max:10, v:l => `破片の威力 +${10*l}%`},
+  {id:'prop',     name:'錆びたプロペラ',   rar:0, max:10, v:l => `ドローンの威力 +${15*l}%`},
+  {id:'cat',      name:'招き猫の欠片',     rar:0, max:10, v:l => `全部の報酬 +${10*l}%`},
+  {id:'fist',     name:'鉄の拳',           rar:0, max:10, v:l => `タップの威力 +${20*l}%`},
+  {id:'lens',     name:'拡大鏡',           rar:0, max:10, v:l => `クリティカル率 +${l}%`},
+  {id:'powder',   name:'黒色火薬',         rar:0, max:10, v:l => `砲台の威力 +${20*l}%`},
+  {id:'prism',    name:'プリズム',         rar:0, max:10, v:l => `レーザーの威力 +${20*l}%`},
+  {id:'fuse',     name:'導火線',           rar:1, max:8,  v:l => `ミサイルの威力 +${25*l}%`},
+  {id:'graviton', name:'重力子',           rar:1, max:8,  v:l => `ブラックホールの威力 +${25*l}%`},
+  {id:'ember',    name:'消えない種火',     rar:1, max:8,  v:l => `フィーバーの時間 +${(.5*l).toFixed(1)}秒`},
+  {id:'clover',   name:'四つ葉',           rar:1, max:8,  v:l => `幸運ブロックの出現間隔 −${Math.round((1-Math.pow(.95,l))*100)}%`},
+  {id:'fork',     name:'音叉',             rar:1, max:8,  v:l => `共鳴 +${(.3*l).toFixed(1)}%`},
+  {id:'blade',    name:'研がれた刃',       rar:1, max:8,  v:l => `クリティカルの倍率 +${(.5*l).toFixed(1)}`},
+  {id:'comet',    name:'彗星の欠片',       rar:1, max:8,  v:l => `幸運ブロックの効果時間 +${10*l}%`},
+  {id:'core',     name:'連鎖の核',         rar:2, max:5,  v:l => `爆発するかけらの確率 +${2*l}%`},
+  {id:'hourglass',name:'止まった砂時計',   rar:2, max:5,  v:l => `放置ボーナスが溜まる時間 −${10*l}%`},
+  {id:'gear',     name:'永久機関',         rar:2, max:5,  v:l => `兵器の連射 +${10*l}%`},
+  {id:'crown',    name:'王冠',             rar:2, max:5,  v:l => `全部の報酬 ×${Math.pow(1.25,l).toFixed(2)}`},
+  {id:'seed',     name:'ビッグバンの種',   rar:3, max:3,  v:l => `すべてのダメージ +${50*l}%`},
+  {id:'tear',     name:'星屑の涙',         rar:3, max:3,  v:l => `星屑の獲得 +${25*l}%`},
+  {id:'eye',      name:'創造主の眼',       rar:3, max:3,  v:l => `金のかけらの確率 +${3*l}%`},
+];
+const RL = id => save.relics[id] || 0;
+const relicKinds = () => RELICS.filter(r => RL(r.id) > 0).length;
+// 出す遺物を選ぶ：まずレア度を重みで決め、そのレア度で最大Lvでないものから1つ。全部最大ならほかのレア度から
+function dropRelic(){
+  let x = Math.random() * 100, rar = 0;
+  for (let k = RARITY.length - 1; k >= 0; k--){ x -= RARITY[k][2]; if (x < 0){ rar = k; break; } }
+  let pool = RELICS.filter(r => r.rar === rar && RL(r.id) < r.max);
+  if (!pool.length) pool = RELICS.filter(r => RL(r.id) < r.max);
+  if (!pool.length) return null;
+  const r = pool[Math.floor(Math.random() * pool.length)];
+  save.relics[r.id] = RL(r.id) + 1; save.st.relics++;
+  fx.relic(r, RL(r.id));
+  return r;
+}
+
+// ===== 兵器の進化：威力のLvが一定に届くと、名前と見た目が変わって威力 ×4 =====
+// 1段目は「宇宙」、2段目は「終焉」に一度でも届いていることも条件（到達記録は砕いても残るので、周回の目標になる）
+const EVO = {
+  drone:   {base:'ドローン', up:'dronedmg', upName:'弾の威力', at:[50, 120], names:['戦闘機', '宇宙戦艦'], cols:['#ff4c88', '#ffd84d']},
+  cannon:  {base:'砲台', up:'cannonP', upName:'砲台の威力', at:[40, 80], names:['レールガン', '反物質砲'], cols:['#4cc9ff', '#ff4cf0']},
+  laser:   {base:'レーザー', up:'laserP', upName:'レーザーの威力', at:[40, 80], names:['プラズマ砲', '光子砲'], cols:['#4c9bff', '#fff3b0']},
+  missile: {base:'ミサイル', up:'missileP', upName:'ミサイルの威力', at:[40, 80], names:['核ミサイル', '恒星爆弾'], cols:['#b6ff3b', '#ffffff']},
+  hole:    {base:'ブラックホール', up:'holeP', upName:'ブラックホールの威力', at:[40, 80], names:['特異点', 'ビッグクランチ'], cols:['#ff4c88', '#ffd84d']},
+};
+const EVO_AT = [UNIVERSE, UNIVERSE + 5];
+const evo = id => (SP(id + 'e1') ? 1 : 0) + (SP(id + 'e2') ? 1 : 0);
+const armName = id => evo(id) ? EVO[id].names[evo(id) - 1] : EVO[id].base;
+const evoCol = (id, def) => evo(id) ? EVO[id].cols[evo(id) - 1] : def;
+for (const [id, e] of Object.entries(EVO)) for (let k = 0; k < 2; k++){
+  SPECIALS.push({cat:id === 'drone' ? 'idle' : 'arms', id:`${id}e${k + 1}`, evo:true, name:`進化：${e.names[k]}`, note:`${k ? e.names[0] : e.base}が${e.names[k]}に進化する。威力 ×4・見た目が変わる`,
+    ref:[e.up, e.at[k]], req:() => L(e.up) >= e.at[k] && save.st.deepest >= EVO_AT[k] && (k === 0 || SP(id + 'e1')), rq:`${e.upName} Lv${e.at[k]}・${STAGES[EVO_AT[k]].name}に到達`});
+}
+// ===== シナジー：別々の系統どうしを掛け合わせて火力を伸ばす特殊強化 =====
+const ARM_RELIC = {cannon:['powder', .2], laser:['prism', .2], missile:['fuse', .25], hole:['graviton', .25]};
+const armCount = () => ARMS.reduce((a, x) => a + L(x.id + 'N'), 0);
+// 遺物・進化・シナジーの火力の倍率。これらは「ひびの進み」だけを速くし、コインには効かせない
+// （コインはダメージに比例するので、効かせると ダメージ→コイン→強化→ダメージ の雪だるまで1周が数分で終わってしまう）
+const coreX = () => (1 + .1 * RL('hammer')) * (SP('sy3') ? 1 + .005 * Object.keys(save.ach).length : 1) * (SP('sy7') ? 1 + .005 * modTotal() : 1);
+const droneX = () => (1 + .15 * RL('prop')) * Math.pow(4, evo('drone')) * (SP('sy1') ? 1 + .03 * armCount() : 1);
+const armX = id => (1 + ARM_RELIC[id][1] * RL(ARM_RELIC[id][0])) * Math.pow(4, evo(id)) * (SP('sy2') ? 1 + .03 * stat.drones() : 1);
+const modTotal = () => MODS.reduce((a, m) => a + ML(m.id), 0);
+SPECIALS.push(
+  {cat:'idle', id:'sy1', name:'兵器連動',     note:'兵器の台数の合計1台ごとに、ドローンの威力 +3%',        cost:5e6, req:() => armCount() >= 12, rq:'兵器の台数 合計12台'},
+  {cat:'arms', id:'sy2', name:'編隊射撃',     note:'ドローン1台ごとに、兵器の威力 +3%',                    cost:5e6, req:() => L('drones') >= 10, rq:'ドローンの台数 Lv10'},
+  {cat:'core', id:'sy3', name:'実績の力',     note:'実績1個ごとに、破片の威力 +0.5%',                      cost:1e7, req:() => Object.keys(save.ach).length >= 35, rq:'実績35個'},
+  {cat:'tap',  id:'sy4', name:'コンボ火力',   note:'コンボ200ごとに、すべてのダメージ +5%（最大 +50%）',   cost:1e7, req:() => save.best >= 1000, rq:'最高コンボ1,000'},
+  {cat:'tap',  id:'sy5', name:'熱暴走',       note:'フィーバー中、ドローンと兵器の連射 ×1.5',              cost:1e7, req:() => save.st.fevers >= 20, rq:'フィーバー20回'},
+  {cat:'core', id:'sy6', name:'遺物共鳴',     note:'遺物1種類ごとに、すべてのダメージ +2%',                cost:2e7, req:() => relicKinds() >= 8, rq:'遺物8種類'},
+  {cat:'core', id:'sy7', name:'モジュール共鳴', note:'モジュールのLv合計1ごとに、破片の威力 +0.5%',       cost:2e7, req:() => modTotal() >= 40, rq:'モジュールLv合計40'},
+  {cat:'idle', id:'sy8', name:'共鳴増幅',     note:'共鳴 +5%',                                             cost:2e7, req:() => L('spawn') >= 15, rq:'共鳴 Lv15'},
+);
+
 // 星屑で買う永続強化（砕いても残る）
 const PERM = [
   {id:'pmult',  name:'星屑の輝き',     note:'全部の報酬 +10%',                       cost:4,  g:1.6, max:20, v:l => `+${l*10}%`},
@@ -136,18 +222,16 @@ const PERM = [
   {id:'pgauge', name:'因果の短縮',     note:'ボス出現に必要な稼ぎ −8%',              cost:6,  g:1.9, max:5,  v:l => `−${Math.round((1-Math.pow(.92,l))*100)}%`},
   {id:'pauto',  name:'自動タップ',     note:'毎秒勝手にタップする（熱量は半分。幸運ブロックは叩かない）', cost:40, g:2.2, max:3, v:l => `毎秒${l}回`},
   {id:'poff',   name:'長期休暇',       note:'オフライン収入の上限時間 +4時間',      cost:10, g:1.7, max:4,  v:l => `${8+4*l}時間`},
-  {id:'pslot',  name:'広い装備枠',     note:'最初から装備枠が多い',                  cost:30, g:2.5, max:2,  v:l => `${2+l}枠から`},
+  {id:'pmodc',  name:'モジュール工房', note:'モジュールの値段 −30%',                 cost:30, g:2.5, max:2,  v:l => `−${Math.round((1-Math.pow(.7,l))*100)}%`},
   {id:'pkeep',  name:'モジュール記憶', note:'砕いてもモジュールのLvが残る',          cost:80, g:1,   max:1,  v:l => l ? '有効' : '無効'},
   {id:'pcrit',  name:'星の眼',         note:'クリティカル率 +5%',                    cost:15, g:1.8, max:4,  v:l => `+${5*l}%`},
 ];
-const SLOT_COST = [0, 0, 3e5, 1e8], SLOT_STAGE = [0, 0, 1, 4];
 const upG = u => u.inf ? u.g : Math.pow(TUNE.valStage, u.span / u.max);
 const upCost  = (u, l = L(u.id)) => Math.ceil(u.cost * TUNE.costX * Math.pow(upG(u), l));
 const upCostN = (u, n) => { let s = 0; for (let k = 0; k < n; k++) s += upCost(u, L(u.id) + k); return s; };
 const upMaxN  = u => { let n = 0, s = 0; while (L(u.id) + n < u.max){ const c = upCost(u, L(u.id) + n); if (s + c > save.coins) break; s += c; n++; } return n; };
 // モジュールは st 段目あたりで解放できる値段。Lvは modSpan 段かけて上限へ
-const modCost = m => Math.ceil((ML(m.id) ? m.cost * Math.pow(TUNE.valStage, TUNE.modSpan * (ML(m.id) - 1) / m.max) : m.unlock) * TUNE.costX * sv(m.st));
-const slotCost = () => SLOT_COST[save.slots] * TUNE.costX * sv(SLOT_STAGE[save.slots]);
+const modCost = m => Math.ceil((ML(m.id) ? m.cost * Math.pow(TUNE.valStage, TUNE.modSpan * (ML(m.id) - 1) / m.max) : m.unlock) * TUNE.costX * sv(m.st) * Math.pow(.7, P('pmodc')));
 // Lv条件の特殊強化は、条件になったLvの値段の4倍。記録条件のものは今の素材の価値に合わせる
 const spCost = s => Math.ceil(s.ref ? 4 * upCost(UPG.find(u => u.id === s.ref[0]), s.ref[1]) : s.cost * TUNE.costX * sv(save.stage) / 10);
 const permCost = p => Math.ceil(p.cost * Math.pow(p.g, P(p.id)));
@@ -159,35 +243,37 @@ const achCount = () => Object.keys(save.ach).length;
 // ずっと残る倍率（実績・星屑）。ボスゲージの進みからは除く（周回で極端に速くならないように）
 const permMult = () => (1 + .01 * achCount()) * (1 + TUNE.pmultBonus * P('pmult')) * (1 + TUNE.dustBonus * save.st.bestDust);
 // 放置ボーナス：最後に手でタップしてから idleRamp 秒かけて、報酬が最大 idleBonus 倍まで上がる
-const idleMult = () => 1 + (TUNE.idleBonus - 1) * Math.min(1, lastTap / TUNE.idleRamp);
+const idleMult = () => 1 + (TUNE.idleBonus - 1) * Math.min(1, lastTap / (TUNE.idleRamp * (1 - .1 * RL('hourglass'))));
 const idleDmg = () => 1 + (idleMult() - 1) * TUNE.idleDmgK;
-const rewardMult = () => permMult() * idleMult() * (buffs.frenzy > 0 ? 7 : 1) * (fever > 0 ? TUNE.feverReward : 1);
+const rewardMult = () => permMult() * idleMult() * (buffs.frenzy > 0 ? 7 : 1) * (fever > 0 ? TUNE.feverReward : 1) * (1 + .1 * RL('cat')) * Math.pow(1.25, RL('crown'));
 // 相場はその周だけの倍率なので、ボスゲージにも効く
 // 強化ボーナス：どの強化でも1Lv買うごとに稼ぎ（とボスゲージの進み）が +lvBonus。特定の強化を買わなくても詰まらないように
 const lvTotal = () => { let n = 0; for (const k in save.lv) n += save.lv[k]; return n; };
 const lvMult = () => 1 + TUNE.lvBonus * lvTotal();
 const comboMult = () => (1 + Math.sqrt(combo) * stat.chain()) * stat.market() * lvMult();
-const luckyInterval = () => 110 * (SP('lk1') ? .75 : 1) * (SP('lk2') ? .75 : 1) * Math.pow(.85, P('plucky'));
+const luckyInterval = () => 110 * (SP('lk1') ? .75 : 1) * (SP('lk2') ? .75 : 1) * Math.pow(.85, P('plucky')) * Math.pow(.95, RL('clover'));
 
 const stat = {
   shards:   () => 3 + L('shards'),
-  dmg:      () => 100 * Math.pow(TUNE.fdmg, save.stage) * (1 + .2 * L('power')) * (SP('sh1') ? 2 : 1) * (SP('sh2') ? 2 : 1) * (SP('sh3') ? 3 : 1),
+  dmg:      () => 100 * Math.pow(TUNE.fdmg, save.stage) * (1 + .2 * L('power')) * (SP('sh1') ? 2 : 1) * (SP('sh2') ? 2 : 1) * (SP('sh3') ? 3 : 1)
+              * coreX(),
   drones:   () => Math.min(12, 1 + L('drones') + P('pdrone')),
-  droneInt: () => TUNE.droneInt * Math.pow(.85, L('droneint')) * (SP('rl1') ? .8 : 1) * (buffs.barrage > 0 ? .125 : 1),
-  droneDmg: () => TUNE.droneDmg * (1 + .25 * L('dronedmg')) * (SP('dr1') ? 1.5 : 1) * (SP('dr2') ? 1.5 : 1) * (SP('dr3') ? 2 : 1) * (SP('dr4') ? 2 : 1),
-  reso:     (l = L('spawn')) => TUNE.reso * l * (SP('sp1') ? 2 : 1),
+  droneInt: () => TUNE.droneInt * Math.pow(.85, L('droneint')) * (SP('rl1') ? .8 : 1) * (buffs.barrage > 0 ? .125 : 1) * (SP('sy5') && fever > 0 ? 2 / 3 : 1),
+  droneDmg: () => TUNE.droneDmg * (1 + .25 * L('dronedmg')) * (SP('dr1') ? 1.5 : 1) * (SP('dr2') ? 1.5 : 1) * (SP('dr3') ? 2 : 1) * (SP('dr4') ? 2 : 1)
+              * droneX(),
+  reso:     (l = L('spawn')) => TUNE.reso * l * (SP('sp1') ? 2 : 1) + .003 * RL('fork') + (SP('sy8') ? .05 : 0),
   drburst:  () => L('drburst') * 2 * (SP('bu1') ? 2 : 1),
   tapburst: () => 2 + L('tapburst'),
-  tapPow:   () => SP('tp1') ? 2 : 1,
+  tapPow:   () => (SP('tp1') ? 2 : 1) * (1 + .2 * RL('fist')),
   heat:     () => (8 + 2 * L('heat')) * (SP('ht1') ? 1.5 : 1),
-  fever:    () => 5 + L('fever'),
+  fever:    () => 5 + L('fever') + .5 * RL('ember'),
   tapboom:  () => L('tapboom'),
   chain:    () => 0.1 + 0.05 * L('chain'),
   market:   () => 1 + .1 * L('market'),
-  crit:     () => buffs.awaken > 0 ? 1 : 0.05 + 0.03 * L('crit') + .05 * P('pcrit'),
-  critX:    () => SP('cr2') ? 8 : SP('cr1') ? 6 : 4,
-  bomb:     () => Math.min(.25, .02 + .015 * L('bomb')),
-  gold:     () => Math.min(.2, .01 + .01 * L('gold')),
+  crit:     () => buffs.awaken > 0 ? 1 : 0.05 + 0.03 * L('crit') + .05 * P('pcrit') + .01 * RL('lens'),
+  critX:    () => (SP('cr2') ? 8 : SP('cr1') ? 6 : 4) + .5 * RL('blade'),
+  bomb:     () => Math.min(.25, .02 + .015 * L('bomb')) + .02 * RL('core'),
+  gold:     () => Math.min(.2, .01 + .01 * L('gold')) + .03 * RL('eye'),
   keep:     () => .65 + .025 * L('keep'),
   decay:    () => TUNE.comboDecay * (SP('cb1') ? .5 : 1) * (SP('cb2') ? .5 : 1),
   holdMs:   () => SP('tp2') ? 170 : 250,
@@ -202,16 +288,20 @@ const bossK = () => Math.max(save.stage, save.kills);
 // 巨大ブロックが砕けるまでに必要なダメージ（ブロック1個ぶんのHPの何個分か × (1+段階)^reqPow）
 const gaugeNeed = () => blockHp(save.stage) * TUNE.reqBase * Math.pow(1 + bossK(), TUNE.reqPow) * Math.pow(.92, P('pgauge'));
 const bossHp = () => blockHp(save.stage) * TUNE.bossHp * Math.pow(TUNE.bossGrow, bossK());
-const dustGain = () => { if (save.stage < PRESTIGE_STAGE) return 0; const lv = Math.log10(TUNE.valStage) / 5; return Math.floor(TUNE.dustBase * Math.pow(2, (Math.log10(Math.max(1, save.st.earnedRun)) - 37 * lv) / (TUNE.dustDiv * lv))); };
+const dustGain = () => { if (save.stage < PRESTIGE_STAGE) return 0; const lv = Math.log10(TUNE.valStage) / 5; return Math.floor(TUNE.dustBase * Math.pow(2, (Math.log10(Math.max(1, save.st.earnedRun)) - 37 * lv) / (TUNE.dustDiv * lv)) * (1 + .25 * RL('tear'))); };
 
 let W = 390, H = 560, cell = 55.7, ucell = 55.7, topBand = 0, botBand = 0;
 let BX = 195, BY = 300, BS = 240, big = {flash:0, wob:0, wx:0, wy:0, spawn:1, burn:0, burnDps:0, burnAcc:0, bd:0};
 // blocks と boss は旧方式の名残（常に空）。表示側の互換のために残している
 let blocks = [], boss = null, shards = [], booms = [], zaps = [], bullets = [], drones = [], lucky = null;
+// 連鎖で爆発・雷が増えすぎると重くなるので、保留できる数に上限を付ける。あふれた分はダメージだけまとめて次のフレームで与える
+const MAXB = 48, MAXZ = 16;
+let overflow = {};
+function queueBoom(e){ if (booms.length < MAXB) booms.push(e); else overflow[e.src] = (overflow[e.src] || 0) + e.dmg; }
 let shells = [], beams = [], missiles = [], holes = [], armT = {}, armK = 0;
 let combo = 0, fever = 0, heat = 0, state = 'title', lastTap = 0, earnedTick = 0, luckyT = 60, autoT = 0;
 let MAXS = 900;   // 破片の上限（自動画質で変わる）
-const fx = {dig(){}, arm(){}, beam(){}, hole(){}, hit(){}, brk(){}, boom(){}, bolt(){}, fever(){}, milestone(){}, tap(){}, split(){}, bossHit(){}, bossSpawn(){}, bossDie(){}, shoot(){}, land(){}, lucky(){}, luckyHit(){}, ach(){}};
+const fx = {dig(){}, arm(){}, beam(){}, hole(){}, hit(){}, brk(){}, boom(){}, bolt(){}, fever(){}, milestone(){}, tap(){}, split(){}, bossHit(){}, bossSpawn(){}, bossDie(){}, shoot(){}, land(){}, lucky(){}, luckyHit(){}, ach(){}, relic(){}};
 const TIERS = [[25, 'いいぞ', '#ffe14d'], [50, 'ナイス！', '#ffe14d'], [100, 'スゴい！', '#ff9a3c'], [250, 'ヤバい！', '#ff4c88'], [500, '狂気', '#c38bff'], [1000, '神', '#4cc9ff'], [2500, '宇宙', '#ffffff'], [5000, '無量大数', '#ffffff']];
 let milestoneSeen = 0;
 
@@ -240,7 +330,11 @@ function shatter(){
   const gain = earn(100 * sv(save.stage) * TUNE.bossReward * comboMult() * rewardMult());
   save.kills++; save.st.bosses++; save.prog = 0;
   const prevStage = save.stage;
-  if (save.stage < STAGES.length - 1) save.stage++; else save.ended = true;
+  // 宇宙を初めて砕いたらエンディング。そのあとも「宇宙の先」へ進める
+  if (save.stage === UNIVERSE) save.ended = true;
+  if (save.stage < STAGES.length - 1) save.stage++;
+  save.st.deepest = Math.max(save.st.deepest, save.stage);
+  dropRelic();
   big = freshBig();
   shards = []; holes = [];
   fx.bossDie(prevStage, gain);
@@ -253,7 +347,7 @@ function spawnLucky(){
 }
 function hitLucky(){
   const lk = lucky; lucky = null; save.st.lucky++;
-  const dur = SP('lk3') ? 1.5 : 1;
+  const dur = (SP('lk3') ? 1.5 : 1) * (1 + .1 * RL('comet'));
   const roll = Math.random(); let kind, text;
   if (roll < .36){ kind = 'frenzy'; buffs.frenzy = 60 * dur; text = 'フレンジー！　報酬 ×7'; }
   else if (roll < .58){ kind = 'barrage'; buffs.barrage = 25 * dur; text = '弾幕！　ドローン連射 ×8'; }
@@ -261,6 +355,7 @@ function hitLucky(){
   else if (roll < .92){ kind = 'awaken'; buffs.awaken = 20 * dur; text = '覚醒！　クリティカル100%'; }
   else { kind = 'storm'; buffs.storm = 1; text = 'かけら嵐！'; spawnShards(lk.x, lk.y, 300, 0); }
   if (SP('lk4')) spawnShards(lk.x, lk.y, 100, 0);
+  if (Math.random() < .15) dropRelic();
   heat = Math.min(100, heat + 30);
   fx.luckyHit(lk, text, kind);
 }
@@ -275,7 +370,7 @@ function tap(x, y, auto){
   else { heat += stat.heat() * (auto ? .5 : 1); if (heat >= 100){ heat = 0; fever = fv; save.st.fevers++; fx.fever(); } }
   hit(stat.dmg() * 3 * stat.tapPow(), auto ? 'auto' : 'tap', x, y, 0, stat.shards() * stat.tapburst());
   const tb = stat.tapboom();
-  if (tb) booms.push({x, y, R:cell * (1 + .3 * tb + (SP('sw1') ? 1 : 0)), dmg:stat.dmg() * tb * 2 * stat.tapPow(), t:.04, big:false, quiet:true, d:1, src:'tapboom'});
+  if (tb) queueBoom({x, y, R:cell * (1 + .3 * tb + (SP('sw1') ? 1 : 0)), dmg:stat.dmg() * tb * 2 * stat.tapPow(), t:.04, big:false, quiet:true, d:1, src:'tapboom'});
   fx.tap(x, y);
   return true;
 }
@@ -303,21 +398,24 @@ function trackDps(dt){
 }
 // 兵器のON/OFF（save.off[id] が 1 なら撃たない）
 const armOn = id => !(save.off && save.off[id]);
+// すべてのダメージに効く倍率（遺物「ビッグバンの種」、シナジー）
+const allDmg = () => (1 + .5 * RL('seed')) * (SP('sy4') ? 1 + Math.min(.5, combo / 4000) : 1) * (SP('sy6') ? 1 + .02 * relicKinds() : 1);
 function hit(dmg, src, x, y, d = 0, burst = 0){
   let crit = false;
   if (src !== 'burn' && src !== 'reso' && Math.random() < stat.crit()){ dmg *= stat.critX(); crit = true; }
   // 共鳴は「すでに倍率がかかったダメージ」を元にするので、フィーバー・放置ボーナスをかけ直さない。
   // 炎上のフィーバー分は burnAcc でかけ済み
   if (fever > 0 && src !== 'burn' && src !== 'reso') dmg *= 2;
-  // 放置ボーナスはダメージにも半分の強さで効く（放置でもひびが進むように）
-  if (src !== 'reso') dmg *= idleDmg();
+  // 放置ボーナスはダメージにも約1/3の強さで効く（最大×3.1）（放置でもひびが進むように）
+  if (src !== 'reso') dmg *= idleDmg() * allDmg();
   // 進み（ひび）は与えたダメージ。直接タップは tapProg 倍
   save.prog += dmg * (src === 'tap' ? TUNE.tapProg : 1);
   { const D = globalThis.__dmg = globalThis.__dmg || {}; D[src] = (D[src] || 0) + dmg; }
   { const g = DPS_GROUP[src] || src; dpsAcc[g] = (dpsAcc[g] || 0) + dmg; }
   combo += src === 'burn' || src === 'reso' ? .2 : 1; save.st.destroyed++;
   // コインは与えたダメージに比例（ブロック1個ぶんのHPで、その素材のブロック1個ぶんの価値）
-  let gain = 100 * sv(save.stage) * dmg / blockHp(save.stage) * comboMult() * rewardMult(), gold = false;
+  const nx = allDmg() * coreX() * (src === 'drone' ? droneX() : ARM_RELIC[src] ? armX(src) : 1);
+  let gain = 100 * sv(save.stage) * dmg / nx / blockHp(save.stage) * comboMult() * rewardMult(), gold = false;
   if (src !== 'burn' && src !== 'reso' && Math.random() < stat.gold()){ gain *= 15 * (SP('go1') ? 2 : 1); gold = true; }
   earn(gain);
   if (src !== 'reso') resoWin += dmg;
@@ -328,11 +426,14 @@ function hit(dmg, src, x, y, d = 0, burst = 0){
   const nd = d + 1, kp = Math.pow(stat.keep(), nd);
   if (burst) spawnShards(x, y, burst, nd);
   if (src !== 'burn' && src !== 'reso'){
-    if (Math.random() < stat.bomb() * .3) booms.push({x, y, R:cell * 1.7 * (SP('bm1') ? 1.3 : 1), dmg:stat.dmg() * 5 * (SP('bm1') ? 2 : 1) * kp, t:.08, big:true, d:nd, src:'bomb'});
+    if (Math.random() < stat.bomb() * .3) queueBoom({x, y, R:cell * 1.7 * (SP('bm1') ? 1.3 : 1), dmg:stat.dmg() * 5 * (SP('bm1') ? 2 : 1) * kp, t:.08, big:true, d:nd, src:'bomb'});
     const bl = M('blast');
-    if (bl && Math.random() < Math.min(.5, .08 + .04 * (bl - 1)) * .3) booms.push({x, y, R:cell * 1.25, dmg:stat.dmg() * 2 * kp, t:.08, big:false, d:nd, src:'blast'});
+    if (bl && Math.random() < Math.min(.5, .08 + .04 * (bl - 1)) * .3) queueBoom({x, y, R:cell * 1.25, dmg:stat.dmg() * 2 * kp, t:.08, big:false, d:nd, src:'blast'});
     const bo = M('bolt');
-    if (bo && Math.random() < Math.min(.6, .15 + .05 * (bo - 1)) * .3) zaps.push({x, y, n:2 + Math.floor((bo - 1) / 2), t:.05, d:nd});
+    if (bo && Math.random() < Math.min(.6, .15 + .05 * (bo - 1)) * .3){
+      const n = 2 + Math.floor((bo - 1) / 2);
+      if (zaps.length < MAXZ) zaps.push({x, y, n, t:.05, d:nd}); else overflow.bolt = (overflow.bolt || 0) + stat.dmg() * 3 * Math.pow(stat.keep(), nd) * n;
+    }
     if (src === 'shard' && M('burn')){ big.burn = 2; big.burnDps = Math.max(big.burnDps * .9, stat.dmg() * .8 * (1 + .3 * (M('burn') - 1))); big.bd = d; }
   }
   const cm = Math.floor(combo);
@@ -347,8 +448,9 @@ function fireDrone(dr){
   bullets.push({x:dr.x, y:dr.y, vx:dx / len * v, vy:dy / len * v, tx, ty, life:len / v + .05});
   fx.shoot(dr, tx, ty);
 }
-const armRate = () => 1 + (idleMult() - 1) / (TUNE.idleBonus - 1);
-const armPow = id => (1 + .25 * L(id + 'P')) * (id === 'cannon' && SP('cn1') ? 2 : 1) * (SP(id + 'u1') ? 2 : 1) * (SP(id + 'u2') ? 3 : 1);
+const armRate = () => (1 + TUNE.armIdle * (idleMult() - 1) / (TUNE.idleBonus - 1)) * (1 + .1 * RL('gear')) * (SP('sy5') && fever > 0 ? 1.5 : 1);
+const armPow = id => (1 + .25 * L(id + 'P')) * (id === 'cannon' && SP('cn1') ? 2 : 1) * (SP(id + 'u1') ? 2 : 1) * (SP(id + 'u2') ? 3 : 1)
+  * armX(id);
 // 兵器1発の威力（破片1つの何倍か）。ブラックホールは1回の吸い込みぶん（最後の爆発はその5倍）
 const ARM_BY = Object.fromEntries(ARMS.map(a => [a.id, a]));
 const armDmg = id => ARM_BY[id].dmg * TUNE.armMul * armPow(id);
@@ -368,7 +470,7 @@ function fireArm(a, n){
     missiles.push({x, y, vx:(Math.random() - .5) * cell * 4, vy:-cell * 7, tx, ty, life:4});
     fx.arm('missile', x, y);
   } else if (a.id === 'hole'){
-    const R = cell * 1.6 * (SP('bh1') ? 1.4 : 1);
+    const R = cell * 1.6 * (SP('bh1') ? 1.4 : 1) * (1 + .3 * evo('hole'));
     holes.push({x:tx, y:ty, life:3, max:3, tick:0, R});
     fx.hole(tx, ty, R);
   }
@@ -376,14 +478,14 @@ function fireArm(a, n){
 function stepArms(dt){
   for (const a of ARMS){
     const n = L(a.id + 'N'); if (!n || !armOn(a.id)) continue;
-    // 放置中は兵器の連射が上がる（放置ボーナスが最大のとき2倍）
+    // 放置ボーナスで連射を上げる場合は TUNE.armIdle（今は0：兵器は威力が強いぶん、連射は上げない）
     armT[a.id] = (armT[a.id] || Math.random()) + dt * n / a.every * armRate();
     while (armT[a.id] >= 1){ armT[a.id] -= 1; fireArm(a, n); }
   }
   const base = stat.dmg();
   for (let k = shells.length - 1; k >= 0; k--){
     const o = shells[k]; o.t += dt;
-    if (o.t >= o.dur){ shells.splice(k, 1); booms.push({x:o.tx, y:o.ty, R:cell * 1.4 * (SP('cn1') ? 1.2 : 1), dmg:base * armDmg('cannon'), t:0, big:false, arm:true, d:0, burst:3, src:'cannon'}); }
+    if (o.t >= o.dur){ shells.splice(k, 1); booms.push({x:o.tx, y:o.ty, dmg:base * armDmg('cannon'), t:0, big:false, arm:true, d:0, burst:3 + 2 * evo('cannon'), src:'cannon', R:cell * 1.4 * (SP('cn1') ? 1.2 : 1) * (1 + .3 * evo('cannon'))}); }
   }
   for (let k = beams.length - 1; k >= 0; k--){
     const b = beams[k]; b.t -= dt;
@@ -401,7 +503,7 @@ function stepArms(dt){
     if (d < cell * .4 || m.life <= 0){
       missiles.splice(k, 1);
       const p = armDmg('missile');
-      booms.push({x:m.x, y:m.y, R:cell * 2.2, dmg:base * p, t:0, big:false, arm:true, missile:true, d:0, burst:8, src:'missile'});
+      booms.push({x:m.x, y:m.y, R:cell * 2.2 * (1 + .4 * evo('missile')), dmg:base * p, t:0, big:false, arm:true, missile:true, d:0, burst:8, src:'missile'});
       if (SP('ms1')) for (let q = 0; q < 3; q++){ const [sx, sy] = bigPoint(); booms.push({x:sx, y:sy, R:cell * 1.2, dmg:base * .4 * p, t:.12 + q * .06, big:false, arm:true, d:0, src:'missile'}); }
     }
   }
@@ -484,6 +586,8 @@ function step(dt){
     for (let m = 0; m < z.n; m++){ const [px, py] = bigPoint(); pts.push([px, py]); hit(stat.dmg() * 3 * Math.pow(stat.keep(), z.d), 'bolt', px, py, z.d); }
     fx.bolt(pts);
   }
+  for (const src in overflow){ const [ox, oy] = bigPoint(); hit(overflow[src], src, ox, oy, 6); }
+  overflow = {};
   if (fever > 0) fever = Math.max(0, fever - dt); else heat = Math.max(0, heat - 6 * dt);
   for (const k in buffs) if (buffs[k] > 0) buffs[k] = Math.max(0, buffs[k] - dt);
   combo = Math.max(0, combo - combo * stat.decay() * dt);
@@ -509,11 +613,18 @@ achSet('u', '強化レベル合計', [10, 100, 300, 1000, 3000], ['初心者', '
 achSet('h', 'プレイ時間', [600, 3600, 3 * 3600, 10 * 3600, 24 * 3600], ['10分', '1時間', '3時間', '10時間', '丸一日'], () => save.st.time, fmtT);
 ACH.push({id:'arms4', name:'兵器工場', desc:'4種類の兵器をすべてそろえる', ok:() => ARMS.every(a => L(a.id + 'N') > 0)});
 ACH.push({id:'mall', name:'全モジュール', desc:'7種のモジュールを全部解放', ok:() => MODS.every(m => ML(m.id) > 0)});
-ACH.push({id:'slot4', name:'フル装備', desc:'装備枠を4つにする', ok:() => save.slots >= 4});
+ACH.push({id:'slot4', name:'フル装備', desc:'7種のモジュールを全部Lv5以上にする', ok:() => MODS.every(m => ML(m.id) >= 5)});
 ACH.push({id:'off1', name:'おかえり', desc:'オフライン収入を受け取る', ok:() => save.st.offline >= 1});
 ACH.push({id:'sp10', name:'特殊部隊', desc:'特殊強化を10個買う', ok:() => Object.keys(save.sp).length >= 10});
 ACH.push({id:'spall', name:'全部入り', desc:'特殊強化を全部買う', ok:() => SPECIALS.every(s => SP(s.id))});
 ACH.push({id:'dust100', name:'星屑の山', desc:'星屑を累計100集める', ok:() => save.st.bestDust >= 100});
+achSet('r', '遺物の種類', [1, 5, 10, 15, RELICS.length], ['掘り出し物', '収集家', '博物館', '考古学者', '完全図鑑'], () => relicKinds(), n => n + '種');
+ACH.push({id:'rleg', name:'伝説', desc:'レジェンドの遺物を手に入れる', ok:() => RELICS.some(r => r.rar === 3 && RL(r.id) > 0)});
+ACH.push({id:'rmax', name:'極めし者', desc:'遺物をどれか1つ最大Lvにする', ok:() => RELICS.some(r => RL(r.id) >= r.max)});
+achSet('z', '到達', [UNIVERSE + 1, UNIVERSE + 5, UNIVERSE + 10, UNIVERSE + 20, STAGES.length - 1], ['宇宙の先へ', '終焉を見た', '深淵', '深淵の底', '果て'], () => save.st.deepest, n => STAGES[n].name);
+ACH.push({id:'evo1', name:'進化', desc:'兵器をどれか1つ進化させる', ok:() => Object.keys(EVO).some(id => evo(id) > 0)});
+ACH.push({id:'evo5', name:'全軍進化', desc:'ドローンと4つの兵器を全部進化させる', ok:() => Object.keys(EVO).every(id => evo(id) > 0)});
+ACH.push({id:'evo10', name:'最終形態', desc:'ドローンと4つの兵器を全部2段階進化させる', ok:() => Object.keys(EVO).every(id => evo(id) > 1)});
 function checkAch(){
   for (const a of ACH) if (!save.ach[a.id] && a.ok()){ save.ach[a.id] = 1; fx.ach(a); }
 }
@@ -523,7 +634,7 @@ function prestige(){
   const d = dustGain();
   save.dust += d; save.st.bestDust += d; save.runs++;
   const keepMods = P('pkeep') ? save.mods : {};
-  Object.assign(save, {coins:0, stage:Math.min(P('pstage'), STAGES.length - 1), lv:{}, mods:keepMods, equip:[], slots:2 + P('pslot'), ended:false, endSeen:false, prog:0, kills:0, boss:null, sp:{}, idleRate:0});
+  Object.assign(save, {coins:0, stage:Math.min(P('pstage'), STAGES.length - 1), lv:{}, mods:keepMods, ended:false, endSeen:false, prog:0, kills:0, boss:null, sp:{}, idleRate:0});
   save.st.earnedRun = 0;
   for (const k in buffs) buffs[k] = 0;
   combo = 0; fever = 0; heat = 0; boss = null; lucky = null; luckyT = 30;
@@ -533,5 +644,5 @@ function prestige(){
 
 // 調整用：環境変数 TUNE='{"gaugeLate":1.5}' で数値を差し替えられる
 Object.assign(TUNE, JSON.parse(process.env.TUNE || '{}'));
-module.exports = { get save(){ return save; }, setSave, DEFAULT, L, ML, M, SP, P, UPG, MODS, SPECIALS, PERM, STAGES, PRESTIGE_STAGE, SLOT_COST, upCost, modCost, slotCost, spCost, permCost, stat, layout, buildGrid, step, tap, fmt, get BX(){ return BX; }, get BY(){ return BY; }, get BS(){ return BS; },
+module.exports = { get save(){ return save; }, setSave, DEFAULT, L, ML, M, SP, P, UPG, MODS, SPECIALS, PERM, STAGES, PRESTIGE_STAGE, upCost, modCost, spCost, permCost, stat, layout, buildGrid, step, tap, fmt, get BX(){ return BX; }, get BY(){ return BY; }, get BS(){ return BS; },
   checkAch, prestige, dustGain, ACH, gaugeNeed, comboMult, rewardMult, permMult, blockHp, get blocks(){ return blocks; }, get boss(){ return boss; }, get lucky(){ return lucky; }, get combo(){ return combo; }, get fever(){ return fever; }, setState(s){ state = s; }, fx };
