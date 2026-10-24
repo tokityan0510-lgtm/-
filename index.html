@@ -269,7 +269,7 @@ const STAGES = [
 const PRESTIGE_STAGE = 8;   // この素材に到達したら「砕く」が解放される
 // ブロックの価値の素材倍率（TUNE.valStage）
 const sv = s => Math.pow(TUNE.valStage, s);
-const TUNE = {fhp:4000, fhpLate:4000, fdmg:4000, reqBase:2000, reqPow:5.4, dmgG:1.5, hpPow:3.4, hpMul:1, lvBonus:.01, tapProg:1.5, dustBase:18, dustDiv:8, dustBonus:.001, pmultBonus:.1, idleBonus:7, idleRamp:30, idleDmgK:.5, feverReward:2, costX:3, valStage:1e4, modSpan:7, droneDmg:5, droneInt:1.5, bossHp:1500, bossGrow:1.35, bossReward:300, comboDecay:.6};
+const TUNE = {fhp:4000, fhpLate:4000, fdmg:4000, reqBase:2200, reqPow:5.4, dmgG:1.5, hpPow:3.4, hpMul:1, lvBonus:.01, tapProg:1.5, dustBase:18, dustDiv:8, dustBonus:.001, pmultBonus:.1, idleBonus:7, idleRamp:30, idleDmgK:.35, feverReward:2, costX:3, valStage:1e4, modSpan:7, droneDmg:5, droneInt:1.5, armMul:15, armIdle:0, reso:.01, bossHp:1500, bossGrow:1.35, bossReward:300, comboDecay:.6};
 const DEFAULT = {
   coins:0, stage:0, lv:{}, mods:{}, equip:[], slots:2, best:0, ended:false, muted:false, t:0, idleRate:0, prog:0, started:false, kills:0, boss:null,
   sp:{}, ach:{}, dust:0, perm:{}, off:{}, runs:0, buyMode:1, endSeen:false,
@@ -283,12 +283,12 @@ const SP = id => !!save.sp[id];
 const P = id => save.perm[id] || 0;
 
 // ===== 兵器：放置で勝手に戦う。素材を進めるほど新しい兵器が手に入る =====
-//   st：手に入る目安の素材の段。n：最大台数。every：1台あたりの発射間隔（秒）。dmg：威力（破片1つの何倍か）
+//   st：手に入る目安の素材の段。n：最大台数。every：1台あたりの発射間隔（秒）。dmg：1発の威力（破片1つの何倍か。さらに TUNE.armMul 倍）
 const ARMS = [
-  {id:'cannon',  name:'砲台',           st:1, n:6, every:3.0, dmg:6,  note:'画面下の砲台が砲弾を撃ち、着弾した周りを吹き飛ばす'},
-  {id:'laser',   name:'レーザー',       st:2, n:5, every:4.5, dmg:8,  note:'横一列をまとめて焼き払う'},
-  {id:'missile', name:'ミサイル',       st:4, n:5, every:5.0, dmg:15, note:'狙ったブロックへ曲がって飛び、大爆発する'},
-  {id:'hole',    name:'ブラックホール', st:6, n:3, every:10,  dmg:4,  note:'周りを吸い込みながら削り、最後に爆発する'},
+  {id:'cannon',  name:'砲台',           st:1, n:6, every:3.0, dmg:3,  note:'画面下の砲台が砲弾を撃ち、着弾した周りを吹き飛ばす'},
+  {id:'laser',   name:'レーザー',       st:2, n:5, every:4.5, dmg:10, note:'横一列をまとめて焼き払う'},
+  {id:'missile', name:'ミサイル',       st:4, n:5, every:5.0, dmg:20, note:'狙ったブロックへ曲がって飛び、大爆発する'},
+  {id:'hole',    name:'ブラックホール', st:6, n:3, every:10,  dmg:8,  note:'周りを吸い込みながら削り、最後に爆発する'},
 ];
 // 値段はボスを倒しても上がらない（クッキークリッカー型）。上がるのは買ったときだけ。
 //   inf:true … 上限なし。値段は g 倍ずつ。効果は足し算で伸びる（ボス撃破のたびに数十Lvまとめて買える）
@@ -343,6 +343,11 @@ const SPECIALS = [
   {cat:'arms', id:'lz1', name:'十字照射',         note:'レーザーが横と縦の十字に撃つ',        ref:['laserN',3], req:() => L('laserN') >= 3, rq:'レーザーの数 Lv3'},
   {cat:'arms', id:'ms1', name:'多弾頭',           note:'ミサイルが着弾後に子弾を3つばらまく', ref:['missileN',3], req:() => L('missileN') >= 3, rq:'ミサイルの数 Lv3'},
   {cat:'arms', id:'bh1', name:'事象の地平線',     note:'ブラックホールの範囲 ×1.4',           ref:['holeN',2], req:() => L('holeN') >= 2, rq:'ブラックホールの数 Lv2'},
+  // 兵器の威力を大きく伸ばす改良（ドローン改良と同じく、後半に兵器が置いていかれないように）
+  ...ARMS.flatMap(a => [
+    {cat:'arms', id:a.id + 'u1', name:a.name + '改良 I',  note:a.name + 'の威力 ×2', ref:[a.id + 'P', 10], req:() => L(a.id + 'P') >= 10, rq:a.name + 'の威力 Lv10'},
+    {cat:'arms', id:a.id + 'u2', name:a.name + '改良 II', note:a.name + 'の威力 ×3', ref:[a.id + 'P', 25], req:() => L(a.id + 'P') >= 25, rq:a.name + 'の威力 Lv25'},
+  ]),
   {cat:'tap',  id:'tp1', name:'鉄拳',             note:'タップのボスへの威力と衝撃波 ×2',     ref:['tapburst',5],   req:() => L('tapburst') >= 5, rq:'タップの破片 Lv5'},
   {cat:'tap',  id:'tp2', name:'連打の達人',       note:'長押しの連打が速くなる（毎秒4回→6回）', ref:['tapburst',10], req:() => L('tapburst') >= 10, rq:'タップの破片 Lv10'},
   {cat:'tap',  id:'ht1', name:'発熱体',           note:'タップで溜まる熱量 ×1.5',             ref:['heat',5],   req:() => L('heat') >= 5, rq:'熱量 Lv5'},
@@ -410,7 +415,7 @@ const stat = {
   drones:   () => Math.min(12, 1 + L('drones') + P('pdrone')),
   droneInt: () => TUNE.droneInt * Math.pow(.85, L('droneint')) * (SP('rl1') ? .8 : 1) * (buffs.barrage > 0 ? .125 : 1),
   droneDmg: () => TUNE.droneDmg * (1 + .25 * L('dronedmg')) * (SP('dr1') ? 1.5 : 1) * (SP('dr2') ? 1.5 : 1) * (SP('dr3') ? 2 : 1) * (SP('dr4') ? 2 : 1),
-  reso:     (l = L('spawn')) => .02 * l * (SP('sp1') ? 2 : 1),
+  reso:     (l = L('spawn')) => TUNE.reso * l * (SP('sp1') ? 2 : 1),
   drburst:  () => L('drburst') * 2 * (SP('bu1') ? 2 : 1),
   tapburst: () => 2 + L('tapburst'),
   tapPow:   () => SP('tp1') ? 2 : 1,
@@ -541,9 +546,11 @@ const armOn = id => !(save.off && save.off[id]);
 function hit(dmg, src, x, y, d = 0, burst = 0){
   let crit = false;
   if (src !== 'burn' && src !== 'reso' && Math.random() < stat.crit()){ dmg *= stat.critX(); crit = true; }
-  if (fever > 0) dmg *= 2;
-  // 放置ボーナスはダメージにも半分の強さで効く（放置でもひびが進むように）
-  dmg *= idleDmg();
+  // 共鳴は「すでに倍率がかかったダメージ」を元にするので、フィーバー・放置ボーナスをかけ直さない。
+  // 炎上のフィーバー分は burnAcc でかけ済み
+  if (fever > 0 && src !== 'burn' && src !== 'reso') dmg *= 2;
+  // 放置ボーナスはダメージにも約1/3の強さで効く（最大×3.1）（放置でもひびが進むように）
+  if (src !== 'reso') dmg *= idleDmg();
   // 進み（ひび）は与えたダメージ。直接タップは tapProg 倍
   save.prog += dmg * (src === 'tap' ? TUNE.tapProg : 1);
   { const g = DPS_GROUP[src] || src; dpsAcc[g] = (dpsAcc[g] || 0) + dmg; }
@@ -579,8 +586,11 @@ function fireDrone(dr){
   bullets.push({x:dr.x, y:dr.y, vx:dx / len * v, vy:dy / len * v, tx, ty, life:len / v + .05});
   fx.shoot(dr, tx, ty);
 }
-const armRate = () => 1 + (idleMult() - 1) / (TUNE.idleBonus - 1);
-const armPow = id => (1 + .25 * L(id + 'P')) * (id === 'cannon' && SP('cn1') ? 2 : 1);
+const armRate = () => 1 + TUNE.armIdle * (idleMult() - 1) / (TUNE.idleBonus - 1);
+const armPow = id => (1 + .25 * L(id + 'P')) * (id === 'cannon' && SP('cn1') ? 2 : 1) * (SP(id + 'u1') ? 2 : 1) * (SP(id + 'u2') ? 3 : 1);
+// 兵器1発の威力（破片1つの何倍か）。ブラックホールは1回の吸い込みぶん（最後の爆発はその5倍）
+const ARM_BY = Object.fromEntries(ARMS.map(a => [a.id, a]));
+const armDmg = id => ARM_BY[id].dmg * TUNE.armMul * armPow(id);
 function fireArm(a, n){
   const [tx, ty] = bigPoint();
   if (a.id === 'cannon'){
@@ -605,20 +615,20 @@ function fireArm(a, n){
 function stepArms(dt){
   for (const a of ARMS){
     const n = L(a.id + 'N'); if (!n || !armOn(a.id)) continue;
-    // 放置中は兵器の連射が上がる（放置ボーナスが最大のとき2倍）
+    // 放置ボーナスで連射を上げる場合は TUNE.armIdle（今は0：兵器は威力が強いぶん、連射は上げない）
     armT[a.id] = (armT[a.id] || Math.random()) + dt * n / a.every * armRate();
     while (armT[a.id] >= 1){ armT[a.id] -= 1; fireArm(a, n); }
   }
   const base = stat.dmg();
   for (let k = shells.length - 1; k >= 0; k--){
     const o = shells[k]; o.t += dt;
-    if (o.t >= o.dur){ shells.splice(k, 1); booms.push({x:o.tx, y:o.ty, R:cell * 1.4 * (SP('cn1') ? 1.2 : 1), dmg:base * 6 * armPow('cannon'), t:0, big:false, arm:true, d:0, burst:3, src:'cannon'}); }
+    if (o.t >= o.dur){ shells.splice(k, 1); booms.push({x:o.tx, y:o.ty, R:cell * 1.4 * (SP('cn1') ? 1.2 : 1), dmg:base * armDmg('cannon'), t:0, big:false, arm:true, d:0, burst:3, src:'cannon'}); }
   }
   for (let k = beams.length - 1; k >= 0; k--){
     const b = beams[k]; b.t -= dt;
     if (!b.fired && b.t <= b.fireAt){
       b.fired = true;
-      hit(base * 8 * armPow('laser'), 'laser', b.kind === 'row' ? BX : b.x, b.kind === 'row' ? b.y : BY, 0, 2);
+      hit(base * armDmg('laser'), 'laser', b.kind === 'row' ? BX : b.x, b.kind === 'row' ? b.y : BY, 0, 2);
       fx.beam(b);
     }
     if (b.t <= 0) beams.splice(k, 1);
@@ -629,15 +639,15 @@ function stepArms(dt){
     m.x += m.vx * dt; m.y += m.vy * dt; m.life -= dt;
     if (d < cell * .4 || m.life <= 0){
       missiles.splice(k, 1);
-      const p = armPow('missile');
-      booms.push({x:m.x, y:m.y, R:cell * 2.2, dmg:base * 15 * p, t:0, big:false, arm:true, missile:true, d:0, burst:8, src:'missile'});
-      if (SP('ms1')) for (let q = 0; q < 3; q++){ const [sx, sy] = bigPoint(); booms.push({x:sx, y:sy, R:cell * 1.2, dmg:base * 6 * p, t:.12 + q * .06, big:false, arm:true, d:0, src:'missile'}); }
+      const p = armDmg('missile');
+      booms.push({x:m.x, y:m.y, R:cell * 2.2, dmg:base * p, t:0, big:false, arm:true, missile:true, d:0, burst:8, src:'missile'});
+      if (SP('ms1')) for (let q = 0; q < 3; q++){ const [sx, sy] = bigPoint(); booms.push({x:sx, y:sy, R:cell * 1.2, dmg:base * .4 * p, t:.12 + q * .06, big:false, arm:true, d:0, src:'missile'}); }
     }
   }
   for (let k = holes.length - 1; k >= 0; k--){
     const h = holes[k]; h.life -= dt; h.tick -= dt;
-    if (h.tick <= 0){ h.tick = .25; hit(base * 4 * armPow('hole'), 'hole', h.x, h.y, 0); }
-    if (h.life <= 0){ holes.splice(k, 1); booms.push({x:h.x, y:h.y, R:h.R * 1.4, dmg:base * 20 * armPow('hole'), t:0, big:true, d:0, burst:10, src:'hole'}); }
+    if (h.tick <= 0){ h.tick = .25; hit(base * armDmg('hole'), 'hole', h.x, h.y, 0); }
+    if (h.life <= 0){ holes.splice(k, 1); booms.push({x:h.x, y:h.y, R:h.R * 1.4, dmg:base * 5 * armDmg('hole'), t:0, big:true, d:0, burst:10, src:'hole'}); }
   }
 }
 function step(dt){
@@ -1354,7 +1364,7 @@ function anyAffordable(kind){
 function renderTabs(){
   tabsEl.innerHTML = TABS.map(([k, n]) => `<button class="tab" role="tab" data-tab="${k}" aria-selected="${tab === k}">${n}${tab !== k && anyAffordable(k) ? '<span class="dot"></span>' : ''}</button>`).join('');
 }
-const HINTS = {arms:'放置で勝手に戦ってくれる兵器。触らずにいるほど連射が上がる（最大2倍）。素材を進めるほど新しい兵器が手に入る。上のボタンで兵器ごとに止められる。', idle:'ドローンは目を離していても撃ち続ける。放置の稼ぎはここで伸びる。', tap:'タップは加速役。叩くほどフィーバーゲージが溜まり、満タンで全部が速くなる。長押しで連打できる。', core:'ドローンにもタップにも効く土台の強化。', build:'モジュールは装備枠に入れたものだけが効く。組み合わせでビルドが決まる。', ach:'実績1個ごとに全部の報酬が+1%。', dust:'宇宙を砕くと星屑が手に入り、すべてがリセットされる代わりに永続強化が買える。'};
+const HINTS = {arms:'放置で勝手に戦ってくれる兵器。威力を上げると「改良」で大きく伸びる。素材を進めるほど新しい兵器が手に入る。上のボタンで兵器ごとに止められる。', idle:'ドローンは目を離していても撃ち続ける。放置の稼ぎはここで伸びる。', tap:'タップは加速役。叩くほどフィーバーゲージが溜まり、満タンで全部が速くなる。長押しで連打できる。', core:'ドローンにもタップにも効く土台の強化。', build:'モジュールは装備枠に入れたものだけが効く。組み合わせでビルドが決まる。', ach:'実績1個ごとに全部の報酬が+1%。', dust:'宇宙を砕くと星屑が手に入り、すべてがリセットされる代わりに永続強化が買える。'};
 function buyN(u){ return save.buyMode === 'max' ? Math.max(1, upMaxN(u)) : Math.min(save.buyMode, u.max - L(u.id)); }
 const DPS_NAMES = {tap:['タップ', '#ffffff'], shard:['かけら', '#9fe6ff'], drone:['ドローン', '#4cc9ff'], cannon:['砲台', '#ffb13b'], laser:['レーザー', '#ff5a6e'], missile:['ミサイル', '#ff8a1f'], hole:['ブラックホール', '#b48cff'], reso:['共鳴', '#3ddc97'], bolt:['雷撃', '#bfe9ff'], burn:['炎上', '#ff7a1a'], bomb:['爆発するかけら', '#e0263f'], blast:['誘爆', '#ff4c88'], boom:['爆発', '#ffd84d']};
 function dpsHtml(){
