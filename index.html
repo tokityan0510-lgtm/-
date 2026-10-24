@@ -305,10 +305,10 @@ for (let k = 1; k <= 38; k++){
 }
 const PRESTIGE_STAGE = 8;   // この素材に到達したら「砕く」が解放される
 // ブロックの価値の素材倍率（TUNE.valStage）
-const sv = s => Math.pow(TUNE.valStage, s);
+const sv = s => s <= UNIVERSE ? Math.pow(TUNE.valStage, s) : Math.pow(TUNE.valStage, UNIVERSE) * Math.pow(TUNE.valBeyond, s - UNIVERSE);
 // コインの基準：ブロック1個ぶんのHPを削ると coinBase × 素材の価値。値段も同じ割合（costX）
 const coinBase = () => 100 * TUNE.coinK;
-const TUNE = {fhp:4000, fhpLate:4000, fdmg:4000, reqBase:135000, reqPow:6.4, dmgG:1.5, hpPow:3.4, hpMul:1, lvBonus:.01, tapProg:1.5, dustBase:18, dustCap:2000, dustSoftPow:.3, dustDiv:8, dustBonus:.001, pmultBonus:.1, idleBonus:7, idleRamp:30, idleDmgK:.5, feverReward:2, costX:3, coinK:.03, valStage:1e4, modSpan:7, droneDmg:5, droneInt:1.5, armMul:15, armCatch:.8, modMul:.12, armIdle:0, reso:.01, bossHp:1500, bossGrow:1.35, bossReward:300, comboDecay:.6};
+const TUNE = {fhp:4000, fhpLate:4000, fdmg:4000, reqBase:135000, reqPow:6.4, dmgG:1.5, hpPow:3.4, hpMul:1, lvBonus:.01, tapProg:1.5, dustBase:18, dustCap:2000, dustSoftPow:.3, dustDiv:8, dustBonus:.001, pmultBonus:.1, idleBonus:7, idleRamp:30, idleDmgK:.5, feverReward:2, costX:3, coinK:.03, valBeyond:100, valStage:1e4, modSpan:7, droneDmg:5, droneInt:1.5, armMul:15, armCatch:.8, modMul:.12, armIdle:0, reso:.01, bossHp:1500, bossGrow:1.35, bossReward:300, comboDecay:.6};
 const DEFAULT = {
   coins:0, stage:0, lv:{}, mods:{}, best:0, ended:false, muted:false, t:0, idleRate:0, prog:0, started:false, kills:0, boss:null,
   sp:{}, ach:{}, dust:0, perm:{}, off:{}, runs:0, buyMode:1, endSeen:false, relics:{}, scale2:1,
@@ -680,7 +680,9 @@ const rnd = (a, b) => a + Math.random() * (b - a);
 const inBig = (x, y, pad = 0) => Math.abs(x - BX) <= BS / 2 + pad && Math.abs(y - BY) <= BS / 2 + pad;
 // 巨大ブロックの表面のどこか
 const bigPoint = () => [BX + rnd(-.42, .42) * BS, BY + rnd(-.42, .42) * BS];
-function earn(gain){ save.coins += gain; earnedTick += gain; save.st.earnedRun += gain; save.st.earnedAll += gain; return gain; }
+// 10^300 を天井にする（数字があふれて∞になると、保存したときに消えてしまう）
+const CAP = 1e300, capN = v => Number.isFinite(v) ? Math.min(v, CAP) : CAP;
+function earn(gain){ gain = capN(gain); save.coins = capN(save.coins + gain); earnedTick = capN(earnedTick + gain); save.st.earnedRun = capN(save.st.earnedRun + gain); save.st.earnedAll = capN(save.st.earnedAll + gain); return gain; }
 // ひびが満タンになったら砕けて次の素材へ
 function shatter(){
   const gain = earn(coinBase() * sv(save.stage) * TUNE.bossReward * comboMult() * rewardMult());
@@ -691,7 +693,7 @@ function shatter(){
   if (save.stage < STAGES.length - 1) save.stage++;
   // 深淵（宇宙の先の7つ目以降）で一番深い記録を更新したら：星屑と、レア以上の遺物。ときどき神話の遺物
   if (save.stage > save.st.deepest && save.stage > UNIVERSE + 6){
-    const bonus = Math.max(10, Math.floor(dustGain() * .05)); save.dust += bonus; save.st.bestDust += bonus;
+    const bonus = Math.max(10, Math.floor(dustGain() * .05)); save.dust = capN(save.dust + bonus); save.st.bestDust = capN(save.st.bestDust + bonus);
     fx.record(save.stage, bonus);
     dropRelic(1);
     const myth = RELICS.filter(r => r.rar === 4 && RL(r.id) < r.max);
@@ -794,7 +796,7 @@ function hit(dmg, src, x, y, d = 0, burst = 0){
   // 放置ボーナスはダメージにも半分の強さで効く（最大×4）（放置でもひびが進むように）
   if (src !== 'reso') dmg *= idleDmg() * allDmg();
   // 進み（ひび）は与えたダメージ。直接タップは tapProg 倍
-  save.prog += dmg * (src === 'tap' ? TUNE.tapProg : 1);
+  save.prog = capN(save.prog + dmg * (src === 'tap' ? TUNE.tapProg : 1));
   { const g = DPS_GROUP[src] || src; dpsAcc[g] = (dpsAcc[g] || 0) + dmg; }
   combo += DOT.has(src) ? .2 : 1; save.st.destroyed++;
   // コインは与えたダメージに比例（ブロック1個ぶんのHPで、その素材のブロック1個ぶんの価値）
@@ -1159,7 +1161,7 @@ function checkAch(){
 /* ---- 砕く（転生） ---- */
 function prestige(){
   const d = dustGain();
-  save.dust += d; save.st.bestDust += d; save.runs++;
+  save.dust = capN(save.dust + d); save.st.bestDust = capN(save.st.bestDust + d); save.runs++;
   const keepMods = P('pkeep') ? save.mods : {};
   Object.assign(save, {coins:0, stage:Math.min(P('pstage'), STAGES.length - 1), lv:{}, mods:keepMods, ended:false, endSeen:false, prog:0, kills:0, boss:null, sp:{}, idleRate:0});
   save.st.earnedRun = 0;
@@ -1185,6 +1187,12 @@ function load(){
     if (s){ const o = JSON.parse(s); save = Object.assign(JSON.parse(JSON.stringify(DEFAULT)), o); save.st = Object.assign(JSON.parse(JSON.stringify(DEFAULT.st)), o.st || {});
       // 桁を下げる前（1タップ=300ダメージ）のセーブは、コインと進みを新しい桁にそろえる
       if (!o.scale2 && o.started){ save.coins *= TUNE.coinK; save.idleRate *= TUNE.coinK; save.st.earnedRun *= TUNE.coinK; save.prog *= .01; } }
+    // 数字があふれて∞になったまま保存されたセーブ（null になっている）は、天井の値などで埋め直す
+    const fix = (obj, k, v) => { if (obj[k] === null || (typeof obj[k] === 'number' && !Number.isFinite(obj[k]))) obj[k] = v; };
+    fix(save, 'coins', 1e250); fix(save, 'idleRate', 0); fix(save, 'prog', 0); fix(save, 'dust', 1e5);
+    fix(save.st, 'earnedRun', 1e250); fix(save.st, 'earnedAll', 1e250); fix(save.st, 'bestDust', Math.max(1e5, Number(save.dust) || 0));
+    for (const k of ['coins', 'idleRate', 'dust']) save[k] = capN(save[k]);
+    for (const k of ['earnedRun', 'earnedAll', 'bestDust']) save.st[k] = capN(save.st[k]);
     // 掘削方式（段数のノルマ）より前のセーブは進み具合の単位が違うので、ノルマ未満に切り詰める
     save.prog = Math.min(Math.floor(save.prog || 0), gaugeNeed() - 1);
     // 装備枠をなくしたので、永続強化「広い装備枠」に使った星屑を返す
