@@ -1140,6 +1140,8 @@ function load(){
     // 装備枠をなくしたので、永続強化「広い装備枠」に使った星屑を返す
     if (save.perm && save.perm.pslot){ for (let k = 0; k < save.perm.pslot; k++) save.dust += Math.ceil(30 * Math.pow(2.5, k)); delete save.perm.pslot; }
     delete save.equip; delete save.slots;
+    // 上限を超えてしまったLv（上の不具合）は上限にそろえる
+    for (const u of UPG) if (L(u.id) > u.max) save.lv[u.id] = u.max;
   } catch(e) {}
 }
 function persist(){ save.t = Date.now(); try { localStorage.setItem(KEY, JSON.stringify(save)); } catch(e) {} }
@@ -1837,7 +1839,8 @@ function renderTabs(){
   if (on){ const l = on.getBoundingClientRect().left - tabsEl.getBoundingClientRect().left + tabsEl.scrollLeft - (tabsEl.clientWidth - on.offsetWidth) / 2; tabsEl.scrollTo({left:Math.max(0, l), behavior:reduceMotion ? 'auto' : 'smooth'}); }
 }
 const HINTS = {arms:'放置で勝手に戦ってくれる兵器。威力を上げると「改良」で大きく伸びる。素材を進めるほど新しい兵器が手に入る。上のボタンで兵器ごとに止められる。', idle:'ドローンは目を離していても撃ち続ける。放置の稼ぎはここで伸びる。', tap:'タップは加速役。叩くほどフィーバーゲージが溜まり、満タンで全部が速くなる。長押しで連打できる。', core:'ドローンにもタップにも効く土台の強化。', build:'モジュールは解放したら全部効く。重ねるほど連鎖が派手になる。2つを育てると組み合わせ技が発動する。右のボタンで止められる。', ach:'実績1個ごとに全部の報酬が+1%。', help:'分かりにくいところの解説。見出しを押すと開く。', relic:'ひびが満タンで砕けるたびに遺物が1つ落ちる（幸運ブロックからもたまに）。集めた遺物は全部効き、宇宙を砕いても消えない。同じ遺物が出たらLvが上がる。', dust:'宇宙を砕くと星屑が手に入り、すべてがリセットされる代わりに永続強化が買える。'};
-function buyN(u){ return save.buyMode === 'max' ? Math.max(1, upMaxN(u)) : Math.min(save.buyMode, u.max - L(u.id)); }
+// ×MAX で最大Lvのものを押すと、上限を超えて1Lv買えてしまっていた（max(1, 0) = 1）。上限までに収める
+function buyN(u){ const left = Math.max(0, u.max - L(u.id)); return Math.min(left, save.buyMode === 'max' ? Math.max(1, upMaxN(u)) : save.buyMode); }
 const DPS_NAMES = {tap:['タップ', '#ffffff'], shard:['かけら', '#9fe6ff'], drone:['ドローン', '#4cc9ff'], cannon:['砲台', '#ffb13b'], laser:['レーザー', '#ff5a6e'], missile:['ミサイル', '#ff8a1f'], hole:['ブラックホール', '#b48cff'], reso:['共鳴', '#3ddc97'], bolt:['雷撃', '#bfe9ff'], burn:['炎上', '#ff7a1a'], bomb:['爆発するかけら', '#e0263f'], blast:['誘爆', '#ff4c88'], boom:['爆発', '#ffd84d'], poison:['猛毒', '#5fe36b'], drill:['ドリル', '#c9d3de'], tesla:['テスラコイル', '#bfe9ff'], hammer:['巨大ハンマー', '#8a94a3'], orbital:['軌道砲', '#ffe14d'], nano:['ナノマシン', '#9dffb0'], nova:['超新星', '#fff3b0'], orbit:['衛星', '#7cf5ff'], meteor:['流星', '#ff9a3c'], pulse:['波動', '#3fd9c0']};
 function dpsHtml(){
   const ent = Object.entries(dps).filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]), tot = ent.reduce((a, [, v]) => a + v, 0);
@@ -2063,7 +2066,7 @@ sheet.addEventListener('click', e => {
   if (d.tab){ tab = d.tab; sheetSig = ''; renderSheet(false); return; }
   if (d.off){ save.off = save.off || {}; if (save.off[d.off]) delete save.off[d.off]; else save.off[d.off] = 1; persist(); sfxBuy(); renderSheet(true); return; }
   if (d.mode){ save.buyMode = d.mode === 'max' ? 'max' : +d.mode; persist(); sheetSig = ''; renderSheet(true); return; }
-  if (d.up){ const u = UPG.find(x => x.id === d.up); const n = buyN(u); if (n > 0) buy(upCostN(u, n), () => save.lv[u.id] = L(u.id) + n); return; }
+  if (d.up){ const u = UPG.find(x => x.id === d.up); const n = buyN(u); if (n > 0 && L(u.id) + n <= u.max) buy(upCostN(u, n), () => save.lv[u.id] = L(u.id) + n); return; }
   if (d.sp){ const s = SPECIALS.find(x => x.id === d.sp); if (!SP(s.id) && s.req()) buy(spCost(s), () => { save.sp[s.id] = 1; showToast(s.name, s.note); if (s.evo){ bigText(s.name.replace('進化：', '') + 'に進化！', .42, '#ffe14d', 2, 7); flash = .8; shake += 12; sfxFever(); } }); return; }
   if (d.mod){ const m = MODS.find(x => x.id === d.mod); if (ML(m.id) < m.max) buy(modCost(m), () => { const was = ML(m.id); save.mods[m.id] = was + 1; }); return; }
   if (d.perm){ const p = PERM.find(x => x.id === d.perm); const c = permCost(p); if (P(p.id) < p.max && save.dust >= c){ save.dust -= c; save.perm[p.id] = P(p.id) + 1; persist(); sfxBuy(); updateStageLabel(); renderSheet(true); } return; }
