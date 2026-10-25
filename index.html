@@ -904,7 +904,7 @@ function hit(dmg, src, x, y, d = 0, burst = 0, nxIn = 0){
   // 画面に出すのはタップ以外は1発あたり2個まで。残りはまとめて与える（数が多すぎると重くなるので）
   if (!DOT.has(src) && !echo){
     const n = stat.shards() * (src === 'tap' || src === 'auto' ? stat.tapburst() : 1) + burst + (crit && CB('critical') ? 10 : 0);
-    const vis = src === 'tap' || src === 'auto' ? n : Math.min(2, n), each = dmg * TUNE.shardF * Math.sqrt(n) / n;   // 全部で dmg × shardF × √n
+    const vis = src === 'tap' || src === 'auto' ? n : Math.min(loud() ? 2 : 1, n), each = dmg * TUNE.shardF * Math.sqrt(n) / n;   // 全部で dmg × shardF × √n
     spawnShards(x, y, vis, nd, 0, each, nx); if (n > vis) poolShards((n - vis) * each, nx);
   }
   if (!DOT.has(src)){
@@ -1381,20 +1381,20 @@ let freeze = 0, shake = 0, zoom = 0, flash = 0, clock = 0, slow = 0, flashColor 
 const loud = () => save.fx === 1;
 let MAXP = 500;   // 火花・破片くずの上限（自動画質で変わる）
 let MAXR = 36, MAXF = 8;   // 波紋・光の上限（自動画質で変わる。控えめではさらに半分）
-const addRing = r => { if (rings.length < (loud() ? MAXR : MAXR >> 1)) rings.push(r); };
+const addRing = r => { if (rings.length < (loud() ? MAXR : Math.max(2, MAXR / 3 | 0))) rings.push(r); };
 const addFlash = f => { if (flashes.length < (loud() ? MAXF : MAXF >> 1)) flashes.push(f); };
 // ヒットストップ（一瞬止める演出）は連発するとカクついて見えるので、0.4秒に1回まで
 let lastFreezeT = 0;
 function hitStop(d){ if (clock - lastFreezeT < .4) return; lastFreezeT = clock; freeze = Math.max(freeze, d); }
 function sparks(x, y, n, color, speed = 8){
-  if (!loud()) n = Math.ceil(n * .4);
+  if (!loud()) n = Math.ceil(n * .3);
   for (let k = 0; k < n && parts.length < MAXP; k++){
     const a = Math.random() * 6.283, v = cell * rnd(speed * .4, speed);
     parts.push({k:'spark', x, y, vx:Math.cos(a) * v, vy:Math.sin(a) * v, life:rnd(.25, .5), max:.5, c:color});
   }
 }
 function debris(x, y, n, color, big){
-  if (!loud()) n = Math.ceil(n * .5);
+  if (!loud()) n = Math.ceil(n * .4);
   for (let k = 0; k < n && parts.length < MAXP; k++){
     parts.push({k:'deb', x:x + rnd(-.3, .3) * cell, y:y + rnd(-.3, .3) * cell, vx:rnd(-4, 4) * cell * (big ? 1.6 : 1), vy:rnd(-5.5, 1) * cell * (big ? 1.6 : 1),
       life:rnd(.45, .85) * (big ? 1.5 : 1), max:1.3, c:color, s:cell * rnd(.08, .18) * (big ? 2 : 1), r:Math.random() * 6, vr:rnd(-12, 12)});
@@ -1402,7 +1402,7 @@ function debris(x, y, n, color, big){
 }
 function addFloat(f){
   // 大きな見出し以外の数字は同時に6個まで（派手では16個）
-  if (!f.big && floats.filter(o => !o.big).length >= (loud() ? 16 : quality >= 2 ? 3 : 6)) return;
+  if (!f.big && floats.filter(o => !o.big).length >= (loud() ? 16 : quality >= 2 ? 3 : 5)) return;
   if (floats.length > 60) floatPool.push(floats.shift().img); floatSprite(f); floats.push(f);
 }
 // 数字は縁取りの文字を毎フレーム描くと重いので、出したときに一度だけ小さなキャンバスに描いて、あとは貼るだけにする
@@ -1446,10 +1446,10 @@ fx.hit = (x, y, d, crit, gain, gold, src) => {
     addFloat({x, y:y - cell * .2, t:'+' + fmtC(gain), life:1, max:1, c:'#ffd84d', size:ucell * .46, vy:-cell * 1.1, pop:1});
     addRing({x, y, to:cell * 1.4, life:.35, max:.35, c:'#ffd84d', w:.16}); sparks(x, y, 14, '#ffe14d', 10); shake += 3; sfxGold();
   } else if (crit){
-    if (floats.length < 24 && Math.random() < .5) addFloat({x:x + rnd(-.2, .2) * cell, y:y - cell * .1, t:fmtD(d) + '!', life:.6, max:.6, c:'#ffe14d', size:ucell * .36, vy:-cell * 1.8, pop:1});
+    if (floats.length < 24 && Math.random() < (loud() ? .5 : .3)) addFloat({x:x + rnd(-.2, .2) * cell, y:y - cell * .1, t:fmtD(d) + '!', life:.6, max:.6, c:'#ffe14d', size:ucell * .36, vy:-cell * 1.8, pop:1});
     sparks(x, y, 4, '#ffe14d', 7); shake += .5;
-  } else if (gain >= 1 && floats.length < 14 && Math.random() < (src === 'tap' ? 1 : .2)){
-    addFloat({x:x + rnd(-.25, .25) * cell, y, t:'+' + fmtC(gain), life:.7, max:.7, c:buffs.frenzy > 0 ? '#ffe14d' : '#ffc53a', size:ucell * (src === 'tap' ? .32 : .22), vy:-cell * 1.4});
+  } else if (gain >= 1 && floats.length < 14 && Math.random() < (src === 'tap' ? 1 : loud() ? .2 : .1)){
+    addFloat({x:x + rnd(-.25, .25) * cell, y, t:'+' + fmtC(gain), life:.7, max:.7, c:buffs.frenzy > 0 ? '#ffe14d' : '#ffc53a', size:ucell * (src === 'tap' ? (loud() ? .32 : .28) : .22), vy:-cell * 1.4});
   }
   if (src !== 'burn' && src !== 'reso'){
     if (parts.length < MAXP - 40) debris(x, y, src === 'tap' ? 6 : 2, STAGES[save.stage].color);
@@ -1815,12 +1815,12 @@ function render(){
   const st = STAGES[save.stage];
   ctx.save();
   ctx.fillStyle = st.bg; ctx.fillRect(0, 0, W, H);
-  if (fever > 0 && (loud() || quality < 2)){ ctx.globalAlpha = loud() ? .22 + .08 * Math.sin(clock * 12) : .08; ctx.fillStyle = `hsl(${(clock * 220) % 360},90%,45%)`; ctx.fillRect(0, 0, W, H); ctx.globalAlpha = 1; }
+  if (fever > 0 && (loud() || quality < 2)){ ctx.globalAlpha = loud() ? .22 + .08 * Math.sin(clock * 12) : .06; ctx.fillStyle = `hsl(${(clock * 220) % 360},90%,45%)`; ctx.fillRect(0, 0, W, H); ctx.globalAlpha = 1; }
   if (buffs.frenzy > 0 && (loud() || quality < 2)){ ctx.globalAlpha = .1 + .05 * Math.sin(clock * 8); ctx.fillStyle = '#ffd84d'; ctx.fillRect(0, 0, W, H); ctx.globalAlpha = 1; }
   if (boss){ ctx.globalAlpha = .12 + .06 * Math.sin(clock * 4); ctx.fillStyle = '#ff4c88'; ctx.fillRect(0, 0, W, H); ctx.globalAlpha = 1; }
   if (!reduceMotion){
     // 控えめでは揺れを小さく（最大4px）、ズームも弱く
-    const sh = loud() ? Math.min(shake, 16) : Math.min(shake * .35, 4), z = 1 + zoom * (loud() ? 1 : .4);
+    const sh = loud() ? Math.min(shake, 16) : Math.min(shake * .3, 3), z = 1 + zoom * (loud() ? 1 : .35);
     ctx.translate(W / 2, H / 2); ctx.scale(z, z); ctx.translate(-W / 2, -H / 2);
     if (sh > .3) ctx.translate(rnd(-.5, .5) * sh, rnd(-.5, .5) * sh);
   }
@@ -1858,7 +1858,7 @@ function render(){
       const col = fever > 0 ? `hsl(${(clock * 300 + bkt * 60) % 360},100%,65%)` : buffs.frenzy > 0 ? '#ffe14d' : st.glow;
       // 控えめでは外側のぼんやりした光を描かず、軌跡も細く短く・少し透かす
       for (const pass of loud() ? [0, 1] : [1]){
-        ctx.strokeStyle = col; ctx.globalAlpha = pass ? (loud() ? 1 : .6) : .22; ctx.lineWidth = pass ? Math.max(loud() ? 1.5 : 1, cell * (loud() ? .05 : .03)) : cell * .16; ctx.beginPath();
+        ctx.strokeStyle = col; ctx.globalAlpha = pass ? (loud() ? 1 : .5) : .22; ctx.lineWidth = pass ? Math.max(loud() ? 1.5 : 1, cell * (loud() ? .05 : .03)) : cell * .16; ctx.beginPath();
         for (let k = bkt; k < shards.length; k += buckets){ const o = shards[k], tl = pass ? (loud() ? .022 : .012) : .035; ctx.moveTo(o.x - o.vx * tl, o.y - o.vy * tl); ctx.lineTo(o.x, o.y); }
         ctx.stroke();
       }
@@ -1889,7 +1889,7 @@ function render(){
   }
   ctx.globalAlpha = 1;
   ctx.restore();
-  if (flash > 0){ ctx.fillStyle = `rgba(${flashColor},${flash * (loud() ? .55 : .2)})`; ctx.fillRect(0, 0, W, H); }
+  if (flash > 0){ ctx.fillStyle = `rgba(${flashColor},${flash * (loud() ? .55 : .15)})`; ctx.fillRect(0, 0, W, H); }
 }
 function updateFx(dt){
   const g = cell * 14;
@@ -1905,7 +1905,7 @@ function updateFx(dt){
   for (let k = rings.length - 1; k >= 0; k--){ rings[k].life -= dt; if (rings[k].life <= 0) rings.splice(k, 1); }
   for (let k = bolts.length - 1; k >= 0; k--){ bolts[k].life -= dt; if (bolts[k].life <= 0) bolts.splice(k, 1); }
   for (let k = flashes.length - 1; k >= 0; k--){ flashes[k].life -= dt; if (flashes[k].life <= 0) flashes.splice(k, 1); }
-  if (big.burn > 0 && parts.length < MAXP && Math.random() < dt * 30){
+  if (big.burn > 0 && parts.length < MAXP && Math.random() < dt * (loud() ? 30 : 12)){
     const [fx0, fy0] = bigPoint();
     parts.push({k:'flame', x:fx0, y:fy0, vx:rnd(-.3, .3) * cell, vy:-cell * rnd(.6, 1.4), life:rnd(.3, .55), max:.55, c:Math.random() < .5 ? '#ff7a1a' : '#ffcf3a', s:cell * rnd(.08, .15)});
   }
