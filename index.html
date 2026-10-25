@@ -652,7 +652,7 @@ const rewardMult = () => permMult() * idleMult() * (buffs.frenzy > 0 ? 7 : 1) * 
 // 強化ボーナス：どの強化でも1Lv買うごとに稼ぎ（とボスゲージの進み）が +lvBonus。特定の強化を買わなくても詰まらないように
 const lvTotal = () => { let n = 0; for (const k in save.lv) n += save.lv[k]; return n; };
 const lvMult = () => 1 + TUNE.lvBonus * lvTotal();
-const comboMult = () => (1 + Math.sqrt(combo) * stat.chain()) * stat.market() * lvMult();
+const comboMult = () => (1 + Math.sqrt(Math.max(0, combo - 1)) * stat.chain()) * stat.market() * lvMult();
 const luckyInterval = () => 110 * (SP('lk1') ? .75 : 1) * (SP('lk2') ? .75 : 1) * Math.pow(.85, P('plucky')) * Math.pow(.95, RL('clover')) * Math.pow(.97, L('luckyrate'));
 // モジュールの間隔・持続（ビルドの強化）
 const modTick = () => Math.pow(.96, L('modspd'));
@@ -825,7 +825,7 @@ function tap(x, y, auto){
   else { heat += stat.heat() * (auto ? .5 : 1); if (heat >= 100){ heat = 0; fever = fv; save.st.fevers++; fx.fever(); } }
   // 連打の勢い：0.7秒以内に続けて叩くと段々強くなる（20連打まで）
   rushN = rushT < .7 ? Math.min(20, rushN + 1) : 0; rushT = 0;
-  hit(stat.dmg() * 3 * stat.tapPow() * stat.rushX(), auto ? 'auto' : 'tap', x, y, 0, 0);
+  hit(stat.dmg() * stat.tapPow() * stat.rushX(), auto ? 'auto' : 'tap', x, y, 0, 0);
   const tb = stat.tapboom();
   if (tb) queueBoom({x, y, R:cell * (1 + .3 * tb + (SP('sw1') ? 1 : 0)), dmg:stat.dmg() * tb * 2 * stat.tapPow(), t:.04, big:false, quiet:true, d:1, src:'tapboom'});
   fx.tap(x, y);
@@ -1448,7 +1448,7 @@ fx.hit = (x, y, d, crit, gain, gold, src) => {
   } else if (crit){
     if (floats.length < 24 && Math.random() < .5) addFloat({x:x + rnd(-.2, .2) * cell, y:y - cell * .1, t:fmtD(d) + '!', life:.6, max:.6, c:'#ffe14d', size:ucell * .36, vy:-cell * 1.8, pop:1});
     sparks(x, y, 4, '#ffe14d', 7); shake += .5;
-  } else if (floats.length < 14 && Math.random() < (src === 'tap' ? 1 : .2)){
+  } else if (gain >= 1 && floats.length < 14 && Math.random() < (src === 'tap' ? 1 : .2)){
     addFloat({x:x + rnd(-.25, .25) * cell, y, t:'+' + fmtC(gain), life:.7, max:.7, c:buffs.frenzy > 0 ? '#ffe14d' : '#ffc53a', size:ucell * (src === 'tap' ? .32 : .22), vy:-cell * 1.4});
   }
   if (src !== 'burn' && src !== 'reso'){
