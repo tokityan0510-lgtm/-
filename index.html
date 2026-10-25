@@ -326,7 +326,7 @@ const sv = s => Math.pow(10, svLog(s) - save.ec);
 const relC = lg => { const v = Math.pow(10, lg - save.ec); return save.ec === 0 && v < 1e15 ? Math.ceil(v) : v; };
 // コインの基準：ブロック1個ぶんのHPを削ると coinBase × 素材の価値。値段も同じ割合（costX）
 const coinBase = () => 100 * TUNE.coinK;
-const TUNE = {fhp:4000, fhpLate:4000, fdmg:4000, reqBase:150000, early:[.025, .005048, .006171, .02024, .06819, .2284, .5547, .6295, .7145, .7888, .8524, .9083], reqPow:6.4, dmgG:1.5, hpPow:3.4, hpMul:1, lvBonus:.01, tapProg:1.5, dustBase:18, dustCap:2000, dustSoftPow:.3, dustDiv:8, dustBonus:.001, pmultBonus:.1, idleBonus:7, idleRamp:30, idleDmgK:.5, feverReward:2, costX:3, coinK:.03, valBeyond:100, valStage:1e4, modSpan:7, droneDmg:5, droneInt:1.5, armMul:15, armCatch:.8, modMul:.12, armIdle:0, reso:.01, bossHp:1500, bossGrow:1.35, bossReward:300, comboDecay:.6};
+const TUNE = {fhp:4000, fhpLate:4000, fdmg:4000, reqBase:467642, early:[0.008019, 0.001619, 0.001979, 0.006493, 0.02187, 0.07327, 0.1779, 0.274, 0.4234, 0.603, 0.782, 1], reqPow:6.4, dmgG:1.5, hpPow:3.4, hpMul:1, lvBonus:.01, tapProg:1.5, dustBase:18, dustCap:2000, dustSoftPow:.3, dustDiv:8, dustBonus:.001, pmultBonus:.1, idleBonus:7, idleRamp:30, idleDmgK:.5, feverReward:2, costX:3, coinK:.03, valBeyond:100, valStage:1e4, modSpan:7, droneDmg:5, droneInt:1.5, armMul:15, armCatch:.8, modMul:.12, armIdle:0, reso:.005, bossHp:1500, bossGrow:1.35, bossReward:300, comboDecay:.6};
 const DEFAULT = {
   coins:0, stage:0, lv:{}, mods:{}, best:0, ended:false, muted:false, t:0, idleRate:0, prog:0, started:false, kills:0, boss:null,
   sp:{}, ach:{}, dust:0, perm:{}, off:{}, runs:0, buyMode:1, endSeen:false, relics:{}, scale2:1, scale3:1, ec:0,
@@ -373,11 +373,18 @@ const UPG = [
   ]),
   // モジュール（ビルド）：上限なしの威力。ドローンや兵器と同じく後半まで伸ばせるように
   {cat:'build', id:'modpow', name:'モジュールの威力', note:'猛毒・炎上・雷撃・誘爆・衛星・流星・波動のダメージ（上限なし）。兵器の改良・進化・極みなどの倍率の平均も、モジュールに同じように乗る', cost:20000, inf:true, g:TUNE.dmgG, max:1e9, v:l => `×${fmtX(1+.25*l)}`},
+  {cat:'build', id:'modspd',  name:'モジュールの回転', note:'衛星・流星・波動・会心が出る間隔を短くする', cost:30000, span:8, max:10, v:l => `間隔 ×${Math.pow(.96, l).toFixed(2)}`},
+  {cat:'build', id:'dotlen',  name:'持続の長さ',     note:'炎上が燃え続ける時間と、猛毒が抜けにくくなる', cost:40000, span:8, max:10, v:l => `×${(1 + .08 * l).toFixed(2)}`},
+  {cat:'build', id:'modburst', name:'モジュールの破片', note:'衛星・流星・波動が当たったときに飛ぶかけらを増やす', cost:25000, span:9, max:10, v:l => `+${Math.ceil(l / 2)}個`},
   // 操作
   {cat:'tap',  id:'tapburst', name:'タップの破片',   note:'タップしたとき飛び散るかけらの倍率',     cost:500,   span:9,  max:10,  v:l => `×${2+l}`},
   {cat:'tap',  id:'heat',     name:'熱量',           note:'1タップで溜まるフィーバーゲージ',     cost:1500,  span:7,  max:12,  v:l => `+${((8+2*l)*(SP('ht1')?1.5:1)).toFixed(0)}`},
   {cat:'tap',  id:'fever',    name:'フィーバー',     note:'ゲージ満タンで報酬2倍・威力2倍になる時間', cost:4000, span:8, max:10, v:l => `${5+l}秒`},
   {cat:'tap',  id:'tapboom',  name:'衝撃波',         note:'タップしたところで衝撃波が起きる', cost:3000, span:8,  max:5,   v:l => l ? `半径${(1+.3*l+(SP('sw1')?1:0)).toFixed(1)}・威力×${l*2}` : 'なし'},
+  {cat:'tap',  id:'rush',     name:'連打の勢い',     note:'0.7秒以内に続けてタップするほど、タップの威力が上がる（20連打まで）', cost:5000, span:9, max:10, v:l => l ? `20連打で ×${(1 + .01 * l * 20).toFixed(1)}` : 'なし'},
+  {cat:'tap',  id:'holdspd',  name:'長押しの速さ',   note:'長押しの連打の速さ',               cost:2500, span:8,  max:8,   v:l => `毎秒${(1000 / stat.holdMs(l)).toFixed(1)}回`},
+  {cat:'tap',  id:'tapcrit',  name:'タップの会心',   note:'タップ（と長押し）だけに上乗せされるクリティカル率', cost:3500, span:8, max:10, v:l => `+${4*l}%`},
+  {cat:'tap',  id:'feverx',   name:'フィーバーの威力', note:'フィーバー中のダメージの倍率',   cost:8000, span:8,  max:10,  v:l => `×${(2 + .1*l).toFixed(1)}`},
   // 共通
   {cat:'core', id:'market',   name:'相場',           note:'すべてのブロックの価値が上がる（上限なし）', cost:1000, inf:true, g:1.15, max:1e9, v:l => `+${(l*10).toLocaleString('ja-JP')}%`},
   {cat:'core', id:'chain',    name:'コンボ係数',     note:'コンボが高いほど報酬が増える（上限なし）', cost:5000, inf:true, g:1.22, max:1e9, v:l => `${(0.1+0.05*l).toFixed(2)}`},
@@ -387,6 +394,10 @@ const UPG = [
   {cat:'core', id:'crit',     name:'クリティカル',   note:'大ダメージが出る確率',               cost:4000,  span:9,  max:15,  v:l => `${5+3*l}%`},
   {cat:'core', id:'bomb',     name:'爆発するかけら', note:'当たったところで、ときどき爆発が起きる確率', cost:6000, span:8, max:15, v:l => `${(Math.min(.25,.02+.015*l)*100).toFixed(1)}%`},
   {cat:'core', id:'gold',     name:'金のかけら',     note:'当たったとき、ときどき金のかけらが出てコイン15倍になる確率',           cost:8000,  span:9,  max:15,  v:l => `${Math.round(Math.min(.2,.01+.01*l)*100)}%`},
+  {cat:'core', id:'critdmg',  name:'会心の威力',     note:'クリティカルの倍率に上乗せ',         cost:7000,  span:9,  max:15,  v:l => `×${stat.critX(l).toFixed(1)}`},
+  {cat:'core', id:'combokeep', name:'コンボの粘り',  note:'コンボが減っていく速さをゆるやかにする', cost:9000, span:9, max:10, v:l => `減り方 ×${Math.pow(.93, l).toFixed(2)}`},
+  {cat:'core', id:'luckyrate', name:'幸運の呼び声',  note:'幸運ブロックが出てくる間隔を短くする', cost:12000, span:9, max:10, v:l => `間隔 ×${Math.pow(.97, l).toFixed(2)}`},
+  {cat:'core', id:'luckydur', name:'幸運の余韻',     note:'幸運ブロックが画面にいる時間',       cost:15000, span:8,  max:6,   v:l => `+${l}秒`},
 ];
 const MODS = [
   {id:'ricochet', name:'跳弾', note:'かけらが画面の端で跳ね返り、跳ねるたびに威力が上がる', unlock:15000,  cost:12000, st:0, max:10, v:l => `${1+l}回・1回ごと+${25+5*(l-1)}%`},
@@ -422,7 +433,7 @@ const SPECIALS = [
   {cat:'idle', id:'dr4', name:'ドローン軍団',     note:'ドローンの弾の威力 ×2',               ref:['drones',11],   req:() => L('drones') >= 11, rq:'ドローンの台数 Lv11'},
   {cat:'idle', id:'rl1', name:'速射機構',         note:'ドローンの発射間隔 ×0.8',             ref:['droneint',5],   req:() => L('droneint') >= 5, rq:'連射速度 Lv5'},
   {cat:'idle', id:'rl2', name:'二連装',           note:'ドローンが2発同時に撃つ',             ref:['droneint',8],    req:() => L('droneint') >= 8, rq:'連射速度 Lv8'},
-  {cat:'idle', id:'sp1', name:'大共鳴',           note:'共鳴の威力 ×2',                       ref:['spawn',5],   req:() => L('spawn') >= 5, rq:'共鳴 Lv5'},
+  {cat:'idle', id:'sp1', name:'大共鳴',           note:'共鳴の威力 ×1.5',                       ref:['spawn',5],   req:() => L('spawn') >= 5, rq:'共鳴 Lv5'},
   {cat:'idle', id:'bu1', name:'榴弾',             note:'弾の炸裂で飛ぶ破片 ×2',               ref:['drburst',5],   req:() => L('drburst') >= 5, rq:'弾の炸裂 Lv5'},
   {cat:'arms', id:'cn1', name:'徹甲弾',           note:'砲台の威力 ×2・爆発範囲 ×1.2',        ref:['cannonN',3], req:() => L('cannonN') >= 3, rq:'砲台の数 Lv3'},
   {cat:'arms', id:'lz1', name:'十字照射',         note:'レーザーが横と縦の十字に撃つ',        ref:['laserN',3], req:() => L('laserN') >= 3, rq:'レーザーの数 Lv3'},
@@ -479,7 +490,7 @@ const RELICS = [
   {id:'graviton', name:'重力子',           rar:1, max:8,  v:l => `ブラックホールの威力 +${25*l}%`},
   {id:'ember',    name:'消えない種火',     rar:1, max:8,  v:l => `フィーバーの時間 +${(.5*l).toFixed(1)}秒`},
   {id:'clover',   name:'四つ葉',           rar:1, max:8,  v:l => `幸運ブロックの出現間隔 −${Math.round((1-Math.pow(.95,l))*100)}%`},
-  {id:'fork',     name:'音叉',             rar:1, max:8,  v:l => `共鳴 +${(.3*l).toFixed(1)}%`},
+  {id:'fork',     name:'音叉',             rar:1, max:8,  v:l => `共鳴 +${(.15*l).toFixed(2)}%`},
   {id:'blade',    name:'研がれた刃',       rar:1, max:8,  v:l => `クリティカルの倍率 +${(.5*l).toFixed(1)}`},
   {id:'comet',    name:'彗星の欠片',       rar:1, max:8,  v:l => `幸運ブロックの効果時間 +${10*l}%`},
   {id:'core',     name:'連鎖の核',         rar:2, max:5,  v:l => `爆発するかけらの確率 +${2*l}%`},
@@ -544,6 +555,23 @@ for (const [id, up] of Object.entries(MASTER_UP)) for (let k = 1; k <= MASTER_N;
     get name(){ return `${masterName(id)}の極み ${k}`; }, get note(){ return `${masterName(id)}の威力 ×1.5（重ねがけ）`; },
     ref:[up, masterAt(k)], req:() => L(up) >= masterAt(k) && (k === 1 || SP(id + 'm' + (k - 1))), get rq(){ return `${id === 'drone' ? '弾の威力' : id === 'mod' ? 'モジュールの威力' : armName(id) + 'の威力'} Lv${masterAt(k)}`; }});
 }
+// ===== 小さな強化：星以降、素材ごとに4つずつ出てくる「+2%」の一度きりの強化（クッキークリッカーの後半の安い強化のように、お金の使い道として）=====
+// 値段は「いまの基本威力の次のLvの値段」の 8・12・18・27倍。火力の伸びには見合わないが、余ったコインの行き先になる
+const TW_NAMES = ['ネジの増し締め', '砲身を磨く', 'ドローンに名前をつける', 'かけらを尖らせる', 'レンズを拭く', '配線をまとめる', '油をさす', '照準を合わせ直す', '塗装を塗り替える', 'ボルトを交換',
+  'ベアリングを新品に', '発射音を調整', '作業手順書を更新', '予備パーツを備蓄', '冷却ファンを増設', 'ケーブルを束ねる', '足場を固める', '制御プログラムを更新', 'センサーを校正', '安全ゴーグル支給',
+  '作業用BGMを導入', '朝礼を始める', '休憩室にソファ', 'コーヒーメーカー導入', '工具を整理整頓', '床を掃き清める', '看板を新調', '標語を掲げる', '記録ノートをつける', '作戦会議を開く',
+  '風向きを読む', 'ブロックの弱点を研究', '破片の軌道を計算', '熱膨張を考慮', '振動を解析', '共振点を避ける', '反動を抑える', '無駄弾を減らす', '当たり判定を見直す', '発射タイミングを同期',
+  '砲台に名札', 'ドローンの編隊練習', 'レーザーの焦点調整', 'ミサイルの燃料改良', 'ドリルの刃を研ぐ', 'コイルを巻き直す', 'ハンマーの柄を交換', '軌道を再計算', 'ナノマシンに躾', '超新星の着火改善',
+  '応援団を結成', '太鼓をたたく', '士気を高める', 'ご褒美の約束', '勝利の舞を練習', '伝説を語り継ぐ', '願掛けをする', '縁起物を飾る', '星に祈る', '宇宙の意志を信じる'];
+const TW_TIER = ['', ' 改', ' 極', ' 真', ' 神'], TW_N = TW_NAMES.length * TW_TIER.length, TW_FROM = 6, TW_PER = 4;
+const twName = n => TW_NAMES[(n - 1) % TW_NAMES.length] + TW_TIER[Math.floor((n - 1) / TW_NAMES.length)];
+const twStage = n => TW_FROM + Math.floor((n - 1) / TW_PER);
+const twCount = () => { let n = 0; for (let k = 1; k <= TW_N && SP('tw' + k); k++) n++; return n; };
+for (let n = 1; n <= TW_N; n++){
+  SPECIALS.push({cat:['core', 'tap', 'build', 'idle', 'arms'][(n - 1) % 5], id:'tw' + n, tiny:true, name:twName(n), note:'すべてのダメージ +2%（小さな強化。重ねがけ）',
+    relPow:8 * Math.pow(1.5, (n - 1) % TW_PER), req:() => save.stage >= twStage(n) && (n === 1 || SP('tw' + (n - 1))),
+    get rq(){ return `${STAGES[Math.min(twStage(n), STAGES.length - 1)].name}に到達${n > 1 ? `・「${twName(n - 1)}」を買う` : ''}`; }});
+}
 // ===== シナジー：別々の系統どうしを掛け合わせて火力を伸ばす特殊強化 =====
 const ARM_RELIC = {cannon:['powder', .2], laser:['prism', .2], missile:['fuse', .25], hole:['graviton', .25]};
 const armCount = () => ARMS.reduce((a, x) => a + L(x.id + 'N'), 0);
@@ -562,7 +590,7 @@ SPECIALS.push(
   {cat:'core', id:'sy6', name:'遺物共鳴',     note:'遺物1種類ごとに、すべてのダメージ +2%',                cost:2e7, req:() => relicKinds() >= 8, rq:'遺物8種類'},
   {cat:'core', id:'sy7', name:'モジュール共鳴', note:'モジュールのLv合計1ごとに、破片の威力 +0.5%',       cost:2e7, req:() => modTotal() >= 40, rq:'モジュールLv合計40'},
   {cat:'idle', id:'sy9', name:'放置の極意',   note:'放置ボーナスが最大のあいだ、すべてのダメージ +25%',     cost:1e7, req:() => save.st.time >= 1200, rq:'プレイ時間20分'},
-  {cat:'idle', id:'sy8', name:'共鳴増幅',     note:'共鳴 +5%',                                             cost:2e7, req:() => L('spawn') >= 15, rq:'共鳴 Lv15'},
+  {cat:'idle', id:'sy8', name:'共鳴増幅',     note:'共鳴 +3%',                                             cost:2e7, req:() => L('spawn') >= 15, rq:'共鳴 Lv15'},
 );
 
 // 星屑で買う永続強化（砕いても残る）
@@ -599,7 +627,7 @@ const upMaxN  = u => { let n = 0, s = 0; while (L(u.id) + n < u.max){ const c = 
 // モジュールは st 段目あたりで解放できる値段。Lvは modSpan 段かけて上限へ
 const modCost = m => relC(Math.log10((ML(m.id) ? m.cost * Math.pow(TUNE.valStage, TUNE.modSpan * (ML(m.id) - 1) / m.max) : m.unlock) * TUNE.costX * TUNE.coinK * Math.pow(.7, P('pmodc'))) + svLog(m.st));
 // Lv条件の特殊強化は、条件になったLvの値段の4倍。記録条件のものは今の素材の価値に合わせる
-const spCost = s => s.ref ? Math.pow(.8, P('pspc')) * 4 * upCost(UPG.find(u => u.id === s.ref[0]), s.ref[1]) : relC(Math.log10(Math.pow(.8, P('pspc')) * s.cost * TUNE.costX * TUNE.coinK / 10) + svLog(save.stage));
+const spCost = s => s.relPow ? s.relPow * upCost(UPG.find(u => u.id === 'power')) : s.ref ? Math.pow(.8, P('pspc')) * 4 * upCost(UPG.find(u => u.id === s.ref[0]), s.ref[1]) : relC(Math.log10(Math.pow(.8, P('pspc')) * s.cost * TUNE.costX * TUNE.coinK / 10) + svLog(save.stage));
 const permCost = p => Math.ceil(p.cost * Math.pow(p.g, P(p.id)));
 
 // 幸運ブロックの効果（バフ）
@@ -619,7 +647,10 @@ const rewardMult = () => permMult() * idleMult() * (buffs.frenzy > 0 ? 7 : 1) * 
 const lvTotal = () => { let n = 0; for (const k in save.lv) n += save.lv[k]; return n; };
 const lvMult = () => 1 + TUNE.lvBonus * lvTotal();
 const comboMult = () => (1 + Math.sqrt(combo) * stat.chain()) * stat.market() * lvMult();
-const luckyInterval = () => 110 * (SP('lk1') ? .75 : 1) * (SP('lk2') ? .75 : 1) * Math.pow(.85, P('plucky')) * Math.pow(.95, RL('clover'));
+const luckyInterval = () => 110 * (SP('lk1') ? .75 : 1) * (SP('lk2') ? .75 : 1) * Math.pow(.85, P('plucky')) * Math.pow(.95, RL('clover')) * Math.pow(.97, L('luckyrate'));
+// モジュールの間隔・持続（ビルドの強化）
+const modTick = () => Math.pow(.96, L('modspd'));
+const dotLen = () => 1 + .08 * L('dotlen');
 
 const stat = {
   shards:   () => 3 + L('shards'),
@@ -631,7 +662,7 @@ const stat = {
   droneDmg: () => TUNE.droneDmg * (1 + .25 * L('dronedmg')) * (SP('dr1') ? 1.5 : 1) * (SP('dr2') ? 1.5 : 1) * (SP('dr3') ? 2 : 1) * (SP('dr4') ? 2 : 1)
               * droneX(),
   modPow:   () => modPowCache,
-  reso:     (l = L('spawn')) => TUNE.reso * l * (SP('sp1') ? 2 : 1) + .003 * RL('fork') + (SP('sy8') ? .05 : 0),
+  reso:     (l = L('spawn')) => TUNE.reso * l * (SP('sp1') ? 1.5 : 1) + .0015 * RL('fork') + (SP('sy8') ? .03 : 0),
   drburst:  () => L('drburst') * 2 * (SP('bu1') ? 2 : 1),
   tapburst: () => 2 + L('tapburst'),
   tapPow:   () => (SP('tp1') ? 2 : 1) * (1 + .2 * RL('fist')),
@@ -641,12 +672,15 @@ const stat = {
   chain:    () => 0.1 + 0.05 * L('chain'),
   market:   () => 1 + .1 * L('market'),
   crit:     () => buffs.awaken > 0 ? 1 : 0.05 + 0.03 * L('crit') + .05 * P('pcrit') + .01 * RL('lens'),
-  critX:    () => (SP('cr2') ? 8 : SP('cr1') ? 6 : 4) + .5 * RL('blade'),
+  critX:    (l = L('critdmg')) => (SP('cr2') ? 8 : SP('cr1') ? 6 : 4) + .5 * RL('blade') + .2 * l,
+  tapCrit:  () => .04 * L('tapcrit'),
+  feverX:   () => 2 + .1 * L('feverx'),
+  rushX:    () => 1 + .01 * L('rush') * rushN,
   bomb:     () => Math.min(.25, .02 + .015 * L('bomb')) + .02 * RL('core'),
   gold:     () => Math.min(.2, .01 + .01 * L('gold')) + .03 * RL('eye') + (buffs.gold > 0 ? .5 : 0),
   keep:     () => .65 + .025 * L('keep'),
-  decay:    () => TUNE.comboDecay * (SP('cb1') ? .5 : 1) * (SP('cb2') ? .5 : 1) * Math.pow(.9, P('pcombo')),
-  holdMs:   () => SP('tp2') ? 170 : 250,
+  decay:    () => TUNE.comboDecay * (SP('cb1') ? .5 : 1) * (SP('cb2') ? .5 : 1) * Math.pow(.9, P('pcombo')) * Math.pow(.93, L('combokeep')),
+  holdMs:   (l = L('holdspd')) => (SP('tp2') ? 170 : 250) * Math.pow(.92, l),
 };
 // 暗黒物質以降はHPの伸びをダメージと揃える（差が積み重なって終盤だけ詰まるのを防ぐ）
 // HPは威力と同じ伸び（×4000/段）に加えて、強化で積み上がる火力に見合うよう (1+段階)^hpPow 倍を上乗せする（掘る速さ＝威力÷HP）
@@ -741,7 +775,7 @@ function shatter(){
 
 function spawnLucky(){
   const side = Math.random() < .5 ? -1 : 1, y = topBand + (H - topBand - botBand) * rnd(.1, .9);
-  lucky = {x:side < 0 ? -cell : W + cell, y, vx:-side * cell * .55, vy:0, life:14 + (SP('lk3') ? 4 : 0), ph:Math.random() * 6, r:ucell * .42};
+  lucky = {x:side < 0 ? -cell : W + cell, y, vx:-side * cell * .55, vy:0, life:14 + (SP('lk3') ? 4 : 0) + L('luckydur'), ph:Math.random() * 6, r:ucell * .42};
   fx.lucky(lucky);
 }
 // 幸運ブロックの効果（w：出る重み）。run は効果を起こして、画面に出す文字を返す
@@ -781,7 +815,9 @@ function tap(x, y, auto){
   const fv = stat.fever();
   if (fever > 0){ if (SP('fv1')) fever = Math.min(fv * 2, fever + stat.heat() / 100 * fv * .5); }
   else { heat += stat.heat() * (auto ? .5 : 1); if (heat >= 100){ heat = 0; fever = fv; save.st.fevers++; fx.fever(); } }
-  hit(stat.dmg() * 3 * stat.tapPow(), auto ? 'auto' : 'tap', x, y, 0, stat.shards() * stat.tapburst());
+  // 連打の勢い：0.7秒以内に続けて叩くと段々強くなる（20連打まで）
+  rushN = rushT < .7 ? Math.min(20, rushN + 1) : 0; rushT = 0;
+  hit(stat.dmg() * 3 * stat.tapPow() * stat.rushX(), auto ? 'auto' : 'tap', x, y, 0, stat.shards() * stat.tapburst());
   const tb = stat.tapboom();
   if (tb) queueBoom({x, y, R:cell * (1 + .3 * tb + (SP('sw1') ? 1 : 0)), dmg:stat.dmg() * tb * 2 * stat.tapPow(), t:.04, big:false, quiet:true, d:1, src:'tapboom'});
   fx.tap(x, y);
@@ -798,7 +834,7 @@ function spawnShards(x, y, n, d = 0, gen = 0){
     shards.push({x, y, vx:Math.cos(a) * v, vy:Math.sin(a) * v, life:2, b, p, nb:0, gen, d, out:!inBig(x, y)});
   }
 }
-let resoWin = 0, resoT = 1, shatterPending = false, shatterCool = 0;
+let resoWin = 0, resoT = 1, shatterPending = false, shatterCool = 0, rushN = 0, rushT = 9;
 const BIG_KICK = new Set(['boom', 'laser', 'cannon', 'missile', 'bomb', 'blast', 'tapboom', 'hammer', 'orbital', 'nova', 'meteor']);
 // 火力の内訳：出どころごとのダメージを集計し、1秒ごとに直近10秒ほどの移動平均（毎秒あたり）にする
 const DPS_GROUP = {tap:'tap', auto:'tap', tapboom:'tap'};
@@ -812,19 +848,19 @@ function trackDps(dt){
 // 兵器のON/OFF（save.off[id] が 1 なら撃たない）
 const armOn = id => !(save.off && save.off[id]);
 // すべてのダメージに効く倍率（遺物「ビッグバンの種」、シナジー）
-const allDmgRaw = () => Math.pow(1.5, RL('abyss')) * (1 + .5 * RL('seed')) * (SP('sy4') ? 1 + Math.min(.25, combo / 4000) : 1) * (SP('sy6') ? 1 + .02 * relicKinds() : 1) * (SP('sy9') && idleMult() >= idleMax() ? 1.25 : 1) * (1 + .1 * P('pdmg'));
+const allDmgRaw = () => Math.pow(1.02, twCount()) * Math.pow(1.5, RL('abyss')) * (1 + .5 * RL('seed')) * (SP('sy4') ? 1 + Math.min(.25, combo / 4000) : 1) * (SP('sy6') ? 1 + .02 * relicKinds() : 1) * (SP('sy9') && idleMult() >= idleMax() ? 1.25 : 1) * (1 + .1 * P('pdmg'));
 const DOT = new Set(['burn', 'reso', 'poison']);
 function hit(dmg, src, x, y, d = 0, burst = 0){
   let crit = false;
   // 会心：決まった秒数ごとに、次の一撃が大きくなる（回数で数えると、終盤は当たる回数が多すぎて毎秒何回も出た）
   const ch = M('charge');
-  if (ch && !DOT.has(src) && chargeN <= 0){ chargeN = 6 - .3 * (ch - 1); dmg *= 30 + 5 * ch; crit = true; fx.charge(x, y); if (CB('critical')) spawnShards(x, y, 10, d + 1); }
+  if (ch && !DOT.has(src) && chargeN <= 0){ chargeN = (6 - .3 * (ch - 1)) * modTick(); dmg *= 30 + 5 * ch; crit = true; fx.charge(x, y); if (CB('critical')) spawnShards(x, y, 10, d + 1); }
   // 凍っている間は受けるダメージが増える
   if (big.frost > 0) dmg *= 1.1 + .05 * M('frost');
-  if (!crit && !DOT.has(src) && Math.random() < stat.crit()){ dmg *= stat.critX(); crit = true; }
+  if (!crit && !DOT.has(src) && Math.random() < stat.crit() + (src === 'tap' || src === 'auto' ? stat.tapCrit() : 0)){ dmg *= stat.critX(); crit = true; }
   // 共鳴は「すでに倍率がかかったダメージ」を元にするので、フィーバー・放置ボーナスをかけ直さない。
   // 炎上のフィーバー分は burnAcc でかけ済み
-  if (fever > 0 && src !== 'burn' && src !== 'reso' && src !== 'poison') dmg *= 2;
+  if (fever > 0 && src !== 'burn' && src !== 'reso' && src !== 'poison') dmg *= stat.feverX();
   // 放置ボーナスはダメージにも半分の強さで効く（最大×4）（放置でもひびが進むように）
   if (src !== 'reso') dmg *= idleDmg() * allDmg();
   // 進み（ひび）は与えたダメージ。直接タップは tapProg 倍
@@ -855,7 +891,7 @@ function hit(dmg, src, x, y, d = 0, burst = 0){
     // 凍結・猛毒・炎上は、かけらだけでなくドローンや兵器の直撃でも起きる（放置でかけらが少なくても発動するように）
     const fr = M('frost'); if (fr && Math.random() < .015 + .004 * (fr - 1)){ if (big.frost <= 0) fx.frost(); big.frost = 2.5; }
     if (M('poison')) big.poison = Math.min(poisonMax(), big.poison + 1);
-    if (M('burn')){ big.burn = 2; big.burnDps = Math.max(big.burnDps * .9, stat.dmg() * stat.modPow() * 1000 * (1 + .3 * (M('burn') - 1))); big.bd = d; }
+    if (M('burn')){ big.burn = 2 * dotLen(); big.burnDps = Math.max(big.burnDps * .9, stat.dmg() * stat.modPow() * 1000 * (1 + .3 * (M('burn') - 1))); big.bd = d; }
   }
   const cm = Math.floor(combo);
   if (cm > save.best) save.best = cm;
@@ -893,7 +929,7 @@ function stepMods(dt){
       big.poisonAcc += big.poison * stat.dmg() * stat.modPow() * 7 * (1 + .2 * (po - 1)) * (big.burn > 0 && CB('scorch') ? 2 : 1) * dt;
       if (Math.random() < dt * 3){ const [x, y] = bigPoint(); hit(big.poisonAcc, 'poison', x, y); big.poisonAcc = 0; }
     }
-    big.poison = Math.max(0, big.poison - big.poison * .15 * dt - (po ? 0 : 5 * dt));
+    big.poison = Math.max(0, big.poison - big.poison * .15 / dotLen() * dt - (po ? 0 : 5 * dt));
   }
   // 衛星：ブロックの周りを回り、0.6秒ごとに撃ち込む
   const ob = M('orbit'), ns = ob ? 1 + Math.floor(ob / 3) : 0;
@@ -903,12 +939,12 @@ function stepMods(dt){
   for (let k = 0; k < ns; k++){
     const s = sats[k], a = satA + k * 6.283 / ns, r = BS * .66;
     s.x = BX + Math.cos(a) * r; s.y = BY + Math.sin(a) * r; s.fl = Math.max(0, s.fl - dt * 4); s.t -= dt;
-    if (s.t <= 0){ s.t = .6; s.fl = 1; const tx = BX + Math.cos(a) * BS * .4, ty = BY + Math.sin(a) * BS * .4; s.tx = tx; s.ty = ty;
-      hit(stat.dmg() * stat.modPow() * 96 * (1 + .25 * (ob - 1)), 'orbit', tx, ty, 0, 1 + (CB('satgun') ? 2 : 0)); }
+    if (s.t <= 0){ s.t = .6 * modTick(); s.fl = 1; const tx = BX + Math.cos(a) * BS * .4, ty = BY + Math.sin(a) * BS * .4; s.tx = tx; s.ty = ty;
+      hit(stat.dmg() * stat.modPow() * 96 * (1 + .25 * (ob - 1)), 'orbit', tx, ty, 0, 1 + (CB('satgun') ? 2 : 0) + Math.ceil(L('modburst') / 2)); }
   }
   // 流星：一定時間ごとに上から降ってくる
   const me = M('meteor');
-  if (me){ meteorT -= dt; if (meteorT <= 0){ meteorT = 5 - .3 * (me - 1); spawnMeteor(1); } }
+  if (me){ meteorT -= dt; if (meteorT <= 0){ meteorT = (5 - .3 * (me - 1)) * modTick(); spawnMeteor(1); } }
   // 流星雨（幸運ブロック）：モジュールがなくても0.4秒ごとに降る
   if (buffs.mrain > 0){ mrainT -= dt; if (mrainT <= 0){ mrainT = .4; spawnMeteor(.8); } }
   for (let k = meteors.length - 1; k >= 0; k--){
@@ -916,13 +952,13 @@ function stepMods(dt){
     const p = Math.min(1, m.t / m.dur); m.x = m.x0 + (m.tx - m.x0) * p; m.y = m.y0 + (m.ty - m.y0) * p;
     if (p >= 1){
       meteors.splice(k, 1);
-      queueBoom({x:m.tx, y:m.ty, R:cell * 2 * m.s, dmg:stat.dmg() * stat.modPow() * 640 * (1 + .3 * (Math.max(1, me) - 1)) * m.s, t:0, big:true, d:0, burst:Math.round(6 * m.s), src:'meteor', arm:true, missile:m.s >= 1});
+      queueBoom({x:m.tx, y:m.ty, R:cell * 2 * m.s, dmg:stat.dmg() * stat.modPow() * 640 * (1 + .3 * (Math.max(1, me) - 1)) * m.s, t:0, big:true, d:0, burst:Math.round(6 * m.s) + Math.ceil(L('modburst') / 2), src:'meteor', arm:true, missile:m.s >= 1});
       if (m.s >= 1 && CB('shower')) spawnMeteor(.5, 2);
     }
   }
   // 波動：3秒ごとに中心から波が広がる
   const pu = M('pulse');
-  if (pu){ pulseT -= dt; if (pulseT <= 0){ pulseT = 3; fx.pulse(); hit(stat.dmg() * stat.modPow() * 80 * (3 + pu) * (CB('tidal') ? 2 : 1), 'pulse', BX, BY, 0, 2 + Math.floor(pu / 2)); } }
+  if (pu){ pulseT -= dt; if (pulseT <= 0){ pulseT = 3 * modTick(); fx.pulse(); hit(stat.dmg() * stat.modPow() * 80 * (3 + pu) * (CB('tidal') ? 2 : 1), 'pulse', BX, BY, 0, 2 + Math.floor(pu / 2) + Math.ceil(L('modburst') / 2)); } }
 }
 function spawnMeteor(s, n = 1){
   for (let q = 0; q < n; q++){
@@ -1082,6 +1118,7 @@ function step(dt){
   }
   stepMods(dt);
   // 共鳴：直前1秒に与えたダメージの一部を、もう一度与える
+  rushT += dt;
   resoT -= dt;
   if (resoT <= 0){ resoT = 1; const r = stat.reso(); if (r && resoWin > 0){ const [x, y] = bigPoint(); hit(resoWin * r, 'reso', x, y); } resoWin = 0; }
   // 幸運ブロック
@@ -1999,6 +2036,12 @@ function helpHtml(){
       <p>直接タップしたダメージは、ひびが1.5倍進む。</p>`),
     sec('コンボ', `<p>当てるたびにコンボが増え、時間がたつと少しずつ減る。コンボが多いほどコインが増える（コンボ係数を上げると伸びが大きくなる）。ダメージは増えない。</p>`),
     sec('フィーバー', `<p>タップするとフィーバーゲージ（画面下の虹色の線）が溜まり、満タンで<b>フィーバー</b>。数秒間、報酬2倍・威力2倍・ドローンの連射2倍になる。長さは「操作」タブのフィーバーで延びる。</p>`),
+    sec('かけら（連鎖）', `<p>タップやドローンの弾がブロックに当たると、当たった所から<b>かけら</b>が飛び散る。かけらは外へ飛んだあとブロックに引き寄せられて弧を描いて戻り、<b>もう一度当たってダメージを出す</b>。これが「連鎖」。</p>
+      <p>戻って当たるたびに連鎖が1段深くなり、威力は1段ごとに「連鎖の持続」の倍率（最初は×0.65）で落ちていく。かけらが当たった所からも、ときどき爆発や雷撃・誘爆が起きる。</p>
+      <p>数を増やすのは「かけらの数」「タップの破片」「弾の炸裂」「モジュールの破片」、威力は「基本威力」（かけらは基本威力そのまま）。跳弾・誘導・分裂・貫通のモジュールはかけらの飛び方を変える。</p>
+      <p>いまのかけら1個のダメージ：約${fmtD(stat.dmg())}（タップ1回は約${fmtD(stat.dmg() * 3 * stat.tapPow())}、ドローンの弾1発は約${fmtD(stat.dmg() * stat.droneDmg())}）。放置中は数が少ないので、火力の内訳では小さめに出る。</p>`),
+    sec('小さな強化', `<p>星に着くと、各タブの特殊強化に「ネジの増し締め」のような<b>小さな強化</b>が出てくる。1つ買うごとにすべてのダメージが+2%（重ねがけ）。素材が1つ進むごとに4つずつ増え、値段は「基本威力の次のLvの値段」の8〜27倍。</p>
+      <p>火力の伸びとしては割に合わないが、余ったコインの行き先として。買った数：${twCount()} / ${TW_N}（＋${Math.round((Math.pow(1.02, twCount()) - 1) * 100)}%）</p>`),
     sec('放置とタップ', `<p>放置ゲームなので、触らなくてもドローンと兵器が壊し続ける。しばらく触らないと放置ボーナスが上がる。タップは加速役で、フィーバーと幸運ブロックはタップでしか取れない。</p>
       <p>長押しすると連打になる。アプリを閉じている間もオフライン収入が入る（上限あり）。</p>`),
     sec('幸運ブロック', `<p>ときどき光る星形のブロックが画面の端から流れてくる。叩くと${LUCKY.length}種類のどれかの効果（フレンジー・総攻撃・宝箱など）。実績タブで見た効果の一覧と、出る確率が見られる。</p>`),
