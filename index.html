@@ -326,7 +326,7 @@ const sv = s => Math.pow(10, svLog(s) - save.ec);
 const relC = lg => { const v = Math.pow(10, lg - save.ec); return save.ec === 0 && v < 1e15 ? Math.ceil(v) : v; };
 // コインの基準：ブロック1個ぶんのHPを削ると coinBase × 素材の価値。値段も同じ割合（costX）
 const coinBase = () => 100 * TUNE.coinK;
-const TUNE = {fhp:4000, fhpLate:4000, fdmg:4000, reqBase:150000, early:[.025, .02, .03, .08, .2, .5], reqPow:6.4, dmgG:1.5, hpPow:3.4, hpMul:1, lvBonus:.01, tapProg:1.5, dustBase:18, dustCap:2000, dustSoftPow:.3, dustDiv:8, dustBonus:.001, pmultBonus:.1, idleBonus:7, idleRamp:30, idleDmgK:.5, feverReward:2, costX:3, coinK:.03, valBeyond:100, valStage:1e4, modSpan:7, droneDmg:5, droneInt:1.5, armMul:15, armCatch:.8, modMul:.12, armIdle:0, reso:.01, bossHp:1500, bossGrow:1.35, bossReward:300, comboDecay:.6};
+const TUNE = {fhp:4000, fhpLate:4000, fdmg:4000, reqBase:150000, early:[.025, .005048, .006171, .02024, .06819, .2284, .5547, .6295, .7145, .7888, .8524, .9083], reqPow:6.4, dmgG:1.5, hpPow:3.4, hpMul:1, lvBonus:.01, tapProg:1.5, dustBase:18, dustCap:2000, dustSoftPow:.3, dustDiv:8, dustBonus:.001, pmultBonus:.1, idleBonus:7, idleRamp:30, idleDmgK:.5, feverReward:2, costX:3, coinK:.03, valBeyond:100, valStage:1e4, modSpan:7, droneDmg:5, droneInt:1.5, armMul:15, armCatch:.8, modMul:.12, armIdle:0, reso:.01, bossHp:1500, bossGrow:1.35, bossReward:300, comboDecay:.6};
 const DEFAULT = {
   coins:0, stage:0, lv:{}, mods:{}, best:0, ended:false, muted:false, t:0, idleRate:0, prog:0, started:false, kills:0, boss:null,
   sp:{}, ach:{}, dust:0, perm:{}, off:{}, runs:0, buyMode:1, endSeen:false, relics:{}, scale2:1, scale3:1, ec:0,
@@ -1886,17 +1886,21 @@ function hud(dt){
   if (bh !== shownBuffs){ buffsEl.innerHTML = bh; shownBuffs = bh; }
 }
 function updateStageLabel(){ const s = STAGES[save.stage]; shownDepth = -1; updateDepth(); el('stageSwatch').style.background = s.color; dustTag.hidden = !save.dust && !save.runs; dustTag.textContent = `✦ 星屑 ${save.dust}`; }
-let progRate = 0, progSample = 0, progStage = -1;
+let progRate = 0, progSample = 0, progStage = -1, progHist = [];
 function etaText(){
   if (boss || progRate <= 0) return '';
-  const sec = Math.max(0, gaugeNeed() - save.prog) / progRate;
+  const left = Math.max(0, gaugeNeed() - save.prog);
+  // 火力が伸び続けると見込む（直近30秒の伸び率、1秒あたり+3%まで）。伸びていなければ今の火力で割るのと同じ
+  const span = Math.min(30, progHist.length - 1), old = span > 0 ? progHist[progHist.length - 1 - span] : 0;
+  const k = span >= 10 && old > 0 ? Math.min(.03, Math.max(0, Math.log(progRate / old) / span)) : 0;
+  const sec = k > 1e-6 ? Math.log(1 + k * left / progRate) / k : left / progRate;
   return sec < 60 ? '　もうすぐ！' : sec < 3600 ? `　あと約${Math.ceil(sec / 60)}分` : sec < 3 * 3600 ? `　あと約${Math.floor(sec / 3600)}時間` : '　まだまだ先';
 }
 function updateProgLabel(){ progText.textContent = `${STAGES[save.stage].name}を砕くまで${etaText()}`; updateDepth(); }
 let shownDepth = -1;
 function updateDepth(){ if (shownDepth !== save.stage){ shownDepth = save.stage; const nm = STAGES[save.stage].name; el('stageText').textContent = nm.length > 4 ? nm : '素材：' + nm; } }
 el('prog').addEventListener('click', () => showToast(`与えたダメージ ${fmtD(save.prog)} ／ 砕くのに必要 ${fmtD(gaugeNeed())}`,
-  'ひび＝これまでに与えたダメージの割合。100%で砕けて次の素材へ。「あと約◯分」は今の火力のままの見積もり。火力を上げると速くなる。タップで直接叩くと1.5倍', 'ひび', 6000));
+  'ひび＝これまでに与えたダメージの割合。100%で砕けて次の素材へ。「あと約◯分」は最近の火力の伸びも見込んだ見積もり。強化するほど縮む。タップで直接叩くと1.5倍', 'ひび', 6000));
 const muteBtn = el('mute');
 function syncMute(){ muteBtn.textContent = save.muted ? '🔇' : '🔊'; muteBtn.setAttribute('aria-label', save.muted ? '音を出す' : '音を消す'); }
 muteBtn.addEventListener('click', () => { save.muted = !save.muted; syncMute(); persist(); initAudio(); });
@@ -1991,7 +1995,7 @@ function helpHtml(){
       <li><b>放置 ×◯</b>：触らずにいると30秒かけて最大×7まで上がる報酬の倍率。ダメージにも半分くらい効く。タップすると1に戻る</li>
       <li><b>強化 ×◯</b>：強化を1Lv買うごとに+1%される報酬の倍率（どの強化でも増える）</li>
       <li><b>報酬 ×◯</b>：実績・星屑・遺物・フレンジー・フィーバーなどをまとめた報酬の倍率</li></ul>`),
-    sec('ひびのゲージ', `<p>画面下のゲージ。<b>ひび◯%</b> は、砕くのに必要なダメージのうち何%を与えたか。「あと約◯分」は今の火力のままの見積もりで、強化すると縮む。押すと実際のダメージの数字が見られる。</p>
+    sec('ひびのゲージ', `<p>画面下のゲージ。<b>ひび◯%</b> は、砕くのに必要なダメージのうち何%を与えたか。「あと約◯分」は、いまの火力と最近の伸び方から見た見積もり（序盤は火力が数分で何倍にもなるので、伸びを見込まないと実際よりずっと長く出てしまう）。強化すると縮む。押すと実際のダメージの数字が見られる。</p>
       <p>直接タップしたダメージは、ひびが1.5倍進む。</p>`),
     sec('コンボ', `<p>当てるたびにコンボが増え、時間がたつと少しずつ減る。コンボが多いほどコインが増える（コンボ係数を上げると伸びが大きくなる）。ダメージは増えない。</p>`),
     sec('フィーバー', `<p>タップするとフィーバーゲージ（画面下の虹色の線）が溜まり、満タンで<b>フィーバー</b>。数秒間、報酬2倍・威力2倍・ドローンの連射2倍になる。長さは「操作」タブのフィーバーで延びる。</p>`),
@@ -2298,7 +2302,8 @@ function frame(now){
     const rate = earnedTick / tickT;
     // ゲージの進み方（あと約◯分の見積もり用）。素材が変わったらやり直す
     if (progStage === save.stage && !boss && save.prog >= progSample){ const r = (save.prog - progSample) / tickT; progRate = progRate ? progRate * .85 + r * .15 : r; }
-    else if (progStage !== save.stage) progRate = 0;
+    else if (progStage !== save.stage){ progRate = 0; progHist = []; }
+    progHist.push(progRate); if (progHist.length > 31) progHist.shift();
     progStage = save.stage; progSample = save.prog;
     earnedTick = 0; tickT = 0; updateProgLabel();
     dispRate = dispRate ? dispRate * .7 + rate * .3 : rate;
